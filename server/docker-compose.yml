@@ -33,8 +33,9 @@ services:
         condition: service_healthy
     volumes:
       - ./src:/app/src
+      - ./prisma:/app/prisma
     command: >
-      sh -c "npx prisma migrate deploy && npm run dev"
+      sh -c "npx prisma migrate deploy && npx prisma generate && npm run dev"
 
 volumes:
   pgdata:
