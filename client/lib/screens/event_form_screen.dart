@@ -1,0 +1,307 @@
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
+import '../providers/calendar_provider.dart';
+
+class EventFormScreen extends StatefulWidget {
+  final String? eventId;
+
+  const EventFormScreen({super.key, this.eventId});
+
+  @override
+  State<EventFormScreen> createState() => _EventFormScreenState();
+}
+
+class _EventFormScreenState extends State<EventFormScreen> {
+  final _formKey = GlobalKey<FormState>();
+  final _titleController = TextEditingController();
+  final _descController = TextEditingController();
+  late DateTime _startDate;
+  late TimeOfDay _startTime;
+  late DateTime _endDate;
+  late TimeOfDay _endTime;
+  bool _isAllDay = false;
+  bool _isPrivate = false;
+  String? _selectedCalendarId;
+  bool _isLoading = false;
+
+  bool get isEditing => widget.eventId != null;
+
+  @override
+  void initState() {
+    super.initState();
+    final now = DateTime.now();
+    _startDate = now;
+    _startTime = TimeOfDay(hour: now.hour + 1, minute: 0);
+    _endDate = now;
+    _endTime = TimeOfDay(hour: now.hour + 2, minute: 0);
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadCalendars();
+      if (isEditing) _loadEvent();
+    });
+  }
+
+  @override
+  void dispose() {
+    _titleController.dispose();
+    _descController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadCalendars() async {
+    final provider = context.read<CalendarProvider>();
+    if (provider.calendars.isEmpty) {
+      await provider.loadCalendars();
+    }
+    if (mounted && provider.calendars.isNotEmpty && _selectedCalendarId == null) {
+      setState(() {
+        _selectedCalendarId = provider.calendars.first.id;
+      });
+    }
+  }
+
+  Future<void> _loadEvent() async {
+    final provider = context.read<CalendarProvider>();
+    final events = provider.events;
+    final event = events.where((e) => e.id == widget.eventId).firstOrNull;
+    if (event != null) {
+      setState(() {
+        _titleController.text = event.title;
+        _descController.text = event.description ?? '';
+        _startDate = event.startTime;
+        _startTime = TimeOfDay.fromDateTime(event.startTime);
+        _endDate = event.endTime;
+        _endTime = TimeOfDay.fromDateTime(event.endTime);
+        _isAllDay = event.isAllDay;
+        _isPrivate = event.isPrivate;
+        _selectedCalendarId = event.calendarId;
+      });
+    }
+  }
+
+  DateTime _combine(DateTime date, TimeOfDay time) {
+    return DateTime(date.year, date.month, date.day, time.hour, time.minute);
+  }
+
+  Future<void> _pickDate(bool isStart) async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: isStart ? _startDate : _endDate,
+      firstDate: DateTime(2020),
+      lastDate: DateTime(2030),
+    );
+    if (picked != null) {
+      setState(() {
+        if (isStart) {
+          _startDate = picked;
+        } else {
+          _endDate = picked;
+        }
+      });
+    }
+  }
+
+  Future<void> _pickTime(bool isStart) async {
+    final picked = await showTimePicker(
+      context: context,
+      initialTime: isStart ? _startTime : _endTime,
+    );
+    if (picked != null) {
+      setState(() {
+        if (isStart) {
+          _startTime = picked;
+        } else {
+          _endTime = picked;
+        }
+      });
+    }
+  }
+
+  Future<void> _save() async {
+    if (!_formKey.currentState!.validate()) return;
+    if (_selectedCalendarId == null) return;
+
+    setState(() => _isLoading = true);
+
+    final startDt = _isAllDay
+        ? DateTime(_startDate.year, _startDate.month, _startDate.day)
+        : _combine(_startDate, _startTime);
+    final endDt = _isAllDay
+        ? DateTime(_endDate.year, _endDate.month, _endDate.day, 23, 59, 59)
+        : _combine(_endDate, _endTime);
+
+    final data = {
+      'title': _titleController.text.trim(),
+      'description': _descController.text.trim(),
+      'startTime': startDt.toIso8601String(),
+      'endTime': endDt.toIso8601String(),
+      'isAllDay': _isAllDay,
+      'isPrivate': _isPrivate,
+      'calendarId': _selectedCalendarId,
+    };
+
+    final provider = context.read<CalendarProvider>();
+    bool success;
+    if (isEditing) {
+      success = await provider.updateEvent(widget.eventId!, data);
+    } else {
+      success = await provider.createEvent(data);
+    }
+
+    if (mounted) {
+      setState(() => _isLoading = false);
+      if (success) {
+        context.pop();
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('저장에 실패했습니다')),
+        );
+      }
+    }
+  }
+
+  Future<void> _delete() async {
+    if (!isEditing) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('일정 삭제'),
+        content: const Text('이 일정을 삭제하시겠습니까?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('취소'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('삭제', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true && mounted) {
+      final success = await context.read<CalendarProvider>().deleteEvent(
+        widget.eventId!,
+      );
+      if (success && mounted) context.pop();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final calProvider = context.watch<CalendarProvider>();
+    final dateFormat = DateFormat('yyyy-MM-dd');
+    final timeFormat = DateFormat('HH:mm');
+
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(isEditing ? '일정 수정' : '새 일정'),
+        actions: [
+          if (isEditing)
+            IconButton(
+              icon: const Icon(Icons.delete),
+              onPressed: _delete,
+            ),
+        ],
+      ),
+      body: Form(
+        key: _formKey,
+        child: ListView(
+          padding: const EdgeInsets.all(16),
+          children: [
+            TextFormField(
+              controller: _titleController,
+              decoration: const InputDecoration(
+                labelText: '제목',
+                border: OutlineInputBorder(),
+              ),
+              validator: (v) =>
+                  v == null || v.trim().isEmpty ? '제목을 입력하세요' : null,
+            ),
+            const SizedBox(height: 16),
+            TextFormField(
+              controller: _descController,
+              decoration: const InputDecoration(
+                labelText: '설명',
+                border: OutlineInputBorder(),
+              ),
+              maxLines: 3,
+            ),
+            const SizedBox(height: 16),
+            SwitchListTile(
+              title: const Text('종일'),
+              value: _isAllDay,
+              onChanged: (v) => setState(() => _isAllDay = v),
+            ),
+            const SizedBox(height: 8),
+            ListTile(
+              title: const Text('시작'),
+              subtitle: Text(
+                _isAllDay
+                    ? dateFormat.format(_startDate)
+                    : '${dateFormat.format(_startDate)} ${timeFormat.format(_combine(_startDate, _startTime))}',
+              ),
+              trailing: const Icon(Icons.calendar_today),
+              onTap: () async {
+                await _pickDate(true);
+                if (!_isAllDay && mounted) await _pickTime(true);
+              },
+            ),
+            ListTile(
+              title: const Text('종료'),
+              subtitle: Text(
+                _isAllDay
+                    ? dateFormat.format(_endDate)
+                    : '${dateFormat.format(_endDate)} ${timeFormat.format(_combine(_endDate, _endTime))}',
+              ),
+              trailing: const Icon(Icons.calendar_today),
+              onTap: () async {
+                await _pickDate(false);
+                if (!_isAllDay && mounted) await _pickTime(false);
+              },
+            ),
+            const SizedBox(height: 8),
+            SwitchListTile(
+              title: const Text('비공개'),
+              value: _isPrivate,
+              onChanged: (v) => setState(() => _isPrivate = v),
+            ),
+            const SizedBox(height: 16),
+            DropdownButtonFormField<String>(
+              initialValue: _selectedCalendarId,
+              decoration: const InputDecoration(
+                labelText: '캘린더',
+                border: OutlineInputBorder(),
+              ),
+              items: calProvider.calendars
+                  .map(
+                    (c) => DropdownMenuItem(
+                      value: c.id,
+                      child: Text(c.name),
+                    ),
+                  )
+                  .toList(),
+              onChanged: (v) => setState(() => _selectedCalendarId = v),
+            ),
+            const SizedBox(height: 24),
+            FilledButton(
+              onPressed: _isLoading ? null : _save,
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: _isLoading
+                    ? const SizedBox(
+                        height: 20,
+                        width: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : Text(isEditing ? '수정' : '저장'),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
