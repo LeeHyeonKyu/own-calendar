@@ -20,7 +20,7 @@ class _WeeklyViewScreenState extends State<WeeklyViewScreen> {
     super.initState();
     final now = DateTime.now();
     _weekStart = now.subtract(Duration(days: now.weekday % 7));
-    _loadEvents();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _loadEvents());
   }
 
   Future<void> _loadEvents() async {

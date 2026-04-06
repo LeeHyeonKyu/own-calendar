@@ -6,8 +6,9 @@ import '../providers/calendar_provider.dart';
 
 class EventFormScreen extends StatefulWidget {
   final String? eventId;
+  final DateTime? initialDate;
 
-  const EventFormScreen({super.key, this.eventId});
+  const EventFormScreen({super.key, this.eventId, this.initialDate});
 
   @override
   State<EventFormScreen> createState() => _EventFormScreenState();
@@ -31,11 +32,11 @@ class _EventFormScreenState extends State<EventFormScreen> {
   @override
   void initState() {
     super.initState();
-    final now = DateTime.now();
-    _startDate = now;
-    _startTime = TimeOfDay(hour: now.hour + 1, minute: 0);
-    _endDate = now;
-    _endTime = TimeOfDay(hour: now.hour + 2, minute: 0);
+    final base = widget.initialDate ?? DateTime.now();
+    _startDate = base;
+    _startTime = TimeOfDay(hour: base.hour + 1, minute: 0);
+    _endDate = base;
+    _endTime = TimeOfDay(hour: base.hour + 2, minute: 0);
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _loadCalendars();
@@ -270,7 +271,7 @@ class _EventFormScreenState extends State<EventFormScreen> {
             ),
             const SizedBox(height: 16),
             DropdownButtonFormField<String>(
-              initialValue: _selectedCalendarId,
+              value: _selectedCalendarId,
               decoration: const InputDecoration(
                 labelText: '캘린더',
                 border: OutlineInputBorder(),

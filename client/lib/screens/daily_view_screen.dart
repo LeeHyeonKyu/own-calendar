@@ -6,7 +6,9 @@ import '../providers/calendar_provider.dart';
 import '../widgets/event_card.dart';
 
 class DailyViewScreen extends StatefulWidget {
-  const DailyViewScreen({super.key});
+  final DateTime? initialDate;
+
+  const DailyViewScreen({super.key, this.initialDate});
 
   @override
   State<DailyViewScreen> createState() => _DailyViewScreenState();
@@ -18,8 +20,8 @@ class _DailyViewScreenState extends State<DailyViewScreen> {
   @override
   void initState() {
     super.initState();
-    _selectedDate = DateTime.now();
-    _loadEvents();
+    _selectedDate = widget.initialDate ?? DateTime.now();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _loadEvents());
   }
 
   Future<void> _loadEvents() async {
@@ -120,7 +122,7 @@ class _DailyViewScreenState extends State<DailyViewScreen> {
         ],
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: () => context.push('/event/new'),
+        onPressed: () => context.push('/event/new?date=${_selectedDate.toIso8601String()}'),
         child: const Icon(Icons.add),
       ),
     );

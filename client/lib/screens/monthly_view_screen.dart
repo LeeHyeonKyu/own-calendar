@@ -6,7 +6,9 @@ import '../providers/calendar_provider.dart';
 import '../models/event.dart';
 
 class MonthlyViewScreen extends StatefulWidget {
-  const MonthlyViewScreen({super.key});
+  final DateTime? initialMonth;
+
+  const MonthlyViewScreen({super.key, this.initialMonth});
 
   @override
   State<MonthlyViewScreen> createState() => _MonthlyViewScreenState();
@@ -18,9 +20,9 @@ class _MonthlyViewScreenState extends State<MonthlyViewScreen> {
   @override
   void initState() {
     super.initState();
-    final now = DateTime.now();
-    _currentMonth = DateTime(now.year, now.month);
-    _loadEvents();
+    final m = widget.initialMonth ?? DateTime.now();
+    _currentMonth = DateTime(m.year, m.month);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _loadEvents());
   }
 
   Future<void> _loadEvents() async {
@@ -177,7 +179,7 @@ class _MonthlyViewScreenState extends State<MonthlyViewScreen> {
 
                           return Expanded(
                             child: GestureDetector(
-                              onTap: () => context.push('/daily'),
+                              onTap: () => context.push('/daily?date=${day.toIso8601String()}'),
                               child: Container(
                                 margin: const EdgeInsets.all(1),
                                 decoration: BoxDecoration(
@@ -285,7 +287,7 @@ class _MonthlyViewScreenState extends State<MonthlyViewScreen> {
         ],
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: () => context.push('/event/new'),
+        onPressed: () => context.push('/event/new?date=${_currentMonth.toIso8601String()}'),
         child: const Icon(Icons.add),
       ),
       bottomNavigationBar: NavigationBar(

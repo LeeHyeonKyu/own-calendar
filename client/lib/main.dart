@@ -5,20 +5,31 @@ import 'providers/auth_provider.dart';
 import 'providers/calendar_provider.dart';
 import 'router.dart';
 
+// --dart-define=TEST_MODE=true 로 실행하면 테스트 계정 자동 로그인
+const bool kTestMode = bool.fromEnvironment('TEST_MODE', defaultValue: false);
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await initializeDateFormatting('ko');
-  runApp(const OwnCalendarApp());
+
+  final authProvider = AuthProvider();
+  if (kTestMode) {
+    await authProvider.login('hk@test.com', 'test1234');
+  }
+
+  runApp(OwnCalendarApp(authProvider: authProvider));
 }
 
 class OwnCalendarApp extends StatelessWidget {
-  const OwnCalendarApp({super.key});
+  final AuthProvider authProvider;
+
+  const OwnCalendarApp({super.key, required this.authProvider});
 
   @override
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
-        ChangeNotifierProvider(create: (_) => AuthProvider()),
+        ChangeNotifierProvider.value(value: authProvider),
         ChangeNotifierProvider(create: (_) => CalendarProvider()),
       ],
       child: Consumer<AuthProvider>(

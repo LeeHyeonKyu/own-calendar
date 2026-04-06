@@ -28,11 +28,19 @@ GoRouter createRouter(AuthProvider authProvider) {
       ),
       GoRoute(
         path: '/',
-        builder: (context, state) => const MonthlyViewScreen(),
+        builder: (context, state) {
+          final monthStr = state.uri.queryParameters['month'];
+          final month = monthStr != null ? DateTime.tryParse(monthStr) : null;
+          return MonthlyViewScreen(initialMonth: month);
+        },
       ),
       GoRoute(
         path: '/daily',
-        builder: (context, state) => const DailyViewScreen(),
+        builder: (context, state) {
+          final dateStr = state.uri.queryParameters['date'];
+          final date = dateStr != null ? DateTime.tryParse(dateStr) : null;
+          return DailyViewScreen(initialDate: date);
+        },
       ),
       GoRoute(
         path: '/weekly',
@@ -48,7 +56,11 @@ GoRouter createRouter(AuthProvider authProvider) {
       ),
       GoRoute(
         path: '/event/new',
-        builder: (context, state) => const EventFormScreen(),
+        builder: (context, state) {
+          final dateStr = state.uri.queryParameters['date'];
+          final date = dateStr != null ? DateTime.tryParse(dateStr) : null;
+          return EventFormScreen(initialDate: date);
+        },
       ),
       GoRoute(
         path: '/event/:id/edit',
