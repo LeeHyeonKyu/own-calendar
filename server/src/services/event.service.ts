@@ -125,6 +125,44 @@ export const eventService = {
     });
   },
 
+  async search(userId: string, query: string, start?: string, end?: string) {
+    // Get user's calendar IDs
+    const calendars = await prisma.calendar.findMany({
+      where: { ownerId: userId },
+      select: { id: true },
+    });
+    const calendarIds = calendars.map((c) => c.id);
+
+    // Also include family calendar IDs the user has access to
+    const memberships = await prisma.familyMembership.findMany({
+      where: { userId },
+      include: { familyGroup: { include: { calendar: true } } },
+    });
+    for (const m of memberships) {
+      if (m.familyGroup.calendar) {
+        calendarIds.push(m.familyGroup.calendar.id);
+      }
+    }
+
+    // Build where clause
+    const where: any = {
+      calendarId: { in: calendarIds },
+      OR: [
+        { title: { contains: query, mode: 'insensitive' } },
+        { description: { contains: query, mode: 'insensitive' } },
+      ],
+    };
+
+    if (start) where.startTime = { ...(where.startTime || {}), gte: new Date(start) };
+    if (end) where.endTime = { ...(where.endTime || {}), lte: new Date(end) };
+
+    return prisma.event.findMany({
+      where,
+      include: { calendar: { select: { id: true, name: true, color: true } } },
+      orderBy: { startTime: 'desc' },
+    });
+  },
+
   async delete(userId: string, eventId: string) {
     const event = await prisma.event.findUnique({ where: { id: eventId } });
 
