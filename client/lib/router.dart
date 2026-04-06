@@ -1,9 +1,10 @@
 import 'package:go_router/go_router.dart';
 import 'providers/auth_provider.dart';
 import 'screens/login_screen.dart';
-import 'screens/home_screen.dart';
+import 'screens/monthly_view_screen.dart';
 import 'screens/daily_view_screen.dart';
 import 'screens/weekly_view_screen.dart';
+import 'screens/yearly_view_screen.dart';
 import 'screens/family_screen.dart';
 import 'screens/event_form_screen.dart';
 import 'screens/search_screen.dart';
@@ -27,7 +28,7 @@ GoRouter createRouter(AuthProvider authProvider) {
       ),
       GoRoute(
         path: '/',
-        builder: (context, state) => const HomeScreen(),
+        builder: (context, state) => const MonthlyViewScreen(),
       ),
       GoRoute(
         path: '/daily',
@@ -36,6 +37,10 @@ GoRouter createRouter(AuthProvider authProvider) {
       GoRoute(
         path: '/weekly',
         builder: (context, state) => const WeeklyViewScreen(),
+      ),
+      GoRoute(
+        path: '/yearly',
+        builder: (context, state) => const YearlyViewScreen(),
       ),
       GoRoute(
         path: '/family',
