@@ -25,3 +25,9 @@ export const queryEventSchema = z.object({
   start: z.string().datetime().optional(),
   end: z.string().datetime().optional(),
 });
+
+export const searchEventSchema = z.object({
+  q: z.string().min(1),
+  start: z.string().datetime().optional(),
+  end: z.string().datetime().optional(),
+});
