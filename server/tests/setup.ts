@@ -9,7 +9,9 @@ const prisma = new PrismaClient();
 beforeEach(async () => {
   await prisma.event.deleteMany();
   await prisma.refreshToken.deleteMany();
+  await prisma.familyMembership.deleteMany();
   await prisma.calendar.deleteMany();
+  await prisma.familyGroup.deleteMany();
   await prisma.user.deleteMany();
 });
 

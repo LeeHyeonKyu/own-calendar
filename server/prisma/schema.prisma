@@ -9,15 +9,17 @@ datasource db {
 }
 
 model User {
-  id            String         @id @default(cuid())
-  email         String         @unique
-  name          String
-  passwordHash  String
-  calendars     Calendar[]
-  events        Event[]        @relation("CreatedEvents")
-  refreshTokens RefreshToken[]
-  createdAt     DateTime       @default(now())
-  updatedAt     DateTime       @updatedAt
+  id                  String             @id @default(cuid())
+  email               String             @unique
+  name                String
+  passwordHash        String
+  calendars           Calendar[]
+  events              Event[]            @relation("CreatedEvents")
+  refreshTokens       RefreshToken[]
+  familyMemberships   FamilyMembership[]
+  createdFamilyGroups FamilyGroup[]      @relation("CreatedFamilyGroups")
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
 }
 
 model RefreshToken {
@@ -41,17 +43,19 @@ enum CalendarType {
 }
 
 model Calendar {
-  id         String             @id @default(cuid())
-  name       String
-  color      String             @default("#4A90D9")
-  isDefault  Boolean            @default(false)
-  visibility CalendarVisibility @default(PUBLIC)
-  type       CalendarType       @default(PERSONAL)
-  ownerId    String
-  owner      User               @relation(fields: [ownerId], references: [id], onDelete: Cascade)
-  events     Event[]
-  createdAt  DateTime           @default(now())
-  updatedAt  DateTime           @updatedAt
+  id            String             @id @default(cuid())
+  name          String
+  color         String             @default("#4A90D9")
+  isDefault     Boolean            @default(false)
+  visibility    CalendarVisibility @default(PUBLIC)
+  type          CalendarType       @default(PERSONAL)
+  ownerId       String
+  owner         User               @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  familyGroupId String?            @unique
+  familyGroup   FamilyGroup?       @relation(fields: [familyGroupId], references: [id])
+  events        Event[]
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
 }
 
 model Event {
@@ -68,4 +72,33 @@ model Event {
   createdBy   User     @relation("CreatedEvents", fields: [createdById], references: [id])
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+}
+
+enum FamilyRole {
+  OWNER
+  MEMBER
+}
+
+model FamilyGroup {
+  id          String             @id @default(cuid())
+  name        String
+  code        String             @unique
+  createdById String
+  createdBy   User               @relation("CreatedFamilyGroups", fields: [createdById], references: [id])
+  members     FamilyMembership[]
+  calendar    Calendar?          @relation()
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+}
+
+model FamilyMembership {
+  id            String      @id @default(cuid())
+  userId        String
+  user          User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  familyGroupId String
+  familyGroup   FamilyGroup @relation(fields: [familyGroupId], references: [id], onDelete: Cascade)
+  role          FamilyRole  @default(MEMBER)
+  joinedAt      DateTime    @default(now())
+
+  @@unique([userId, familyGroupId])
 }
