@@ -18,6 +18,7 @@ model User {
   refreshTokens       RefreshToken[]
   familyMemberships   FamilyMembership[]
   createdFamilyGroups FamilyGroup[]      @relation("CreatedFamilyGroups")
+  externalConnections ExternalCalendarConnection[]
   createdAt           DateTime           @default(now())
   updatedAt           DateTime           @updatedAt
 }
@@ -54,12 +55,14 @@ model Calendar {
   familyGroupId String?            @unique
   familyGroup   FamilyGroup?       @relation(fields: [familyGroupId], references: [id])
   events        Event[]
+  externalConnection ExternalCalendarConnection?
   createdAt     DateTime           @default(now())
   updatedAt     DateTime           @updatedAt
 }
 
 model Event {
   id          String   @id @default(cuid())
+  externalId  String?
   title       String
   description String?
   startTime   DateTime
@@ -101,4 +104,23 @@ model FamilyMembership {
   joinedAt      DateTime    @default(now())
 
   @@unique([userId, familyGroupId])
+}
+
+model ExternalCalendarConnection {
+  id           String   @id @default(cuid())
+  provider     String   @default("google")
+  externalId   String
+  accessToken  String
+  refreshToken String
+  tokenExpiry  DateTime?
+  syncToken    String?
+  calendarId   String   @unique
+  calendar     Calendar @relation(fields: [calendarId], references: [id], onDelete: Cascade)
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lastSyncedAt DateTime?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@unique([provider, externalId, userId])
 }
