@@ -7,9 +7,9 @@
   "Web": {
     "own-calendar.tailb2886a.ts.net:443": {
       "Handlers": {
-        "/": {
-          "Proxy": "http://127.0.0.1:3000"
-        }
+        "/api/": { "Proxy": "http://127.0.0.1:3000" },
+        "/health": { "Proxy": "http://127.0.0.1:3000" },
+        "/": { "Proxy": "http://127.0.0.1:8080" }
       }
     }
   },
