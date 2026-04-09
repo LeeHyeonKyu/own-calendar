@@ -8,16 +8,15 @@
 
 1. **DNS** — MagicDNS ON, HTTPS Certificates ON
 2. **Features** — Funnel Enabled
-3. **Access Controls** — ACL JSON에 병합:
+3. **Access Controls** — ACL JSON의 `nodeAttrs`에 funnel 권한 추가 (유저 소유 노드 전체 허용):
    ```json
    {
-     "tagOwners": { "tag:funnel": ["<본인 이메일>"] },
      "nodeAttrs": [
-       { "target": ["tag:funnel"], "attr": ["funnel"] }
+       { "target": ["autogroup:member"], "attr": ["funnel"] }
      ]
    }
    ```
-4. **Settings > Keys** — Auth key 발급 (Reusable ON, Ephemeral OFF, **Tags: tag:funnel**)
+4. **Settings > Keys** — Auth key 발급 (Reusable ON, Ephemeral OFF). own-wiki에서 쓰던 키 재사용 가능.
 
 ## hk-imac에서
 
