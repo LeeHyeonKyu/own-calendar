@@ -1,41 +1,63 @@
 services:
+  tailscale:
+    image: tailscale/tailscale:latest
+    hostname: own-calendar
+    restart: unless-stopped
+    cap_add:
+      - NET_ADMIN
+      - SYS_MODULE
+    volumes:
+      - ts-state:/var/lib/tailscale
+      - /dev/net/tun:/dev/net/tun
+      - ./tailscale-serve.json:/config/serve.json:ro
+    environment:
+      - TS_AUTHKEY=${TS_AUTHKEY}
+      - TS_STATE_DIR=/var/lib/tailscale
+      - TS_SERVE_CONFIG=/config/serve.json
+      - TS_EXTRA_ARGS=--hostname=own-calendar --advertise-tags=tag:funnel
+
   postgres:
     image: postgres:15
+    restart: unless-stopped
     environment:
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: own_calendar
-    ports:
-      - "5432:5432"
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      - ${OWN_CALENDAR_DATA:-${HOME}/own-calendar-data}/pgdata:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 5s
       timeout: 5s
       retries: 5
+    network_mode: service:tailscale
+    depends_on:
+      - tailscale
 
   api:
     build: .
-    ports:
-      - "3000:3000"
+    restart: unless-stopped
     environment:
       PORT: 3000
-      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/own_calendar?schema=public
-      JWT_SECRET: ${JWT_SECRET:-dev-secret-change-me}
-      JWT_ACCESS_EXPIRES_IN: 15m
-      JWT_REFRESH_EXPIRES_IN: 7d
+      DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD}@127.0.0.1:5432/own_calendar?schema=public
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_ACCESS_EXPIRES_IN: ${JWT_ACCESS_EXPIRES_IN:-15m}
+      JWT_REFRESH_EXPIRES_IN: ${JWT_REFRESH_EXPIRES_IN:-7d}
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
-      GOOGLE_REDIRECT_URI: ${GOOGLE_REDIRECT_URI:-http://localhost:3000/api/google/callback}
-    depends_on:
-      postgres:
-        condition: service_healthy
+      GOOGLE_REDIRECT_URI: ${GOOGLE_REDIRECT_URI}
+      CORS_ORIGIN: ${CORS_ORIGIN:-}
+      NODE_ENV: ${NODE_ENV:-production}
+      TRUST_PROXY: "1"
     volumes:
       - ./src:/app/src
       - ./prisma:/app/prisma
     command: >
       sh -c "npx prisma migrate deploy && npx prisma generate && npm run dev"
+    network_mode: service:tailscale
+    depends_on:
+      postgres:
+        condition: service_healthy
 
 volumes:
-  pgdata:
+  ts-state:

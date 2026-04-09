@@ -3,7 +3,9 @@ import prisma from '../lib/prisma';
 
 export const familyService = {
   async create(userId: string, name: string) {
-    const code = crypto.randomBytes(4).toString('hex');
+    // 64-bit entropy family code (11 char base64url). Unguessable via brute force
+    // even with /api/family/join rate limiting removed.
+    const code = crypto.randomBytes(8).toString('base64url');
 
     const group = await prisma.familyGroup.create({
       data: {

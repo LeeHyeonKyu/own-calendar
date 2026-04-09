@@ -3,7 +3,13 @@ import 'package:http/http.dart' as http;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 class ApiService {
-  static const String baseUrl = 'http://localhost:3000/api';
+  // Override at build/run time:
+  //   flutter run --dart-define-from-file=config/prod.json
+  //   flutter build ios --dart-define=API_BASE_URL=https://your-host/api
+  static const String baseUrl = String.fromEnvironment(
+    'API_BASE_URL',
+    defaultValue: 'https://own-calendar.tailb2886a.ts.net/api',
+  );
   final _storage = const FlutterSecureStorage();
 
   Future<String?> get accessToken => _storage.read(key: 'accessToken');
