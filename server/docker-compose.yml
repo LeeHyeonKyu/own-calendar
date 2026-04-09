@@ -25,8 +25,13 @@ services:
       POSTGRES_DB: own_calendar
     volumes:
       - ${OWN_CALENDAR_DATA:-${HOME}/own-calendar-data}/pgdata:/var/lib/postgresql/data
+    # Bind to 127.0.0.1 only so Postgres is not reachable over the tailnet
+    # (other tailnet devices must never see 5432). The api container shares
+    # the same network namespace via `network_mode: service:tailscale` and
+    # still reaches it on 127.0.0.1:5432.
+    command: ["postgres", "-c", "listen_addresses=127.0.0.1"]
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      test: ["CMD-SHELL", "pg_isready -U postgres -h 127.0.0.1"]
       interval: 5s
       timeout: 5s
       retries: 5
