@@ -2,8 +2,20 @@ import { Router, Request, Response } from 'express';
 import { authService } from '../services/auth.service';
 import { validate } from '../middleware/validate';
 import { registerSchema, loginSchema, refreshSchema } from '../schemas/auth.schema';
+import { authenticate } from '../middleware/auth';
+import { AuthRequest } from '../types';
 
 const router = Router();
+
+router.get('/me', authenticate, async (req: AuthRequest, res: Response) => {
+  try {
+    const user = await authService.getUserById(req.userId!);
+    res.json({ user });
+  } catch (error: any) {
+    const statusCode = error.statusCode || 500;
+    res.status(statusCode).json({ error: error.message });
+  }
+});
 
 router.post('/register', validate(registerSchema), async (req: Request, res: Response) => {
   try {

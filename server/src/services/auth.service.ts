@@ -146,4 +146,23 @@ export const authService = {
       where: { token: refreshToken },
     });
   },
+
+  async getUserById(userId: string) {
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
+    if (!user) {
+      const error = new Error('User not found');
+      (error as any).statusCode = 404;
+      throw error;
+    }
+    return user;
+  },
 };

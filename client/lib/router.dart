@@ -13,6 +13,10 @@ import 'screens/settings_screen.dart';
 GoRouter createRouter(AuthProvider authProvider) {
   return GoRouter(
     initialLocation: '/',
+    // AuthProvider(ChangeNotifier)의 notifyListeners가 호출될 때마다 redirect가
+    // 재평가된다. 자동 로그인 복원, 백그라운드 hydrate 실패, 명시적 로그아웃
+    // 모두 이 한 줄로 반응한다.
+    refreshListenable: authProvider,
     redirect: (context, state) {
       final isAuthenticated = authProvider.isAuthenticated;
       final isLoginRoute = state.matchedLocation == '/login';
