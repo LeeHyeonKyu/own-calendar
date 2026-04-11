@@ -85,8 +85,6 @@ class _LoginScreenState extends State<LoginScreen> {
                     prefixIcon: Icon(Icons.email),
                   ),
                   keyboardType: TextInputType.emailAddress,
-                  validator: (v) =>
-                      v == null || v.isEmpty ? '이메일을 입력하세요' : null,
                 ),
                 const SizedBox(height: 16),
                 if (_isRegister) ...[
@@ -97,8 +95,6 @@ class _LoginScreenState extends State<LoginScreen> {
                       border: OutlineInputBorder(),
                       prefixIcon: Icon(Icons.person),
                     ),
-                    validator: (v) =>
-                        v == null || v.isEmpty ? '이름을 입력하세요' : null,
                   ),
                   const SizedBox(height: 16),
                 ],
@@ -110,8 +106,6 @@ class _LoginScreenState extends State<LoginScreen> {
                     prefixIcon: Icon(Icons.lock),
                   ),
                   obscureText: true,
-                  validator: (v) =>
-                      v == null || v.length < 6 ? '6자 이상 입력하세요' : null,
                 ),
                 const SizedBox(height: 8),
                 if (auth.error != null)
