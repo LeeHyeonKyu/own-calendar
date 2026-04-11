@@ -34,11 +34,12 @@ describe('Auth API', () => {
       expect(res.body.error).toBeDefined();
     });
 
-    it('returns 400 for invalid data', async () => {
+    it('returns 400 when a required field is missing', async () => {
+      // 형식·길이 제한은 의도적으로 없지만, 필드 누락은 zod가 거부한다.
       const res = await request(app).post('/api/auth/register').send({
-        email: 'not-an-email',
-        name: '',
-        password: '12',
+        email: 'foo@bar.com',
+        // name 누락
+        password: 'whatever',
       });
 
       expect(res.status).toBe(400);
