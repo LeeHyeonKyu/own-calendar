@@ -12,14 +12,29 @@ class ApiService {
   );
   final _storage = const FlutterSecureStorage();
 
-  Future<String?> get accessToken => _storage.read(key: 'accessToken');
-  Future<String?> get refreshToken => _storage.read(key: 'refreshToken');
+  // Storage keys
+  static const _kAccessTokenKey = 'accessToken';
+  static const _kRefreshTokenKey = 'refreshToken';
+  static const _kCachedUserKey = 'cachedUser';
+
+  Future<String?> get accessToken => _storage.read(key: _kAccessTokenKey);
+  Future<String?> get refreshToken => _storage.read(key: _kRefreshTokenKey);
+
+  /// 마지막 로그인 시 서버에서 받은 user JSON.
+  /// 자동 로그인 부트스트랩에서 토큰과 함께 읽어 즉시 세션을 복원할 때 사용.
+  Future<String?> get cachedUserJson => _storage.read(key: _kCachedUserKey);
 
   Future<void> saveTokens(String access, String refresh) async {
-    await _storage.write(key: 'accessToken', value: access);
-    await _storage.write(key: 'refreshToken', value: refresh);
+    await _storage.write(key: _kAccessTokenKey, value: access);
+    await _storage.write(key: _kRefreshTokenKey, value: refresh);
   }
 
+  Future<void> saveCachedUser(String userJson) async {
+    await _storage.write(key: _kCachedUserKey, value: userJson);
+  }
+
+  /// 토큰 + 캐시된 user + 그 외 secure storage 전체 삭제.
+  /// refresh 실패로 세션이 무효화될 때 호출된다.
   Future<void> clearTokens() async {
     await _storage.deleteAll();
   }

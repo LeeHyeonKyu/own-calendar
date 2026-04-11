@@ -124,4 +124,37 @@ describe('Auth API', () => {
       expect(refreshRes.status).toBe(401);
     });
   });
+
+  describe('GET /api/auth/me', () => {
+    it('returns current user for a valid access token', async () => {
+      const created = await createTestUser(app, {
+        email: 'me@example.com',
+        name: 'Me User',
+      });
+
+      const res = await request(app)
+        .get('/api/auth/me')
+        .set('Authorization', `Bearer ${created.accessToken}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.user).toBeDefined();
+      expect(res.body.user.id).toBe(created.user.id);
+      expect(res.body.user.email).toBe('me@example.com');
+      expect(res.body.user.name).toBe('Me User');
+      expect(res.body.user.passwordHash).toBeUndefined();
+    });
+
+    it('returns 401 when Authorization header is missing', async () => {
+      const res = await request(app).get('/api/auth/me');
+      expect(res.status).toBe(401);
+      expect(res.body.error).toBeDefined();
+    });
+
+    it('returns 401 for an invalid access token', async () => {
+      const res = await request(app)
+        .get('/api/auth/me')
+        .set('Authorization', 'Bearer not.a.real.token');
+      expect(res.status).toBe(401);
+    });
+  });
 });
