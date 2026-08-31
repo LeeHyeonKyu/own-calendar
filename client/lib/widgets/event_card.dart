@@ -114,6 +114,11 @@ class EventCard extends StatelessWidget {
                   ],
                 ),
               ),
+              if (event.isRecurring)
+                Padding(
+                  padding: const EdgeInsets.only(right: 4),
+                  child: Icon(Icons.repeat, size: 16, color: Colors.grey[400]),
+                ),
               if (event.isPrivate)
                 Icon(Icons.lock, size: 16, color: Colors.grey[400]),
             ],

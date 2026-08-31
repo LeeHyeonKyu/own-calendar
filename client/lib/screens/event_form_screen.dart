@@ -28,6 +28,8 @@ class _EventFormScreenState extends State<EventFormScreen> {
   bool _isPrivate = false;
   String _category = 'PERSONAL';
   List<String> _tags = [];
+  String _recurrenceType = 'NONE';
+  DateTime? _recurrenceEnd;
   String? _selectedCalendarId;
   bool _isLoading = false;
 
@@ -70,7 +72,7 @@ class _EventFormScreenState extends State<EventFormScreen> {
 
   Future<void> _loadEvent() async {
     final provider = context.read<CalendarProvider>();
-    final events = provider.events;
+    final events = provider.allVisibleEvents;
     final event = events.where((e) => e.id == widget.eventId).firstOrNull;
     if (event != null) {
       setState(() {
@@ -84,6 +86,8 @@ class _EventFormScreenState extends State<EventFormScreen> {
         _isPrivate = event.isPrivate;
         _category = event.category;
         _tags = List.from(event.tags);
+        _recurrenceType = event.recurrenceType;
+        _recurrenceEnd = event.recurrenceEnd;
         _selectedCalendarId = event.calendarId;
       });
     }
@@ -159,6 +163,8 @@ class _EventFormScreenState extends State<EventFormScreen> {
       'isPrivate': _isPrivate,
       'category': _category,
       'tags': _tags,
+      'recurrenceType': _recurrenceType,
+      'recurrenceEnd': _recurrenceEnd?.toIso8601String(),
       'calendarId': _selectedCalendarId,
     };
 
@@ -359,6 +365,67 @@ class _EventFormScreenState extends State<EventFormScreen> {
               value: _isPrivate,
               onChanged: (v) => setState(() => _isPrivate = v),
             ),
+            const SizedBox(height: 16),
+            DropdownButtonFormField<String>(
+              value: _recurrenceType,
+              decoration: const InputDecoration(
+                labelText: '반복',
+                border: OutlineInputBorder(),
+              ),
+              items: EventModel.recurrenceLabels.entries
+                  .map(
+                    (e) => DropdownMenuItem(
+                      value: e.key,
+                      child: Row(
+                        children: [
+                          if (e.key != 'NONE')
+                            const Padding(
+                              padding: EdgeInsets.only(right: 8),
+                              child: Icon(Icons.repeat, size: 16),
+                            ),
+                          Text(e.value),
+                        ],
+                      ),
+                    ),
+                  )
+                  .toList(),
+              onChanged: (v) {
+                if (v != null) setState(() => _recurrenceType = v);
+              },
+            ),
+            if (_recurrenceType != 'NONE') ...[
+              const SizedBox(height: 8),
+              ListTile(
+                title: const Text('반복 종료일'),
+                subtitle: Text(
+                  _recurrenceEnd != null
+                      ? DateFormat('yyyy-MM-dd').format(_recurrenceEnd!)
+                      : '없음 (무한 반복)',
+                ),
+                trailing: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (_recurrenceEnd != null)
+                      IconButton(
+                        icon: const Icon(Icons.clear),
+                        onPressed: () => setState(() => _recurrenceEnd = null),
+                      ),
+                    const Icon(Icons.calendar_today),
+                  ],
+                ),
+                onTap: () async {
+                  final picked = await showDatePicker(
+                    context: context,
+                    initialDate: _recurrenceEnd ?? _startDate.add(const Duration(days: 30)),
+                    firstDate: _startDate,
+                    lastDate: DateTime(2030),
+                  );
+                  if (picked != null) {
+                    setState(() => _recurrenceEnd = picked);
+                  }
+                },
+              ),
+            ],
             const SizedBox(height: 16),
             DropdownButtonFormField<String>(
               value: _selectedCalendarId,

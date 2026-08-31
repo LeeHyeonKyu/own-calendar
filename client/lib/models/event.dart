@@ -8,6 +8,8 @@ class EventModel {
   final bool isPrivate;
   final String category;
   final List<String> tags;
+  final String recurrenceType;
+  final DateTime? recurrenceEnd;
   final String calendarId;
   final String? calendarName;
   final String? calendarColor;
@@ -22,6 +24,8 @@ class EventModel {
     this.isPrivate = false,
     this.category = 'PERSONAL',
     this.tags = const [],
+    this.recurrenceType = 'NONE',
+    this.recurrenceEnd,
     required this.calendarId,
     this.calendarName,
     this.calendarColor,
@@ -38,10 +42,29 @@ class EventModel {
       isPrivate: json['isPrivate'] ?? false,
       category: json['category'] ?? 'PERSONAL',
       tags: (json['tags'] as List<dynamic>?)?.cast<String>() ?? [],
+      recurrenceType: json['recurrenceType'] ?? 'NONE',
+      recurrenceEnd: json['recurrenceEnd'] != null
+          ? DateTime.parse(json['recurrenceEnd'])
+          : null,
       calendarId: json['calendarId'],
       calendarName: json['calendar']?['name'],
       calendarColor: json['calendar']?['color'],
     );
+  }
+
+  bool get isRecurring => recurrenceType != 'NONE';
+
+  String get baseId {
+    if (id.contains('_')) {
+      final parts = id.split('_');
+      if (parts.length >= 2) {
+        final lastPart = parts.last;
+        if (lastPart.contains('T') && lastPart.contains(':')) {
+          return parts.sublist(0, parts.length - 1).join('_');
+        }
+      }
+    }
+    return id;
   }
 
   static const categoryLabels = {
@@ -64,6 +87,15 @@ class EventModel {
     'OTHER': 0xFF95A5A6,
   };
 
+  static const recurrenceLabels = {
+    'NONE': '없음',
+    'DAILY': '매일',
+    'WEEKLY': '매주',
+    'MONTHLY': '매월',
+    'YEARLY': '매년',
+  };
+
   String get categoryLabel => categoryLabels[category] ?? '기타';
   int get categoryColorValue => categoryColors[category] ?? 0xFF95A5A6;
+  String get recurrenceLabel => recurrenceLabels[recurrenceType] ?? '없음';
 }

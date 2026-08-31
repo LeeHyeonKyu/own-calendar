@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 const EVENT_CATEGORIES = ['WORK', 'PERSONAL', 'FAMILY', 'HEALTH', 'SOCIAL', 'FINANCE', 'OTHER'] as const;
+const RECURRENCE_TYPES = ['NONE', 'DAILY', 'WEEKLY', 'MONTHLY', 'YEARLY'] as const;
 
 const timeOrderRefinement = <T extends { startTime?: string; endTime?: string }>(data: T) => {
   if (data.startTime && data.endTime) {
@@ -20,6 +21,8 @@ export const createEventBaseSchema = z.object({
   isPrivate: z.boolean().optional(),
   category: z.enum(EVENT_CATEGORIES).optional().default('PERSONAL'),
   tags: z.array(z.string()).optional().default([]),
+  recurrenceType: z.enum(RECURRENCE_TYPES).optional().default('NONE'),
+  recurrenceEnd: z.string().nullable().optional(),
   calendarId: z.string(),
 });
 
@@ -34,6 +37,8 @@ export const updateEventSchema = z.object({
   isPrivate: z.boolean().optional(),
   category: z.enum(EVENT_CATEGORIES).optional(),
   tags: z.array(z.string()).optional(),
+  recurrenceType: z.enum(RECURRENCE_TYPES).optional(),
+  recurrenceEnd: z.string().nullable().optional(),
   calendarId: z.string().optional(),
 }).refine(timeOrderRefinement, timeOrderMessage);
 

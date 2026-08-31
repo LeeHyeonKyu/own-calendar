@@ -69,9 +69,11 @@ model Event {
   endTime     DateTime
   isAllDay    Boolean       @default(false)
   isPrivate   Boolean       @default(false)
-  category    EventCategory @default(PERSONAL)
-  tags        String[]      @default([])
-  calendarId  String
+  category       EventCategory  @default(PERSONAL)
+  tags           String[]       @default([])
+  recurrenceType RecurrenceType @default(NONE)
+  recurrenceEnd  DateTime?
+  calendarId     String
   calendar    Calendar      @relation(fields: [calendarId], references: [id], onDelete: Cascade)
   createdById String
   createdBy   User          @relation("CreatedEvents", fields: [createdById], references: [id])
@@ -87,6 +89,14 @@ enum EventCategory {
   SOCIAL
   FINANCE
   OTHER
+}
+
+enum RecurrenceType {
+  NONE
+  DAILY
+  WEEKLY
+  MONTHLY
+  YEARLY
 }
 
 enum FamilyRole {
