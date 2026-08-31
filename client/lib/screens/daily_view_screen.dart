@@ -31,7 +31,9 @@ class _DailyViewScreenState extends State<DailyViewScreen> {
       _selectedDate.day,
     );
     final end = start.add(const Duration(days: 1));
-    await context.read<CalendarProvider>().loadEvents(start: start, end: end);
+    final provider = context.read<CalendarProvider>();
+    await provider.loadEvents(start: start, end: end);
+    await provider.loadFamilyEvents(start: start, end: end);
   }
 
   Future<void> _pickDate() async {
@@ -99,7 +101,7 @@ class _DailyViewScreenState extends State<DailyViewScreen> {
           Expanded(
             child: calProvider.isLoading
                 ? const Center(child: CircularProgressIndicator())
-                : calProvider.events.isEmpty
+                : calProvider.allVisibleEvents.isEmpty
                     ? Center(
                         child: Text(
                           '일정이 없습니다',
@@ -108,9 +110,9 @@ class _DailyViewScreenState extends State<DailyViewScreen> {
                       )
                     : ListView.builder(
                         padding: const EdgeInsets.all(16),
-                        itemCount: calProvider.events.length,
+                        itemCount: calProvider.allVisibleEvents.length,
                         itemBuilder: (context, index) {
-                          final event = calProvider.events[index];
+                          final event = calProvider.allVisibleEvents[index];
                           return EventCard(
                             event: event,
                             onTap: () =>

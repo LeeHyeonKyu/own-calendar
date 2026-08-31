@@ -25,10 +25,9 @@ class _WeeklyViewScreenState extends State<WeeklyViewScreen> {
 
   Future<void> _loadEvents() async {
     final weekEnd = _weekStart.add(const Duration(days: 7));
-    await context.read<CalendarProvider>().loadEvents(
-      start: _weekStart,
-      end: weekEnd,
-    );
+    final provider = context.read<CalendarProvider>();
+    await provider.loadEvents(start: _weekStart, end: weekEnd);
+    await provider.loadFamilyEvents(start: _weekStart, end: weekEnd);
   }
 
   Color _parseColor(String? hex) {
@@ -45,7 +44,7 @@ class _WeeklyViewScreenState extends State<WeeklyViewScreen> {
     final provider = context.read<CalendarProvider>();
     final dayStart = DateTime(day.year, day.month, day.day);
     final dayEnd = dayStart.add(const Duration(days: 1));
-    return provider.events
+    return provider.allVisibleEvents
         .where((e) => e.startTime.isBefore(dayEnd) && e.endTime.isAfter(dayStart))
         .toList();
   }

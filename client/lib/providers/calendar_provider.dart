@@ -10,11 +10,20 @@ class CalendarProvider extends ChangeNotifier {
   List<EventModel> _events = [];
   List<EventModel> _familyEvents = [];
   bool _isLoading = false;
+  bool _showFamilyEvents = true;
 
   List<CalendarModel> get calendars => _calendars;
   List<EventModel> get events => _events;
   List<EventModel> get familyEvents => _familyEvents;
+  List<EventModel> get allVisibleEvents =>
+      _showFamilyEvents ? [..._events, ..._familyEvents] : _events;
   bool get isLoading => _isLoading;
+  bool get showFamilyEvents => _showFamilyEvents;
+
+  void toggleFamilyEvents() {
+    _showFamilyEvents = !_showFamilyEvents;
+    notifyListeners();
+  }
 
   Future<void> loadCalendars() async {
     final res = await _api.get('/calendars');

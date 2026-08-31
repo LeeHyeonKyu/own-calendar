@@ -67,7 +67,7 @@ class _MonthlyViewScreenState extends State<MonthlyViewScreen> {
   @override
   Widget build(BuildContext context) {
     final calProvider = context.watch<CalendarProvider>();
-    final allEvents = [...calProvider.events, ...calProvider.familyEvents];
+    final allEvents = calProvider.allVisibleEvents;
     final today = DateTime.now();
     final monthLabel = DateFormat('yyyy년 M월', 'ko').format(_currentMonth);
 
@@ -83,6 +83,13 @@ class _MonthlyViewScreenState extends State<MonthlyViewScreen> {
       appBar: AppBar(
         title: const Text('Own Calendar'),
         actions: [
+          IconButton(
+            icon: Icon(
+              calProvider.showFamilyEvents ? Icons.people : Icons.people_outline,
+            ),
+            tooltip: calProvider.showFamilyEvents ? '가족 일정 숨기기' : '가족 일정 보기',
+            onPressed: () => calProvider.toggleFamilyEvents(),
+          ),
           IconButton(
             icon: const Icon(Icons.search),
             onPressed: () => context.push('/search'),
