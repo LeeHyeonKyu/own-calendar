@@ -84,7 +84,7 @@ class _FamilyScreenState extends State<FamilyScreen> {
     final code = _codeController.text.trim();
     if (code.isEmpty) return;
 
-    final res = await _api.post('/family/join', {'inviteCode': code});
+    final res = await _api.post('/family/join', {'code': code});
     if (res.statusCode == 200) {
       _codeController.clear();
       _loadFamily();
@@ -171,7 +171,7 @@ class _FamilyScreenState extends State<FamilyScreen> {
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
-            if (_family?['inviteCode'] != null) ...[
+            if (_family?['code'] != null) ...[
               Card(
                 child: Padding(
                   padding: const EdgeInsets.all(16),
@@ -188,7 +188,7 @@ class _FamilyScreenState extends State<FamilyScreen> {
                               style: TextStyle(fontSize: 12),
                             ),
                             Text(
-                              _family!['inviteCode'],
+                              _family!['code'],
                               style: const TextStyle(
                                 fontSize: 18,
                                 fontWeight: FontWeight.bold,

@@ -287,7 +287,7 @@ class _MonthlyViewScreenState extends State<MonthlyViewScreen> {
         ],
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: () => context.push('/event/new?date=${_currentMonth.toIso8601String()}'),
+        onPressed: () => context.push('/event/new?date=${DateTime.now().toIso8601String()}'),
         child: const Icon(Icons.add),
       ),
       bottomNavigationBar: NavigationBar(

@@ -3,7 +3,7 @@ import { familyService } from '../services/family.service';
 import { authenticate } from '../middleware/auth';
 import { validate } from '../middleware/validate';
 import { createFamilySchema, joinFamilySchema } from '../schemas/family.schema';
-import { createEventSchema } from '../schemas/event.schema';
+import { createEventBaseSchema } from '../schemas/event.schema';
 import { AuthRequest } from '../types';
 
 const router = Router();
@@ -78,7 +78,7 @@ router.get('/calendars', async (req: AuthRequest, res: Response) => {
   }
 });
 
-router.post('/events', validate(createEventSchema.omit({ calendarId: true })), async (req: AuthRequest, res: Response) => {
+router.post('/events', validate(createEventBaseSchema.omit({ calendarId: true })), async (req: AuthRequest, res: Response) => {
   try {
     const result = await familyService.createFamilyEvent(req.userId!, req.body);
     res.status(201).json(result);

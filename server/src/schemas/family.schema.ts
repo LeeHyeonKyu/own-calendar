@@ -5,5 +5,5 @@ export const createFamilySchema = z.object({
 });
 
 export const joinFamilySchema = z.object({
-  code: z.string().length(8),
+  code: z.string().min(1),
 });

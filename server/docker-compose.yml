@@ -68,7 +68,7 @@ services:
       - ./src:/app/src
       - ./prisma:/app/prisma
     command: >
-      sh -c "npx prisma migrate deploy && npx prisma generate && npm run dev"
+      sh -c "NODE_ENV=development npm install --silent && npx prisma migrate deploy && npx prisma generate && npm run dev"
     network_mode: service:tailscale
     depends_on:
       postgres:
