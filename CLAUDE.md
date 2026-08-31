@@ -65,6 +65,17 @@ All implementation is delegated to sub-agents with explicit scope and goals.
    - Loop continues until ALL reviewers' criteria are `[x]`
    - Only when all three reviewers fully pass does the orchestrator accept the work
 
+### iOS Build (Widget / Native)
+
+Intel iMac (macOS 15.x) 환경 제약:
+- **Xcode 16.4 사용** (`/Users/hk/Downloads/Xcode16.app`) — 최신 Xcode(26+)는 macOS 26.2+ 필요
+- `sudo xcode-select -s "/Users/hk/Downloads/Xcode16.app/Contents/Developer"` 확인 필수
+- iOS build 전: `cd ios && pod install` 필수 (flutter clean 후 특히)
+- `IPHONEOS_DEPLOYMENT_TARGET = 16.0` (Podfile + pbxproj 통일)
+- Widget Extension 추가 시 pbxproj에서 "Thin Binary"를 마지막 빌드 페이즈로 이동
+- iPhone 테스트: `flutter build ios --release` + `flutter install --release` (debug 모드는 홈화면 실행 불가)
+- iPhone 설정: 개발자 모드 ON + 기기 관리에서 개발자 앱 신뢰
+
 ### Document References
 - Project definition: `docs/PROJECT.md`
 - Technical foundation: `docs/TECHNICAL.md`

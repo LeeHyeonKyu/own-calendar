@@ -1,6 +1,11 @@
 import WidgetKit
 import SwiftUI
 
+struct EventEntry: TimelineEntry {
+    let date: Date
+    let events: [CalendarEvent]
+}
+
 struct CalendarEvent: Codable, Identifiable {
     let title: String
     let time: String
@@ -8,17 +13,12 @@ struct CalendarEvent: Codable, Identifiable {
     var id: String { "\(title)_\(time)" }
 }
 
-struct EventEntry: TimelineEntry {
-    let date: Date
-    let events: [CalendarEvent]
-}
-
 struct OwnCalendarProvider: TimelineProvider {
     let userDefaults = UserDefaults(suiteName: "group.com.owncalendar.ownCalendar")
 
     func placeholder(in context: Context) -> EventEntry {
         EventEntry(date: Date(), events: [
-            CalendarEvent(title: "일정 로딩 중...", time: "09:00", category: "PERSONAL"),
+            CalendarEvent(title: "일정 로딩 중...", time: "09:00", category: "PERSONAL")
         ])
     }
 
@@ -36,8 +36,7 @@ struct OwnCalendarProvider: TimelineProvider {
     private func getEntry() -> EventEntry {
         guard let jsonStr = userDefaults?.string(forKey: "todayEvents"),
               let data = jsonStr.data(using: .utf8),
-              let events = try? JSONDecoder().decode([CalendarEvent].self, from: data)
-        else {
+              let events = try? JSONDecoder().decode([CalendarEvent].self, from: data) else {
             return EventEntry(date: Date(), events: [])
         }
         return EventEntry(date: Date(), events: events)
@@ -127,32 +126,22 @@ struct OwnCalendarWidgetView: View {
     }
 }
 
-@main
 struct OwnCalendarWidget: Widget {
     let kind: String = "OwnCalendarWidget"
 
     var body: some WidgetConfiguration {
         StaticConfiguration(kind: kind, provider: OwnCalendarProvider()) { entry in
-            OwnCalendarWidgetView(entry: entry)
+            if #available(iOS 17.0, *) {
+                OwnCalendarWidgetView(entry: entry)
+                    .containerBackground(.fill.tertiary, for: .widget)
+            } else {
+                OwnCalendarWidgetView(entry: entry)
+                    .padding()
+                    .background()
+            }
         }
         .configurationDisplayName("오늘 일정")
         .description("오늘의 일정을 홈 화면에서 확인합니다.")
         .supportedFamilies([.systemSmall, .systemMedium, .systemLarge])
     }
 }
-
-#if DEBUG
-struct OwnCalendarWidget_Previews: PreviewProvider {
-    static var previews: some View {
-        OwnCalendarWidgetView(entry: EventEntry(
-            date: Date(),
-            events: [
-                CalendarEvent(title: "팀 미팅", time: "10:00", category: "WORK"),
-                CalendarEvent(title: "점심 약속", time: "12:00", category: "SOCIAL"),
-                CalendarEvent(title: "운동", time: "18:00", category: "HEALTH"),
-            ]
-        ))
-        .previewContext(WidgetPreviewContext(family: .systemMedium))
-    }
-}
-#endif
