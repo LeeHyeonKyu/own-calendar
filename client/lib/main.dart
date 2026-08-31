@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/date_symbol_data_local.dart';
+import 'package:home_widget/home_widget.dart';
 import 'providers/auth_provider.dart';
 import 'providers/calendar_provider.dart';
 import 'router.dart';
@@ -12,6 +13,7 @@ const bool kTestMode = bool.fromEnvironment('TEST_MODE', defaultValue: false);
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await initializeDateFormatting('ko');
+  await HomeWidget.setAppGroupId('group.com.owncalendar.ownCalendar');
 
   final authProvider = AuthProvider();
 

@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:home_widget/home_widget.dart';
 import '../models/calendar.dart';
 import '../models/event.dart';
 import '../services/api_service.dart';
@@ -54,6 +55,38 @@ class CalendarProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> _updateHomeWidget() async {
+    try {
+      final now = DateTime.now();
+      final todayStart = DateTime(now.year, now.month, now.day);
+      final todayEnd = todayStart.add(const Duration(days: 1));
+      final todayEvents = allVisibleEvents
+          .where((e) =>
+              e.startTime.isBefore(todayEnd) && e.endTime.isAfter(todayStart))
+          .toList()
+        ..sort((a, b) => a.startTime.compareTo(b.startTime));
+
+      final widgetData = todayEvents
+          .take(8)
+          .map((e) => {
+                'title': e.title,
+                'time': e.isAllDay
+                    ? '종일'
+                    : '${e.startTime.hour.toString().padLeft(2, '0')}:${e.startTime.minute.toString().padLeft(2, '0')}',
+                'category': e.category,
+              })
+          .toList();
+
+      await HomeWidget.saveWidgetData('todayEvents', jsonEncode(widgetData));
+      await HomeWidget.saveWidgetData(
+          'lastUpdated', DateTime.now().toIso8601String());
+      await HomeWidget.updateWidget(
+        iOSName: 'OwnCalendarWidget',
+        androidName: 'OwnCalendarWidgetProvider',
+      );
+    } catch (_) {}
+  }
+
   Future<void> loadCalendars() async {
     final res = await _api.get('/calendars');
     if (res.statusCode == 200) {
@@ -76,6 +109,7 @@ class CalendarProvider extends ChangeNotifier {
     }
     _isLoading = false;
     notifyListeners();
+    _updateHomeWidget();
   }
 
   Future<void> loadFamilyEvents({DateTime? start, DateTime? end}) async {
@@ -101,6 +135,7 @@ class CalendarProvider extends ChangeNotifier {
         }
       }
       notifyListeners();
+      _updateHomeWidget();
     }
   }
 
