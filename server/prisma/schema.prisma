@@ -61,20 +61,32 @@ model Calendar {
 }
 
 model Event {
-  id          String   @id @default(cuid())
+  id          String        @id @default(cuid())
   externalId  String?
   title       String
   description String?
   startTime   DateTime
   endTime     DateTime
-  isAllDay    Boolean  @default(false)
-  isPrivate   Boolean  @default(false)
+  isAllDay    Boolean       @default(false)
+  isPrivate   Boolean       @default(false)
+  category    EventCategory @default(PERSONAL)
+  tags        String[]      @default([])
   calendarId  String
-  calendar    Calendar @relation(fields: [calendarId], references: [id], onDelete: Cascade)
+  calendar    Calendar      @relation(fields: [calendarId], references: [id], onDelete: Cascade)
   createdById String
-  createdBy   User     @relation("CreatedEvents", fields: [createdById], references: [id])
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdBy   User          @relation("CreatedEvents", fields: [createdById], references: [id])
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+}
+
+enum EventCategory {
+  WORK
+  PERSONAL
+  FAMILY
+  HEALTH
+  SOCIAL
+  FINANCE
+  OTHER
 }
 
 enum FamilyRole {

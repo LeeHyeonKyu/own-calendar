@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import '../providers/calendar_provider.dart';
+import '../models/event.dart';
 
 class EventFormScreen extends StatefulWidget {
   final String? eventId;
@@ -18,12 +19,15 @@ class _EventFormScreenState extends State<EventFormScreen> {
   final _formKey = GlobalKey<FormState>();
   final _titleController = TextEditingController();
   final _descController = TextEditingController();
+  final _tagController = TextEditingController();
   late DateTime _startDate;
   late TimeOfDay _startTime;
   late DateTime _endDate;
   late TimeOfDay _endTime;
   bool _isAllDay = false;
   bool _isPrivate = false;
+  String _category = 'PERSONAL';
+  List<String> _tags = [];
   String? _selectedCalendarId;
   bool _isLoading = false;
 
@@ -48,6 +52,7 @@ class _EventFormScreenState extends State<EventFormScreen> {
   void dispose() {
     _titleController.dispose();
     _descController.dispose();
+    _tagController.dispose();
     super.dispose();
   }
 
@@ -77,6 +82,8 @@ class _EventFormScreenState extends State<EventFormScreen> {
         _endTime = TimeOfDay.fromDateTime(event.endTime);
         _isAllDay = event.isAllDay;
         _isPrivate = event.isPrivate;
+        _category = event.category;
+        _tags = List.from(event.tags);
         _selectedCalendarId = event.calendarId;
       });
     }
@@ -120,6 +127,16 @@ class _EventFormScreenState extends State<EventFormScreen> {
     }
   }
 
+  void _addTag() {
+    final tag = _tagController.text.trim();
+    if (tag.isNotEmpty && !_tags.contains(tag)) {
+      setState(() {
+        _tags.add(tag);
+        _tagController.clear();
+      });
+    }
+  }
+
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
     if (_selectedCalendarId == null) return;
@@ -140,6 +157,8 @@ class _EventFormScreenState extends State<EventFormScreen> {
       'endTime': endDt.toIso8601String(),
       'isAllDay': _isAllDay,
       'isPrivate': _isPrivate,
+      'category': _category,
+      'tags': _tags,
       'calendarId': _selectedCalendarId,
     };
 
@@ -222,6 +241,38 @@ class _EventFormScreenState extends State<EventFormScreen> {
                   v == null || v.trim().isEmpty ? '제목을 입력하세요' : null,
             ),
             const SizedBox(height: 16),
+            DropdownButtonFormField<String>(
+              value: _category,
+              decoration: const InputDecoration(
+                labelText: '카테고리',
+                border: OutlineInputBorder(),
+              ),
+              items: EventModel.categoryLabels.entries
+                  .map(
+                    (e) => DropdownMenuItem(
+                      value: e.key,
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 12,
+                            height: 12,
+                            margin: const EdgeInsets.only(right: 8),
+                            decoration: BoxDecoration(
+                              color: Color(EventModel.categoryColors[e.key]!),
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                          Text(e.value),
+                        ],
+                      ),
+                    ),
+                  )
+                  .toList(),
+              onChanged: (v) {
+                if (v != null) setState(() => _category = v);
+              },
+            ),
+            const SizedBox(height: 16),
             TextFormField(
               controller: _descController,
               decoration: const InputDecoration(
@@ -230,6 +281,45 @@ class _EventFormScreenState extends State<EventFormScreen> {
               ),
               maxLines: 3,
             ),
+            const SizedBox(height: 16),
+            // Tags
+            Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _tagController,
+                    decoration: const InputDecoration(
+                      labelText: '태그',
+                      hintText: '태그 입력 후 추가',
+                      border: OutlineInputBorder(),
+                    ),
+                    onSubmitted: (_) => _addTag(),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                IconButton.filled(
+                  onPressed: _addTag,
+                  icon: const Icon(Icons.add),
+                ),
+              ],
+            ),
+            if (_tags.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 6,
+                runSpacing: 4,
+                children: _tags
+                    .map(
+                      (tag) => Chip(
+                        label: Text(tag),
+                        deleteIcon: const Icon(Icons.close, size: 16),
+                        onDeleted: () =>
+                            setState(() => _tags.remove(tag)),
+                      ),
+                    )
+                    .toList(),
+              ),
+            ],
             const SizedBox(height: 16),
             SwitchListTile(
               title: const Text('종일'),

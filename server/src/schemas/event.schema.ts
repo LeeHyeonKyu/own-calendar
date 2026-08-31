@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+const EVENT_CATEGORIES = ['WORK', 'PERSONAL', 'FAMILY', 'HEALTH', 'SOCIAL', 'FINANCE', 'OTHER'] as const;
+
 const timeOrderRefinement = <T extends { startTime?: string; endTime?: string }>(data: T) => {
   if (data.startTime && data.endTime) {
     return new Date(data.endTime) >= new Date(data.startTime);
@@ -16,6 +18,8 @@ export const createEventBaseSchema = z.object({
   endTime: z.string(),
   isAllDay: z.boolean().optional(),
   isPrivate: z.boolean().optional(),
+  category: z.enum(EVENT_CATEGORIES).optional().default('PERSONAL'),
+  tags: z.array(z.string()).optional().default([]),
   calendarId: z.string(),
 });
 
@@ -28,11 +32,14 @@ export const updateEventSchema = z.object({
   endTime: z.string().optional(),
   isAllDay: z.boolean().optional(),
   isPrivate: z.boolean().optional(),
+  category: z.enum(EVENT_CATEGORIES).optional(),
+  tags: z.array(z.string()).optional(),
   calendarId: z.string().optional(),
 }).refine(timeOrderRefinement, timeOrderMessage);
 
 export const queryEventSchema = z.object({
   calendarId: z.string().optional(),
+  category: z.enum(EVENT_CATEGORIES).optional(),
   start: z.string().optional(),
   end: z.string().optional(),
 });

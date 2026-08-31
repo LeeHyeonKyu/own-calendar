@@ -5,6 +5,59 @@ import 'package:intl/intl.dart';
 import '../providers/calendar_provider.dart';
 import '../models/event.dart';
 
+void showCategoryFilterDialog(BuildContext context) {
+  showModalBottomSheet(
+    context: context,
+    builder: (ctx) {
+      return StatefulBuilder(
+        builder: (ctx, setSheetState) {
+          final calProvider = ctx.watch<CalendarProvider>();
+          return SafeArea(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                  child: Row(
+                    children: [
+                      const Text(
+                        '카테고리 필터',
+                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                      ),
+                      const Spacer(),
+                      TextButton(
+                        onPressed: () => calProvider.selectAllCategories(),
+                        child: const Text('전체 선택'),
+                      ),
+                    ],
+                  ),
+                ),
+                ...EventModel.categoryLabels.entries.map(
+                  (e) => CheckboxListTile(
+                    value: calProvider.selectedCategories.contains(e.key),
+                    onChanged: (_) => calProvider.toggleCategory(e.key),
+                    secondary: Container(
+                      width: 16,
+                      height: 16,
+                      decoration: BoxDecoration(
+                        color: Color(EventModel.categoryColors[e.key]!),
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                    title: Text(e.value),
+                    dense: true,
+                  ),
+                ),
+                const SizedBox(height: 8),
+              ],
+            ),
+          );
+        },
+      );
+    },
+  );
+}
+
 class MonthlyViewScreen extends StatefulWidget {
   final DateTime? initialMonth;
 
@@ -83,6 +136,15 @@ class _MonthlyViewScreenState extends State<MonthlyViewScreen> {
       appBar: AppBar(
         title: const Text('Own Calendar'),
         actions: [
+          IconButton(
+            icon: Icon(
+              calProvider.isAllCategoriesSelected
+                  ? Icons.filter_list
+                  : Icons.filter_list_off,
+            ),
+            tooltip: '카테고리 필터',
+            onPressed: () => showCategoryFilterDialog(context),
+          ),
           IconButton(
             icon: Icon(
               calProvider.showFamilyEvents ? Icons.people : Icons.people_outline,

@@ -1,13 +1,17 @@
 import prisma from '../lib/prisma';
 
 export const eventService = {
-  async list(userId: string, query: { calendarId?: string; start?: string; end?: string }) {
+  async list(userId: string, query: { calendarId?: string; category?: string; start?: string; end?: string }) {
     const where: any = {
       calendar: { ownerId: userId },
     };
 
     if (query.calendarId) {
       where.calendarId = query.calendarId;
+    }
+
+    if (query.category) {
+      where.category = query.category;
     }
 
     if (query.start) {
@@ -33,6 +37,8 @@ export const eventService = {
       endTime: string;
       isAllDay?: boolean;
       isPrivate?: boolean;
+      category?: string;
+      tags?: string[];
       calendarId: string;
     },
   ) {
@@ -60,6 +66,8 @@ export const eventService = {
         endTime: new Date(data.endTime),
         isAllDay: data.isAllDay,
         isPrivate: data.isPrivate,
+        category: data.category as any,
+        tags: data.tags,
         calendarId: data.calendarId,
         createdById: userId,
       },
@@ -76,6 +84,8 @@ export const eventService = {
       endTime?: string;
       isAllDay?: boolean;
       isPrivate?: boolean;
+      category?: string;
+      tags?: string[];
       calendarId?: string;
     },
   ) {
@@ -150,6 +160,7 @@ export const eventService = {
       OR: [
         { title: { contains: query, mode: 'insensitive' } },
         { description: { contains: query, mode: 'insensitive' } },
+        { tags: { has: query } },
       ],
     };
 

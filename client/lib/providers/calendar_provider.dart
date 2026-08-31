@@ -11,17 +11,46 @@ class CalendarProvider extends ChangeNotifier {
   List<EventModel> _familyEvents = [];
   bool _isLoading = false;
   bool _showFamilyEvents = true;
+  Set<String> _selectedCategories = {
+    'WORK', 'PERSONAL', 'FAMILY', 'HEALTH', 'SOCIAL', 'FINANCE', 'OTHER',
+  };
 
   List<CalendarModel> get calendars => _calendars;
   List<EventModel> get events => _events;
   List<EventModel> get familyEvents => _familyEvents;
-  List<EventModel> get allVisibleEvents =>
-      _showFamilyEvents ? [..._events, ..._familyEvents] : _events;
+  List<EventModel> get allVisibleEvents {
+    final merged = _showFamilyEvents ? [..._events, ..._familyEvents] : _events;
+    if (_selectedCategories.length == EventModel.categoryLabels.length) {
+      return merged;
+    }
+    return merged.where((e) => _selectedCategories.contains(e.category)).toList();
+  }
   bool get isLoading => _isLoading;
   bool get showFamilyEvents => _showFamilyEvents;
+  Set<String> get selectedCategories => _selectedCategories;
+  bool get isAllCategoriesSelected =>
+      _selectedCategories.length == EventModel.categoryLabels.length;
 
   void toggleFamilyEvents() {
     _showFamilyEvents = !_showFamilyEvents;
+    notifyListeners();
+  }
+
+  void toggleCategory(String category) {
+    if (_selectedCategories.contains(category)) {
+      if (_selectedCategories.length > 1) {
+        _selectedCategories.remove(category);
+      }
+    } else {
+      _selectedCategories.add(category);
+    }
+    notifyListeners();
+  }
+
+  void selectAllCategories() {
+    _selectedCategories = {
+      'WORK', 'PERSONAL', 'FAMILY', 'HEALTH', 'SOCIAL', 'FINANCE', 'OTHER',
+    };
     notifyListeners();
   }
 
