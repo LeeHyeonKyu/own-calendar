@@ -4,6 +4,7 @@ import SwiftUI
 struct EventEntry: TimelineEntry {
     let date: Date
     let events: [CalendarEvent]
+    let isLoggedIn: Bool
 }
 
 struct CalendarEvent: Codable, Identifiable {
@@ -19,7 +20,7 @@ struct OwnCalendarProvider: TimelineProvider {
     func placeholder(in context: Context) -> EventEntry {
         EventEntry(date: Date(), events: [
             CalendarEvent(title: "일정 로딩 중...", time: "09:00", category: "PERSONAL")
-        ])
+        ], isLoggedIn: true)
     }
 
     func getSnapshot(in context: Context, completion: @escaping (EventEntry) -> Void) {
@@ -34,12 +35,18 @@ struct OwnCalendarProvider: TimelineProvider {
     }
 
     private func getEntry() -> EventEntry {
+        let isLoggedIn = userDefaults?.bool(forKey: "isLoggedIn") ?? false
+
+        guard isLoggedIn else {
+            return EventEntry(date: Date(), events: [], isLoggedIn: false)
+        }
+
         guard let jsonStr = userDefaults?.string(forKey: "todayEvents"),
               let data = jsonStr.data(using: .utf8),
               let events = try? JSONDecoder().decode([CalendarEvent].self, from: data) else {
-            return EventEntry(date: Date(), events: [])
+            return EventEntry(date: Date(), events: [], isLoggedIn: true)
         }
-        return EventEntry(date: Date(), events: events)
+        return EventEntry(date: Date(), events: events, isLoggedIn: true)
     }
 }
 
@@ -61,7 +68,25 @@ struct OwnCalendarWidgetView: View {
             }
             .padding(.bottom, 2)
 
-            if entry.events.isEmpty {
+            if !entry.isLoggedIn {
+                Spacer()
+                HStack {
+                    Spacer()
+                    VStack(spacing: 4) {
+                        Image(systemName: "person.crop.circle.badge.exclamationmark")
+                            .font(.title2)
+                            .foregroundColor(.secondary)
+                        Text("로그인이 필요합니다")
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                        Text("앱을 열어 로그인해 주세요")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                    Spacer()
+                }
+                Spacer()
+            } else if entry.events.isEmpty {
                 Spacer()
                 HStack {
                     Spacer()

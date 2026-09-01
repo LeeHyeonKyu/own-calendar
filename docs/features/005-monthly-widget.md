@@ -1,0 +1,175 @@
+---
+id: 5
+title: 월별 캘린더 위젯
+status: complete
+date: 2026-09-01
+generatedBy: know-thy-build-feature
+gate:
+  architect: passed
+  designer: passed
+  qa: passed
+designMockup: https://claude.ai/code/artifact/c032980f-9f55-4627-9ec1-bb0681b7a7f3
+---
+
+# Feature 005: 월별 캘린더 위젯
+
+## Summary
+iOS 홈 화면에 월별 캘린더 그리드 위젯을 추가한다. 날짜별 일정 dot 표시, 날짜 선택으로 일정 확인, 페이지 네비게이션, 가족 토글, 카테고리 필터 순환을 위젯 안에서 지원한다.
+
+## Problem
+기존 "오늘 일정" 위젯은 당일 이벤트 목록만 보여줌. 홈 화면에서 이번 달 전체 일정 분포를 한눈에 파악하거나, 특정 날짜의 일정을 빠르게 확인할 수 없음.
+
+## Value
+- PROJECT.md의 **데이터 조작의 자유 (NON-NEGOTIABLE)** — 앱을 열지 않고도 월간 일정 파악 + 특정 날짜 일정 확인
+- 위젯에서 바로 일정 추가 화면으로 이동 가능 (마찰 최소화)
+
+## Design Reference
+인터랙티브 목업: https://claude.ai/code/artifact/c032980f-9f55-4627-9ec1-bb0681b7a7f3
+
+## What We Build
+
+### 위젯 사이즈별 구성
+
+#### Small (155×155pt)
+- 월/년 헤더
+- 7×5~6 캘린더 그리드 (요일 헤더 포함)
+- 오늘 날짜: accent 색 원형 배경
+- 일정 있는 날: 카테고리 색 dot (최대 3개)
+- 일/토 색 구분 (빨강/파랑)
+- 전월/차월 날짜 dimmed 표시
+- 탭 → 앱의 월별 뷰로 이동
+
+#### Medium (329×155pt)
+- 좌측: Small과 동일한 캘린더 그리드 (날짜 선택 가능)
+- 우측: 선택된 날짜의 일정 목록
+  - 날짜 레이블 + "+" 추가 버튼
+  - 이벤트 카드: 카테고리 색 바 + 제목 + 시간
+  - 3건 단위 페이지 네비게이션 (▲▼ 버튼, 4건 이상일 때만 표시)
+  - 일정 없으면 "일정이 없습니다"
+
+#### Large (329×345pt)
+- 상단: 헤더 (월/년 + 가족 토글 + 필터 버튼 + "+" 추가 버튼)
+- 중단: 캘린더 그리드 (날짜 선택 가능)
+- 하단: 구분선 + 선택된 날짜 레이블 + 일정 목록
+  - 이벤트 카드: 카테고리 색 바 + 제목 + 시간 + 카테고리 태그
+  - 3건 단위 페이지 네비게이션 (▲▼ 버튼, 4건 이상일 때만 표시)
+  - 페이지 버튼은 일정 3건 이하일 때 완전히 숨김 (공간 미점유)
+
+### 인터랙션 (iOS 17+ AppIntent)
+
+| # | 동작 | 위치 | 구현 |
+|---|------|------|------|
+| 1 | 날짜 탭 | 위젯 내 | `Button` + `SelectDateIntent` → 선택 날짜 변경, 타임라인 갱신 |
+| 2 | ▲▼ 페이지 | 위젯 내 | `Button` + `PageEventsIntent(direction)` → 페이지 인덱스 변경 |
+| 3 | "+" 추가 | 앱 이동 | `Link(destination:)` → `owncalendar://add?date=YYYY-MM-DD` |
+| 4 | 가족 토글 | 위젯 내 | `Button` + `ToggleFamilyIntent` → showFamilyEvents 플래그 토글 |
+| 5 | 필터 순환 | 위젯 내 | `Button` + `CycleFilterIntent` → 전체→업무→개인→건강→가족→전체 순환 |
+| 6 | 이벤트 탭 | 앱 이동 | `Link(destination:)` → `owncalendar://event/{id}` |
+
+### 데이터 모델
+
+#### Flutter → Widget (UserDefaults via home_widget)
+
+키: `monthlyData` (JSON)
+```json
+{
+  "year": 2026,
+  "month": 9,
+  "events": {
+    "1": [{"id": "...", "title": "팀 스탠드업", "time": "09:30", "endTime": "10:00", "category": "WORK", "isFamily": false}],
+    "3": [...],
+    ...
+  }
+}
+```
+
+기존 키 재사용:
+- `isLoggedIn` (Bool) — Feature 004 패턴
+- `showFamilyEvents` (Bool) — 가족 토글 상태
+
+위젯 내부 상태 (UserDefaults, 위젯 전용):
+- `selectedDay` (Int) — 선택된 날짜
+- `eventPage` (Int) — 현재 페이지 인덱스
+- `filterIndex` (Int) — 카테고리 필터 인덱스 (0=전체, 1=업무, 2=개인, 3=건강, 4=가족)
+
+#### 데이터 갱신
+- CalendarProvider.loadEvents() 완료 시 → 현재 표시 월의 전체 이벤트를 `monthlyData`로 저장
+- 갱신 주기: 30분 (기존 위젯과 동일)
+- 월 변경 시: 앱에서 월 이동하면 해당 월 데이터로 갱신
+
+### UI 상태
+
+| 상태 | 표시 |
+|------|------|
+| 미로그인 | "로그인이 필요합니다" + "앱을 열어 로그인해 주세요" (Feature 004 패턴) |
+| 로그인 + 선택 날짜 일정 없음 | 그리드 표시 + "일정이 없습니다" |
+| 로그인 + 일정 있음 | 그리드 + 일정 목록 (페이지네이션) |
+
+### 딥링크
+
+앱에서 처리해야 하는 URL scheme:
+- `owncalendar://add?date=2026-09-01` → 해당 날짜로 일정 추가 화면
+- `owncalendar://event/{id}` → 이벤트 상세 화면
+- `owncalendar://monthly` → 월별 뷰 (Small 위젯 탭)
+
+### 색상 체계
+
+| 요소 | 라이트 | 다크 |
+|------|--------|------|
+| 오늘 배경 | #34c195 | #34c195 |
+| 일요일 | #e85d5d | #ff6b6b |
+| 토요일 | #5b8def | #6ea8fe |
+| 업무 dot | #5b8def | #5b8def |
+| 개인 dot | #34c195 | #34c195 |
+| 가족 dot | #e85d5d | #e85d5d |
+| 건강 dot | #f0a432 | #f0a432 |
+
+## Scope
+
+**Includes:**
+- iOS WidgetKit: 새 위젯 `OwnCalendarMonthlyWidget` (Small/Medium/Large)
+- WidgetBundle 업데이트 (기존 + 월별 위젯)
+- AppIntent 5개 (SelectDate, PageEvents, ToggleFamily, CycleFilter + 각각의 IntentConfiguration)
+- Flutter CalendarProvider: `_updateMonthlyWidget()` 메서드 추가
+- Flutter 딥링크 핸들링 (URL scheme 등록 + 라우팅)
+- 라이트/다크 테마 대응
+
+**Excludes:**
+- Android 위젯 (아직 미구현)
+- 위젯에서 직접 일정 수정/삭제
+- 월 이동 (위젯에서는 현재 월만 표시)
+- Lock Screen 위젯
+
+## Acceptance Criteria
+- [ ] Small 위젯이 현재 월의 캘린더 그리드를 표시한다
+- [ ] Medium 위젯에서 날짜 탭 시 해당 날짜의 일정이 우측에 표시된다
+- [ ] Large 위젯에서 날짜 탭 시 해당 날짜의 일정이 하단에 표시된다
+- [ ] 오늘 날짜가 accent 색 원형 배경으로 강조된다
+- [ ] 일정 있는 날에 카테고리 색 dot이 표시된다 (최대 3개)
+- [ ] ▲▼ 버튼으로 일정 페이지 전환이 된다 (4건 이상일 때만 표시)
+- [ ] "+" 버튼 탭 시 앱의 일정 추가 화면으로 이동한다
+- [ ] 가족 토글이 가족 일정 포함/제외를 전환한다
+- [ ] 필터 버튼이 전체→업무→개인→건강→가족→전체 순환한다
+- [ ] 미로그인 시 "로그인이 필요합니다" 상태가 표시된다
+- [ ] 라이트/다크 테마에서 모두 정상 표시된다
+- [ ] 기존 "오늘 일정" 위젯이 정상 동작한다 (회귀 없음)
+- [ ] 위젯 세 가지 크기 모두 정상 렌더링된다
+
+## Approach
+- 기존 `OwnCalendarWidget`과 독립된 새 위젯으로 구현 (WidgetBundle에 추가)
+- `AppIntentConfiguration` 사용 (iOS 17+ 필수, `IPHONEOS_DEPLOYMENT_TARGET = 17.0`으로 상향 검토)
+- Flutter에서 월별 이벤트 데이터를 JSON으로 직렬화하여 UserDefaults에 저장
+- 위젯 내부 상태 (selectedDay, eventPage, filterIndex)는 UserDefaults에 별도 키로 관리
+- 딥링크는 `uni_links` 또는 Flutter의 기본 URL handling 사용
+
+## Files to Create/Modify
+- `client/ios/OwnCalendarWidget/OwnCalendarMonthlyWidget.swift` — 새 위젯
+- `client/ios/OwnCalendarWidget/MonthlyIntents.swift` — AppIntent 정의
+- `client/ios/OwnCalendarWidget/OwnCalendarWidgetBundle.swift` — 번들 업데이트
+- `client/lib/providers/calendar_provider.dart` — `_updateMonthlyWidget()` 추가
+- `client/lib/router.dart` — 딥링크 라우팅 추가
+- `client/ios/Runner/Info.plist` — URL scheme 등록
+
+---
+
+*Generated by know-thy-build-feature | 2026-09-01*

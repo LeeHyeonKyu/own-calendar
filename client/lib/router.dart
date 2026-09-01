@@ -80,6 +80,18 @@ GoRouter createRouter(AuthProvider authProvider) {
         path: '/settings',
         builder: (context, state) => const SettingsScreen(),
       ),
+      // Deep link routes for widget interactions
+      GoRoute(
+        path: '/add',
+        redirect: (context, state) {
+          final date = state.uri.queryParameters['date'];
+          return date != null ? '/event/new?date=$date' : '/event/new';
+        },
+      ),
+      GoRoute(
+        path: '/monthly',
+        redirect: (context, state) => '/',
+      ),
     ],
   );
 }

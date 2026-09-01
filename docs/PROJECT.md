@@ -167,9 +167,11 @@ lastEvolve: 2026-08-31
 
 | # | Feature | Priority | Depends On | Status |
 |---|---------|----------|------------|--------|
-| 001 | [프로젝트 스캐폴딩 및 기본 일정 CRUD API](../specs/features/001-project-scaffold-crud-api.md) | P0 | — | complete |
-| 002 | [가족 그룹 및 일정 공유](../specs/features/002-family-sharing.md) | P0 | 001 | complete |
-| 003 | [자동 로그인 (세션 유지)](../specs/features/003-auto-login.md) | P1 | 001 | complete |
+| 001 | [프로젝트 스캐폴딩 및 기본 일정 CRUD API](features/001-project-scaffold-crud-api.md) | P0 | — | complete |
+| 002 | [가족 그룹 및 일정 공유](features/002-family-sharing.md) | P0 | 001 | complete |
+| 003 | [자동 로그인 (세션 유지)](features/003-auto-login.md) | P1 | 001 | complete |
+| 004 | [위젯 인증 상태 연동](features/004-widget-auth-state.md) | P1 | 003 | complete |
+| 005 | [월별 캘린더 위젯](features/005-monthly-widget.md) | P0 | 004 | complete |
 
 **Technical Foundation:** [TECHNICAL.md](TECHNICAL.md)
 

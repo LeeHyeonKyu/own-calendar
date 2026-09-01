@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:home_widget/home_widget.dart';
 import '../models/user.dart';
 import '../services/api_service.dart';
 
@@ -12,6 +13,33 @@ class AuthProvider extends ChangeNotifier {
   bool _isLoading = false;
   bool _isInitialized = false;
   String? _error;
+
+  Future<void> _clearWidgetData() async {
+    try {
+      await HomeWidget.saveWidgetData<String>('todayEvents', '[]');
+      await HomeWidget.saveWidgetData<bool>('isLoggedIn', false);
+      await HomeWidget.updateWidget(
+        iOSName: 'OwnCalendarWidget',
+        androidName: 'OwnCalendarWidgetProvider',
+      );
+      // Clear monthly widget data
+      await HomeWidget.saveWidgetData<String>('monthlyData', '{}');
+      await HomeWidget.updateWidget(
+        iOSName: 'OwnCalendarMonthlyWidget',
+        androidName: 'OwnCalendarMonthlyWidgetProvider',
+      );
+    } catch (_) {}
+  }
+
+  Future<void> _setWidgetLoggedIn() async {
+    try {
+      await HomeWidget.saveWidgetData<bool>('isLoggedIn', true);
+      await HomeWidget.updateWidget(
+        iOSName: 'OwnCalendarWidget',
+        androidName: 'OwnCalendarWidgetProvider',
+      );
+    } catch (_) {}
+  }
 
   User? get user => _user;
   bool get isLoading => _isLoading;
@@ -33,6 +61,7 @@ class AuthProvider extends ChangeNotifier {
         await _api.saveTokens(data['accessToken'], data['refreshToken']);
         await _api.saveCachedUser(jsonEncode(data['user']));
         _user = User.fromJson(data['user']);
+        unawaited(_setWidgetLoggedIn());
         _isLoading = false;
         notifyListeners();
         return true;
@@ -60,6 +89,7 @@ class AuthProvider extends ChangeNotifier {
         await _api.saveTokens(data['accessToken'], data['refreshToken']);
         await _api.saveCachedUser(jsonEncode(data['user']));
         _user = User.fromJson(data['user']);
+        unawaited(_setWidgetLoggedIn());
         _isLoading = false;
         notifyListeners();
         return true;
@@ -79,6 +109,7 @@ class AuthProvider extends ChangeNotifier {
       await _api.post('/auth/logout', {'refreshToken': refresh});
     }
     await _api.clearTokens();
+    await _clearWidgetData();
     _user = null;
     notifyListeners();
   }
@@ -100,6 +131,7 @@ class AuthProvider extends ChangeNotifier {
           _user = User.fromJson(
             jsonDecode(cachedJson) as Map<String, dynamic>,
           );
+          unawaited(_setWidgetLoggedIn());
         } catch (_) {
           // 캐시 포맷이 깨진 경우 무시 — hydrate에서 복원 시도
         }
@@ -129,8 +161,8 @@ class AuthProvider extends ChangeNotifier {
         await _api.saveCachedUser(jsonEncode(userJson));
         notifyListeners();
       } else if (res.statusCode == 401) {
-        // ApiService가 refresh 시도 + 실패 시 clearTokens까지 이미 수행.
         _user = null;
+        unawaited(_clearWidgetData());
         notifyListeners();
       }
       // 기타 상태 코드(5xx 등)는 일시 장애로 간주하고 기존 상태 유지.

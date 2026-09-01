@@ -5,5 +5,6 @@ import SwiftUI
 struct OwnCalendarWidgetBundle: WidgetBundle {
     var body: some Widget {
         OwnCalendarWidget()
+        OwnCalendarMonthlyWidget()
     }
 }

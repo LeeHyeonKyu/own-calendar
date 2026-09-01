@@ -55,6 +55,66 @@ class CalendarProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> _updateMonthlyWidget() async {
+    try {
+      final now = DateTime.now();
+      // Build events map: day number -> list of event data
+      final Map<String, List<Map<String, dynamic>>> eventsMap = {};
+
+      final allEvents = [..._events, ..._familyEvents];
+      for (final event in allEvents) {
+        // Include events that fall within the current display month
+        final monthStart = DateTime(now.year, now.month, 1);
+        final monthEnd = DateTime(now.year, now.month + 1, 0, 23, 59, 59);
+
+        if (event.endTime.isBefore(monthStart) ||
+            event.startTime.isAfter(monthEnd)) {
+          continue;
+        }
+
+        // Determine which days this event appears on
+        final eventStart =
+            event.startTime.isBefore(monthStart) ? monthStart : event.startTime;
+        final eventEnd =
+            event.endTime.isAfter(monthEnd) ? monthEnd : event.endTime;
+
+        for (var d = DateTime(eventStart.year, eventStart.month, eventStart.day);
+            !d.isAfter(eventEnd);
+            d = d.add(const Duration(days: 1))) {
+          if (d.month != now.month) continue;
+          final dayKey = d.day.toString();
+          eventsMap.putIfAbsent(dayKey, () => []);
+          // Avoid duplicates (multi-day events)
+          if (eventsMap[dayKey]!.any((e) => e['id'] == event.id)) continue;
+          eventsMap[dayKey]!.add({
+            'id': event.id,
+            'title': event.title,
+            'time': event.isAllDay
+                ? '종일'
+                : '${event.startTime.hour.toString().padLeft(2, '0')}:${event.startTime.minute.toString().padLeft(2, '0')}',
+            'endTime': event.isAllDay
+                ? null
+                : '${event.endTime.hour.toString().padLeft(2, '0')}:${event.endTime.minute.toString().padLeft(2, '0')}',
+            'category': event.category,
+            'isFamily': _familyEvents.contains(event),
+          });
+        }
+      }
+
+      final monthlyData = {
+        'year': now.year,
+        'month': now.month,
+        'events': eventsMap,
+      };
+
+      await HomeWidget.saveWidgetData('monthlyData', jsonEncode(monthlyData));
+      await HomeWidget.updateWidget(
+        iOSName: 'OwnCalendarMonthlyWidget',
+        androidName: 'OwnCalendarMonthlyWidgetProvider',
+      );
+    } catch (_) {}
+  }
+
   Future<void> _updateHomeWidget() async {
     try {
       final now = DateTime.now();
@@ -80,6 +140,7 @@ class CalendarProvider extends ChangeNotifier {
       await HomeWidget.saveWidgetData('todayEvents', jsonEncode(widgetData));
       await HomeWidget.saveWidgetData(
           'lastUpdated', DateTime.now().toIso8601String());
+      await HomeWidget.saveWidgetData<bool>('isLoggedIn', true);
       await HomeWidget.updateWidget(
         iOSName: 'OwnCalendarWidget',
         androidName: 'OwnCalendarWidgetProvider',
@@ -110,6 +171,7 @@ class CalendarProvider extends ChangeNotifier {
     _isLoading = false;
     notifyListeners();
     _updateHomeWidget();
+    _updateMonthlyWidget();
   }
 
   Future<void> loadFamilyEvents({DateTime? start, DateTime? end}) async {
@@ -136,6 +198,7 @@ class CalendarProvider extends ChangeNotifier {
       }
       notifyListeners();
       _updateHomeWidget();
+      _updateMonthlyWidget();
     }
   }
 

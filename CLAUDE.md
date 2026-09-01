@@ -4,7 +4,48 @@ Technical decisions are documented in [TECHNICAL.md](./docs/TECHNICAL.md).
 AI agents MUST read docs/PROJECT.md and docs/TECHNICAL.md before starting any work.
 NON-NEGOTIABLE rules in PROJECT.md cannot be overridden.
 
-## Development Workflow
+## Worktree Workflow
+
+### Principle
+- Feature specs (`docs/`, `specs/`) are defined **only in main**.
+- Implementation code is modified **only in the worktree**. Worktree path: `../own-calendar-wt`
+- If a spec change is needed, edit it in main and sync to worktree via `git merge main` (one-way flow).
+- Merge strategy: **squash merge** — `feat(NNN): title` format.
+- On feature completion: `git worktree remove` + `git branch -d` automatic cleanup.
+
+### Feature Lifecycle
+
+```
+main:
+  /know-thy-build:feature → spec finalized → worktree created → sub-agent dispatched
+
+worktree (sub-agent orchestrates the entire lifecycle):
+  Phase 1 — Define:
+    /know-thy-build:architect  → scaffold, signature tests
+    /know-thy-build:designer   → design intent (UI features only)
+    /know-thy-build:qa REVIEW  → test cases
+
+  Phase 2 — Implement:
+    Sub-agent fills scaffolds and implements code
+
+  Phase 3 — Review:
+    Architect review → gate.architect ✓
+    Designer review  → gate.designer ✓
+    QA TEST          → gate.qa ✓
+
+  Phase 4 — Finish:
+    All gates passed → /know-thy-build:finish → squash merge + cleanup
+```
+
+### Gate (Merge Prerequisite)
+The `gate` field in the feature spec frontmatter tracks review status.
+Merge is allowed only when all gates are `passed` or `skipped`.
+
+| Role | Gate Status | Updated When |
+|------|-----------|--------------|
+| architect | pending → passed | Architect review passes |
+| designer | pending → passed / skipped | Designer review passes (skipped for non-UI) |
+| qa | pending → passed | All QA test cases pass |
 
 ### Orchestrator Model
 The user session acts as **orchestrator only** — it does NOT implement directly.
@@ -63,7 +104,7 @@ All implementation is delegated to sub-agents with explicit scope and goals.
    - Designer + Architect re-review if changes are structural
    - QA re-tests failed scenarios + regression check on happy path
    - Loop continues until ALL reviewers' criteria are `[x]`
-   - Only when all three reviewers fully pass does the orchestrator accept the work
+   - Only when all three reviewers fully pass does `/know-thy-build:finish` proceed
 
 ### iOS Build (Widget / Native)
 
@@ -80,5 +121,6 @@ Intel iMac (macOS 15.x) 환경 제약:
 - Project definition: `docs/PROJECT.md`
 - Technical foundation: `docs/TECHNICAL.md`
 - QA checklist: `docs/QA_CHECKLIST.md`
-- Feature specs: `specs/features/NNN.md`
+- QA test cases: `docs/QA.md`
+- Feature specs: `docs/features/NNN.md`
 - Feature registry: `docs/PROJECT.md` → Feature Registry section

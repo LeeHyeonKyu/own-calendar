@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
@@ -39,6 +40,7 @@ class OwnCalendarApp extends StatefulWidget {
 
 class _OwnCalendarAppState extends State<OwnCalendarApp> {
   late final GoRouter _router;
+  StreamSubscription<Uri?>? _widgetClickSub;
 
   @override
   void initState() {
@@ -46,6 +48,42 @@ class _OwnCalendarAppState extends State<OwnCalendarApp> {
     // Router를 한 번만 생성. AuthProvider 변경은 refreshListenable이 반응하므로
     // 여기서 Consumer로 감싸 재생성할 필요가 없다.
     _router = createRouter(widget.authProvider);
+
+    // Handle deep links from widget clicks (runtime)
+    _widgetClickSub = HomeWidget.widgetClicked.listen(_handleWidgetUri);
+
+    // Handle deep link if app was launched from widget (cold start)
+    HomeWidget.initiallyLaunchedFromHomeWidget().then(_handleWidgetUri);
+  }
+
+  @override
+  void dispose() {
+    _widgetClickSub?.cancel();
+    super.dispose();
+  }
+
+  void _handleWidgetUri(Uri? uri) {
+    if (uri == null) return;
+    // owncalendar://monthly → host = "monthly", path = ""
+    // owncalendar://add?date=2026-09-01 → host = "add", query = "date=2026-09-01"
+    // owncalendar://event/abc123 → host = "event", path = "/abc123"
+    final action = uri.host;
+    switch (action) {
+      case 'monthly':
+        _router.go('/');
+        break;
+      case 'add':
+        final date = uri.queryParameters['date'];
+        _router.go(date != null ? '/event/new?date=$date' : '/event/new');
+        break;
+      case 'event':
+        final id =
+            uri.pathSegments.isNotEmpty ? uri.pathSegments.first : null;
+        if (id != null) {
+          _router.go('/event/$id/edit');
+        }
+        break;
+    }
   }
 
   @override
