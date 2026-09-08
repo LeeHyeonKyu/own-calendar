@@ -25,6 +25,8 @@ model User {
   sentFollows         Follow[]           @relation("FollowSent")
   receivedFollows     Follow[]           @relation("FollowReceived")
   eventInvites        EventInvite[]
+  routines            Routine[]
+  routineGroups       RoutineGroup[]
   createdAt           DateTime           @default(now())
   updatedAt           DateTime           @updatedAt
 }
@@ -283,4 +285,42 @@ model EventInvite {
   createdAt DateTime     @default(now())
 
   @@unique([eventId, inviteeId])
+}
+
+model RoutineGroup {
+  id        String    @id @default(cuid())
+  name      String
+  sortOrder Int       @default(0)
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  routines  Routine[]
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+}
+
+model Routine {
+  id          String              @id @default(cuid())
+  name        String
+  time        String?
+  repeatDays  Json
+  sortOrder   Int                 @default(0)
+  groupId     String?
+  group       RoutineGroup?       @relation(fields: [groupId], references: [id], onDelete: SetNull)
+  userId      String
+  user        User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  completions RoutineCompletion[]
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+}
+
+model RoutineCompletion {
+  id          String   @id @default(cuid())
+  routineId   String
+  routine     Routine  @relation(fields: [routineId], references: [id], onDelete: Cascade)
+  date        DateTime
+  completedAt DateTime @default(now())
+  createdAt   DateTime @default(now())
+
+  @@unique([routineId, date])
+  @@index([routineId])
 }

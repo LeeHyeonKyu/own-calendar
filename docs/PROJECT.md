@@ -182,7 +182,7 @@ lastEvolve: 2026-08-31
 | 013 | [공휴일 연동 (국가별 구독)](features/013-public-holidays.md) | P1 | 001 | complete |
 | 014 | [DB 클라우드 이전 및 백업 체계](features/014-cloud-db-migration.md) | P1 | 001 | complete |
 | 015 | [하단 네비게이션 통일 및 커스터마이징](features/015-navigation-customization.md) | P1 | 001 | complete |
-| 016 | [그룹 및 Follow/Invite 시스템](features/016-group-and-follow.md) | P1 | 001 | spec-complete |
+| 016 | [그룹 및 Follow/Invite 시스템](features/016-group-and-follow.md) | P1 | 001 | complete |
 | 017 | [Custom Category (색상/이모지)](features/017-custom-category.md) | P2 | 001, 006 | spec-complete |
 | 018 | [Event/Task 메타데이터 (참여자, 장소, 메모)](features/018-event-task-metadata.md) | P0 | 001, 006 | complete |
 | 019 | [네이티브 앱 패키징 (iOS/macOS + CI/CD)](features/019-native-app-packaging.md) | P0 | 001 | complete |
