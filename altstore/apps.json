@@ -1,0 +1,59 @@
+{
+  "name": "Own Calendar",
+  "identifier": "com.owncalendar.source",
+  "subtitle": "Self-hosted family calendar hub",
+  "description": "Own Calendar source for AltStore. All your schedules in one place — Naver, Google, TickTick unified with family sharing.",
+  "iconURL": "https://raw.githubusercontent.com/LeeHyeonKyu/own-calendar/main/altstore/icon.png",
+  "headerURL": "",
+  "website": "https://github.com/LeeHyeonKyu/own-calendar",
+  "tintColor": "4A90D9",
+  "featuredApps": [
+    "com.owncalendar.ownCalendar"
+  ],
+  "apps": [
+    {
+      "name": "Own Calendar",
+      "bundleIdentifier": "com.owncalendar.ownCalendar",
+      "developerName": "LeeHyeonKyu",
+      "subtitle": "Unified family calendar",
+      "localizedDescription": "Own Calendar brings all your schedules into one place. Sync with Naver Calendar, Google Calendar, and TickTick. Share calendars with your family effortlessly.\n\nFeatures:\n- Unified calendar view (Naver, Google, TickTick)\n- Bidirectional sync with Google Calendar\n- Family group sharing\n- Past event search\n- iOS home screen widgets\n- Self-hosted — you own your data",
+      "iconURL": "https://raw.githubusercontent.com/LeeHyeonKyu/own-calendar/main/altstore/icon.png",
+      "tintColor": "4A90D9",
+      "category": "utilities",
+      "screenshots": [],
+      "version": "1.0.0",
+      "versionDate": "2026-09-08T00:00:00Z",
+      "downloadURL": "https://github.com/LeeHyeonKyu/own-calendar/releases/latest/download/OwnCalendar.ipa",
+      "size": 0,
+      "minOSVersion": "16.0",
+      "permissions": [
+        {
+          "type": "network",
+          "usageDescription": "Connects to your self-hosted Own Calendar server for syncing events and family sharing."
+        },
+        {
+          "type": "background-fetch",
+          "usageDescription": "Refreshes widget data and syncs calendar events in the background."
+        }
+      ],
+      "appPermissions": {
+        "entitlements": [
+          {
+            "name": "com.apple.security.application-groups"
+          }
+        ],
+        "privacy": []
+      },
+      "versions": [
+        {
+          "version": "1.0.0",
+          "date": "2026-09-08T00:00:00Z",
+          "localizedDescription": "Initial release with unified calendar view, family sharing, and home screen widgets.",
+          "downloadURL": "https://github.com/LeeHyeonKyu/own-calendar/releases/latest/download/OwnCalendar.ipa",
+          "size": 0
+        }
+      ]
+    }
+  ],
+  "news": []
+}

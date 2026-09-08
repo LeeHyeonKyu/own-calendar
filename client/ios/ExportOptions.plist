@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<!--
+  Export options for CI builds.
+  Uses "development" method since this project uses a free Apple Developer account.
+  The IPA is distributed via AltStore/SideStore sideloading, not the App Store.
+
+  Note: The CI workflow uses the --no-codesign flag and packages the IPA manually
+  (Payload zip method) since GitHub Actions runners don't have signing certificates.
+  This file is kept for reference and for local signed builds.
+-->
+<dict>
+	<key>method</key>
+	<string>development</string>
+	<key>compileBitcode</key>
+	<false/>
+	<key>thinning</key>
+	<string>&lt;none&gt;</string>
+</dict>
+</plist>

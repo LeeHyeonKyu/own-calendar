@@ -1,0 +1,251 @@
+name: Build Native Apps
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# Cancel in-progress runs for the same branch
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Must ship Dart SDK >= 3.11.1 (see client/pubspec.yaml).
+  # Use 'any' to pick the latest stable; pin here if reproducibility is needed.
+  FLUTTER_CHANNEL: stable
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Version tagging — date-based: v2026.09.08.1 (bumps run number per day)
+  # ---------------------------------------------------------------------------
+  version:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.tag.outputs.version }}
+      build_number: ${{ steps.tag.outputs.build_number }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Generate version tag
+        id: tag
+        run: |
+          DATE_TAG="v$(date -u +'%Y.%m.%d')"
+          # Count existing tags for today to determine run number
+          EXISTING=$(git tag -l "${DATE_TAG}.*" | wc -l | tr -d ' ')
+          RUN_NUM=$((EXISTING + 1))
+          VERSION="${DATE_TAG}.${RUN_NUM}"
+          # Build number = days since 2026-01-01 * 100 + run number (unique ascending integer)
+          EPOCH_START=$(date -u -d '2026-01-01' +%s 2>/dev/null || date -u -j -f '%Y-%m-%d' '2026-01-01' +%s)
+          NOW=$(date -u +%s)
+          DAYS=$(( (NOW - EPOCH_START) / 86400 ))
+          BUILD_NUM=$(( DAYS * 100 + RUN_NUM ))
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "build_number=${BUILD_NUM}" >> "$GITHUB_OUTPUT"
+          echo "Version: ${VERSION}, Build: ${BUILD_NUM}"
+
+  # ---------------------------------------------------------------------------
+  # iOS — build IPA for AltStore / SideStore sideloading
+  # ---------------------------------------------------------------------------
+  build-ios:
+    needs: version
+    runs-on: macos-latest
+    defaults:
+      run:
+        working-directory: client
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: ${{ env.FLUTTER_CHANNEL }}
+          cache: true
+
+      - name: Flutter dependencies
+        run: flutter pub get
+
+      - name: CocoaPods install
+        working-directory: client/ios
+        run: pod install
+
+      - name: Build iOS (release, no codesign)
+        run: |
+          flutter build ios --release --no-codesign \
+            --build-name="${{ needs.version.outputs.version }}" \
+            --build-number="${{ needs.version.outputs.build_number }}"
+
+      - name: Package IPA (ad-hoc / Payload method)
+        run: |
+          # For AltStore/SideStore sideloading, we create a thin IPA
+          # by zipping the .app inside a Payload folder.
+          # This avoids needing an Apple Developer signing certificate.
+          mkdir -p build/ios/ipa/Payload
+          cp -r build/ios/iphoneos/Runner.app build/ios/ipa/Payload/
+          cd build/ios/ipa
+          zip -r -9 OwnCalendar.ipa Payload/
+
+      - name: Upload IPA artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: OwnCalendar-iOS
+          path: client/build/ios/ipa/OwnCalendar.ipa
+          retention-days: 30
+
+  # ---------------------------------------------------------------------------
+  # macOS — build universal .app bundle (Intel + Apple Silicon)
+  # ---------------------------------------------------------------------------
+  build-macos:
+    needs: version
+    runs-on: macos-latest
+    defaults:
+      run:
+        working-directory: client
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: ${{ env.FLUTTER_CHANNEL }}
+          cache: true
+
+      - name: Flutter dependencies
+        run: flutter pub get
+
+      - name: Build macOS (release)
+        run: |
+          flutter build macos --release \
+            --build-name="${{ needs.version.outputs.version }}" \
+            --build-number="${{ needs.version.outputs.build_number }}"
+
+      - name: Package macOS app as zip
+        run: |
+          cd build/macos/Build/Products/Release
+          # The app name comes from the Xcode project (own_calendar.app)
+          APP_NAME=$(ls -d *.app | head -1)
+          zip -r -9 -y "OwnCalendar-macOS.zip" "$APP_NAME"
+
+      - name: Upload macOS artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: OwnCalendar-macOS
+          path: client/build/macos/Build/Products/Release/OwnCalendar-macOS.zip
+          retention-days: 30
+
+  # ---------------------------------------------------------------------------
+  # Release — create GitHub Release and upload artifacts
+  # ---------------------------------------------------------------------------
+  release:
+    needs: [version, build-ios, build-macos]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.version.outputs.version }}
+          name: "Own Calendar ${{ needs.version.outputs.version }}"
+          body: |
+            ## Own Calendar ${{ needs.version.outputs.version }}
+
+            ### Downloads
+            - **iOS (IPA)**: Install via AltStore or SideStore for sideloading
+            - **macOS (.app)**: Extract the zip and move to /Applications
+
+            ### iOS Sideloading
+            1. Download `OwnCalendar.ipa`
+            2. AirDrop to iPhone or use AltStore/SideStore to install
+            3. See [installation guide](https://github.com/LeeHyeonKyu/own-calendar/blob/main/client/ios/dist/README.md)
+
+            ### AltStore Source
+            Add this URL to AltStore as a source for automatic updates:
+            ```
+            https://raw.githubusercontent.com/LeeHyeonKyu/own-calendar/main/altstore/apps.json
+            ```
+
+            Built from commit: ${{ github.sha }}
+          draft: false
+          prerelease: false
+          files: |
+            artifacts/OwnCalendar-iOS/OwnCalendar.ipa
+            artifacts/OwnCalendar-macOS/OwnCalendar-macOS.zip
+
+  # ---------------------------------------------------------------------------
+  # Update AltStore source JSON with latest release URL
+  # ---------------------------------------------------------------------------
+  update-altstore:
+    needs: [version, release]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Update AltStore source JSON
+        env:
+          APP_VERSION: ${{ needs.version.outputs.version }}
+        run: |
+          DOWNLOAD_URL="https://github.com/LeeHyeonKyu/own-calendar/releases/download/${APP_VERSION}/OwnCalendar.ipa"
+          VERSION_DATE=$(date -u +'%Y-%m-%dT%H:%M:%SZ')
+          export DOWNLOAD_URL VERSION_DATE
+
+          python3 << 'PYEOF'
+          import json, os
+
+          version = os.environ["APP_VERSION"]
+          date = os.environ["VERSION_DATE"]
+          download_url = os.environ["DOWNLOAD_URL"]
+
+          with open("altstore/apps.json", "r") as f:
+              data = json.load(f)
+
+          app = data["apps"][0]
+
+          # Check if this version already exists
+          existing_versions = [v["version"] for v in app.get("versions", [])]
+          if version not in existing_versions:
+              new_version = {
+                  "version": version,
+                  "date": date,
+                  "localizedDescription": f"Own Calendar {version}",
+                  "downloadURL": download_url,
+                  "size": 0
+              }
+              app["versions"].insert(0, new_version)
+
+          # Also update the top-level convenience fields
+          app["version"] = version
+          app["versionDate"] = date
+          app["downloadURL"] = download_url
+
+          with open("altstore/apps.json", "w") as f:
+              json.dump(data, f, indent=2, ensure_ascii=False)
+              f.write("\n")
+
+          print(f"Updated altstore/apps.json to {version}")
+          PYEOF
+
+      - name: Commit AltStore source update
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add altstore/apps.json
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "ci: update AltStore source to ${{ needs.version.outputs.version }}"
+            git push
+          fi
