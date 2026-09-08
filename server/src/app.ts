@@ -8,8 +8,10 @@ import calendarRoutes from './routes/calendars';
 import eventRoutes from './routes/events';
 import taskRoutes from './routes/tasks';
 import familyRoutes from './routes/family';
+import groupRoutes from './routes/groups';
+import followRoutes from './routes/follows';
+import inviteRoutes from './routes/invites';
 import googleRoutes from './routes/google';
-import importRoutes from './routes/import';
 
 const app = express();
 
@@ -51,14 +53,17 @@ app.get('/health', (_req, res) => {
 app.use('/api/auth/login', authLimiter);
 app.use('/api/auth/register', authLimiter);
 app.use('/api/family/join', authLimiter);
+app.use('/api/groups/join', authLimiter);
 
 app.use('/api/auth', authRoutes);
 app.use('/api/calendars', calendarRoutes);
 app.use('/api/events', eventRoutes);
 app.use('/api/tasks', taskRoutes);
 app.use('/api/family', familyRoutes);
+app.use('/api/groups', groupRoutes);
+app.use('/api/follows', followRoutes);
+app.use('/api/invites', inviteRoutes);
 app.use('/api/google', googleRoutes);
-app.use('/api/import', importRoutes);
 
 app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
   console.error(err.stack);
