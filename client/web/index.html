@@ -1,46 +1,58 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <!--
-    If you are serving your web app in a path other than the root, change the
-    href value below to reflect the base path you are serving from.
-
-    The path provided below has to start and end with a slash "/" in order for
-    it to work correctly.
-
-    For more details:
-    * https://developer.mozilla.org/en-US/docs/Web/HTML/Element/base
-
-    This is a placeholder for base href that will be replaced by the value of
-    the `--base-href` argument provided to `flutter build`.
-  -->
   <base href="$FLUTTER_BASE_HREF">
-
   <meta charset="UTF-8">
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">
-  <meta name="description" content="A new Flutter project.">
+  <meta name="description" content="Own Calendar">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-  <!-- iOS meta tags & icons -->
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black">
-  <meta name="apple-mobile-web-app-title" content="own_calendar">
+  <meta name="apple-mobile-web-app-title" content="Own Calendar">
   <link rel="apple-touch-icon" href="icons/Icon-192.png">
-
-  <!-- Favicon -->
   <link rel="icon" type="image/png" href="favicon.png"/>
 
-  <title>own_calendar</title>
+  <title>Own Calendar</title>
   <link rel="manifest" href="manifest.json">
+
+  <style>
+    body { margin: 0; background: #121212; }
+    #loading {
+      position: fixed; inset: 0; z-index: 9999;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      background: #121212; color: #9CA3B0;
+      font-family: -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+      gap: 16px;
+    }
+    #loading .spinner {
+      width: 32px; height: 32px;
+      border: 3px solid #2A3040;
+      border-top-color: #5B8DEF;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    #loading .label { font-size: 14px; font-weight: 500; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    @media (prefers-color-scheme: light) {
+      body { background: #F4F5F8; }
+      #loading { background: #F4F5F8; color: #6B7588; }
+      #loading .spinner { border-color: #E6E8EE; border-top-color: #5B8DEF; }
+    }
+  </style>
 </head>
 <body>
-  <!--
-    You can customize the "flutter_bootstrap.js" script.
-    This is useful to provide a custom configuration to the Flutter loader
-    or to give the user feedback during the initialization process.
-
-    For more details:
-    * https://docs.flutter.dev/platform-integration/web/initialization
-  -->
+  <div id="loading">
+    <div class="spinner"></div>
+    <div class="label">Own Calendar</div>
+  </div>
+  <script>
+    window.addEventListener('flutter-first-frame', function () {
+      var el = document.getElementById('loading');
+      if (el) el.remove();
+    });
+  </script>
   <script src="flutter_bootstrap.js" async></script>
 </body>
 </html>
