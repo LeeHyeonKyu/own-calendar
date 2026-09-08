@@ -13,8 +13,6 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  int _currentIndex = 0;
-
   @override
   void initState() {
     super.initState();
@@ -29,23 +27,6 @@ class _HomeScreenState extends State<HomeScreen> {
     final todayEnd = todayStart.add(const Duration(days: 1));
     await provider.loadEvents(start: todayStart, end: todayEnd);
     await provider.loadFamilyEvents(start: todayStart, end: todayEnd);
-  }
-
-  void _onTabTapped(int index) {
-    switch (index) {
-      case 0:
-        setState(() => _currentIndex = 0);
-        break;
-      case 1:
-        context.push('/weekly');
-        break;
-      case 2:
-        context.push('/family');
-        break;
-      case 3:
-        context.push('/settings');
-        break;
-    }
   }
 
   @override
@@ -120,20 +101,6 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
           ],
         ),
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => context.push('/event/new'),
-        child: const Icon(Icons.add),
-      ),
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: _currentIndex,
-        onDestinationSelected: _onTabTapped,
-        destinations: const [
-          NavigationDestination(icon: Icon(Icons.today), label: '일별'),
-          NavigationDestination(icon: Icon(Icons.view_week), label: '주별'),
-          NavigationDestination(icon: Icon(Icons.family_restroom), label: '가족'),
-          NavigationDestination(icon: Icon(Icons.settings), label: '설정'),
-        ],
       ),
     );
   }

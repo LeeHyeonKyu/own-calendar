@@ -110,34 +110,6 @@ class _WeeklyViewScreenState extends State<WeeklyViewScreen> {
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          final date = _selectedDayIndex != null ? days[_selectedDayIndex!] : DateTime.now();
-          _showCreateSheet(context, date);
-        },
-        child: const Icon(Icons.add),
-      ),
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: 2,
-        onDestinationSelected: (index) {
-          switch (index) {
-            case 0: context.go('/'); break;
-            case 1: context.push('/daily'); break;
-            case 2: break;
-            case 3: context.push('/yearly'); break;
-            case 4: context.push('/family'); break;
-            case 5: context.push('/settings'); break;
-          }
-        },
-        destinations: const [
-          NavigationDestination(icon: Icon(Icons.calendar_month), label: '월별'),
-          NavigationDestination(icon: Icon(Icons.today), label: '일별'),
-          NavigationDestination(icon: Icon(Icons.view_week), label: '주별'),
-          NavigationDestination(icon: Icon(Icons.calendar_today), label: '연별'),
-          NavigationDestination(icon: Icon(Icons.family_restroom), label: '가족'),
-          NavigationDestination(icon: Icon(Icons.settings), label: '설정'),
-        ],
-      ),
     );
   }
 
@@ -662,32 +634,4 @@ class _WeeklyViewScreenState extends State<WeeklyViewScreen> {
     );
   }
 
-  void _showCreateSheet(BuildContext context, DateTime date) {
-    showModalBottomSheet(
-      context: context,
-      builder: (ctx) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: const Icon(Icons.event, color: _eventColor),
-              title: const Text('새 Event'),
-              onTap: () {
-                Navigator.pop(ctx);
-                context.push('/event/new?date=${date.toIso8601String()}');
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.check_box_outlined, color: _taskColor),
-              title: const Text('새 Task'),
-              onTap: () {
-                Navigator.pop(ctx);
-                context.push('/task/new?date=${date.toIso8601String()}');
-              },
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 }

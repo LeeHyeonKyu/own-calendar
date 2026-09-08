@@ -108,7 +108,7 @@ class _YearlyViewScreenState extends State<YearlyViewScreen> {
                       month == today.month;
 
                   return GestureDetector(
-                    onTap: () => context.push('/?month=${DateTime(_currentYear, month).toIso8601String()}'),
+                    onTap: () => context.go('/?month=${DateTime(_currentYear, month).toIso8601String()}'),
                     child: Container(
                       decoration: BoxDecoration(
                         border: Border.all(

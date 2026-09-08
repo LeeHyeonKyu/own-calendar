@@ -10,7 +10,8 @@ import 'screens/event_form_screen.dart';
 import 'screens/task_form_screen.dart';
 import 'screens/search_screen.dart';
 import 'screens/settings_screen.dart';
-import 'screens/import_screen.dart';
+import 'screens/tab_settings_screen.dart';
+import 'widgets/navigation_shell.dart';
 
 GoRouter createRouter(AuthProvider authProvider) {
   return GoRouter(
@@ -32,34 +33,50 @@ GoRouter createRouter(AuthProvider authProvider) {
         path: '/login',
         builder: (context, state) => const LoginScreen(),
       ),
-      GoRoute(
-        path: '/',
-        builder: (context, state) {
-          final monthStr = state.uri.queryParameters['month'];
-          final month = monthStr != null ? DateTime.tryParse(monthStr) : null;
-          return MonthlyViewScreen(initialMonth: month);
-        },
+
+      // ── Shell: all main screens share the centralized bottom nav + FAB ──
+      ShellRoute(
+        builder: (context, state, child) => NavigationShell(
+          state: state,
+          child: child,
+        ),
+        routes: [
+          GoRoute(
+            path: '/',
+            builder: (context, state) {
+              final monthStr = state.uri.queryParameters['month'];
+              final month = monthStr != null ? DateTime.tryParse(monthStr) : null;
+              return MonthlyViewScreen(initialMonth: month);
+            },
+          ),
+          GoRoute(
+            path: '/daily',
+            builder: (context, state) {
+              final dateStr = state.uri.queryParameters['date'];
+              final date = dateStr != null ? DateTime.tryParse(dateStr) : null;
+              return DailyViewScreen(initialDate: date);
+            },
+          ),
+          GoRoute(
+            path: '/weekly',
+            builder: (context, state) => const WeeklyViewScreen(),
+          ),
+          GoRoute(
+            path: '/yearly',
+            builder: (context, state) => const YearlyViewScreen(),
+          ),
+          GoRoute(
+            path: '/family',
+            builder: (context, state) => const FamilyScreen(),
+          ),
+          GoRoute(
+            path: '/settings',
+            builder: (context, state) => const SettingsScreen(),
+          ),
+        ],
       ),
-      GoRoute(
-        path: '/daily',
-        builder: (context, state) {
-          final dateStr = state.uri.queryParameters['date'];
-          final date = dateStr != null ? DateTime.tryParse(dateStr) : null;
-          return DailyViewScreen(initialDate: date);
-        },
-      ),
-      GoRoute(
-        path: '/weekly',
-        builder: (context, state) => const WeeklyViewScreen(),
-      ),
-      GoRoute(
-        path: '/yearly',
-        builder: (context, state) => const YearlyViewScreen(),
-      ),
-      GoRoute(
-        path: '/family',
-        builder: (context, state) => const FamilyScreen(),
-      ),
+
+      // ── Full-screen routes (no bottom nav) ──
       GoRoute(
         path: '/event/new',
         builder: (context, state) {
@@ -94,13 +111,10 @@ GoRouter createRouter(AuthProvider authProvider) {
         builder: (context, state) => const SearchScreen(),
       ),
       GoRoute(
-        path: '/settings',
-        builder: (context, state) => const SettingsScreen(),
+        path: '/settings/tabs',
+        builder: (context, state) => const TabSettingsScreen(),
       ),
-      GoRoute(
-        path: '/import',
-        builder: (context, state) => const ImportScreen(),
-      ),
+
       // Deep link routes for widget interactions
       GoRoute(
         path: '/add',

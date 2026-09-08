@@ -124,31 +124,6 @@ class _DailyViewScreenState extends State<DailyViewScreen> {
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => _showCreateSheet(context),
-        child: const Icon(Icons.add),
-      ),
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: 1,
-        onDestinationSelected: (index) {
-          switch (index) {
-            case 0: context.go('/'); break;
-            case 1: break;
-            case 2: context.push('/weekly'); break;
-            case 3: context.push('/yearly'); break;
-            case 4: context.push('/family'); break;
-            case 5: context.push('/settings'); break;
-          }
-        },
-        destinations: const [
-          NavigationDestination(icon: Icon(Icons.calendar_month), label: '월별'),
-          NavigationDestination(icon: Icon(Icons.today), label: '일별'),
-          NavigationDestination(icon: Icon(Icons.view_week), label: '주별'),
-          NavigationDestination(icon: Icon(Icons.calendar_today), label: '연별'),
-          NavigationDestination(icon: Icon(Icons.family_restroom), label: '가족'),
-          NavigationDestination(icon: Icon(Icons.settings), label: '설정'),
-        ],
-      ),
     );
   }
 
@@ -458,37 +433,6 @@ class _DailyViewScreenState extends State<DailyViewScreen> {
                               : '${timeFormat.format(event.startTime)} – ${timeFormat.format(event.endTime)}',
                           style: TextStyle(fontSize: 11, color: Colors.grey[500]),
                         ),
-                        if (event.location != null && event.location!.isNotEmpty)
-                          Padding(
-                            padding: const EdgeInsets.only(top: 2),
-                            child: Row(
-                              children: [
-                                Icon(Icons.location_on_outlined, size: 12, color: Colors.grey[500]),
-                                const SizedBox(width: 2),
-                                Expanded(
-                                  child: Text(
-                                    event.location!,
-                                    style: TextStyle(fontSize: 11, color: Colors.grey[500]),
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        if (event.attendees.isNotEmpty)
-                          Padding(
-                            padding: const EdgeInsets.only(top: 2),
-                            child: Row(
-                              children: [
-                                Icon(Icons.people_outline, size: 12, color: Colors.grey[500]),
-                                const SizedBox(width: 2),
-                                Text(
-                                  '${event.attendees.length}명',
-                                  style: TextStyle(fontSize: 11, color: Colors.grey[500]),
-                                ),
-                              ],
-                            ),
-                          ),
                       ],
                     ),
                   ),
@@ -680,36 +624,6 @@ class _DailyViewScreenState extends State<DailyViewScreen> {
     );
   }
 
-  void _showCreateSheet(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      builder: (ctx) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: const Icon(Icons.event, color: _eventColor),
-              title: const Text('새 Event'),
-              subtitle: const Text('일정, 약속, 기념일'),
-              onTap: () {
-                Navigator.pop(ctx);
-                context.push('/event/new?date=${_selectedDate.toIso8601String()}');
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.check_box_outlined, color: _taskColor),
-              title: const Text('새 Task'),
-              subtitle: const Text('할 일, 체크리스트'),
-              onTap: () {
-                Navigator.pop(ctx);
-                context.push('/task/new?date=${_selectedDate.toIso8601String()}');
-              },
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 }
 
 class _Dot extends StatelessWidget {

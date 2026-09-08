@@ -379,7 +379,7 @@ class _MonthlyViewScreenState extends State<MonthlyViewScreen> {
                             setState(() => _selectedDay = day);
                           },
                           onDoubleTap: () {
-                            context.push('/daily?date=${day.toIso8601String()}');
+                            context.go('/daily?date=${day.toIso8601String()}');
                           },
                           child: Container(
                             height: 48,
@@ -462,72 +462,6 @@ class _MonthlyViewScreenState extends State<MonthlyViewScreen> {
             if (_selectedDay == null)
               const Expanded(child: SizedBox()),
           ],
-        ],
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          final date = _selectedDay ?? DateTime.now();
-          showModalBottomSheet(
-            context: context,
-            builder: (ctx) => SafeArea(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  ListTile(
-                    leading: const Icon(Icons.event, color: Color(0xFF5B8DEF)),
-                    title: const Text('새 Event'),
-                    subtitle: const Text('일정, 약속, 기념일'),
-                    onTap: () {
-                      Navigator.pop(ctx);
-                      context.push('/event/new?date=${date.toIso8601String()}');
-                    },
-                  ),
-                  ListTile(
-                    leading: const Icon(Icons.check_box_outlined, color: Color(0xFFF0A050)),
-                    title: const Text('새 Task'),
-                    subtitle: const Text('할 일, 체크리스트'),
-                    onTap: () {
-                      Navigator.pop(ctx);
-                      context.push('/task/new?date=${date.toIso8601String()}');
-                    },
-                  ),
-                ],
-              ),
-            ),
-          );
-        },
-        child: const Icon(Icons.add),
-      ),
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: 0,
-        onDestinationSelected: (index) {
-          switch (index) {
-            case 0:
-              break; // already here
-            case 1:
-              context.push('/daily');
-              break;
-            case 2:
-              context.push('/weekly');
-              break;
-            case 3:
-              context.push('/yearly');
-              break;
-            case 4:
-              context.push('/family');
-              break;
-            case 5:
-              context.push('/settings');
-              break;
-          }
-        },
-        destinations: const [
-          NavigationDestination(icon: Icon(Icons.calendar_month), label: '월별'),
-          NavigationDestination(icon: Icon(Icons.today), label: '일별'),
-          NavigationDestination(icon: Icon(Icons.view_week), label: '주별'),
-          NavigationDestination(icon: Icon(Icons.calendar_today), label: '연별'),
-          NavigationDestination(icon: Icon(Icons.family_restroom), label: '가족'),
-          NavigationDestination(icon: Icon(Icons.settings), label: '설정'),
         ],
       ),
     );
