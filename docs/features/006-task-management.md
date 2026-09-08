@@ -3,7 +3,7 @@ feature: 006
 title: Task 관리 (Event-Task N:1 관계)
 priority: P0
 depends_on: [001]
-status: in-progress
+status: complete
 gate:
   architect: pending
   designer: pending
