@@ -9,6 +9,7 @@ import eventRoutes from './routes/events';
 import taskRoutes from './routes/tasks';
 import familyRoutes from './routes/family';
 import googleRoutes from './routes/google';
+import importRoutes from './routes/import';
 
 const app = express();
 
@@ -57,6 +58,7 @@ app.use('/api/events', eventRoutes);
 app.use('/api/tasks', taskRoutes);
 app.use('/api/family', familyRoutes);
 app.use('/api/google', googleRoutes);
+app.use('/api/import', importRoutes);
 
 app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
   console.error(err.stack);

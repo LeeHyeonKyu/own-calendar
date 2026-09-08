@@ -117,6 +117,22 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
             ),
           const Divider(),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: Text(
+              'Import',
+              style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                color: Colors.grey[600],
+              ),
+            ),
+          ),
+          ListTile(
+            leading: const Icon(Icons.file_upload),
+            title: const Text('ICS 파일 Import'),
+            subtitle: const Text('외부 캘린더에서 내보낸 .ics 파일 가져오기'),
+            onTap: () => context.push('/import'),
+          ),
+          const Divider(),
           ListTile(
             leading: const Icon(Icons.logout, color: Colors.red),
             title: const Text('로그아웃', style: TextStyle(color: Colors.red)),

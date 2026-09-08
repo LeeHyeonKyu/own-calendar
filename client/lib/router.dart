@@ -10,6 +10,7 @@ import 'screens/event_form_screen.dart';
 import 'screens/task_form_screen.dart';
 import 'screens/search_screen.dart';
 import 'screens/settings_screen.dart';
+import 'screens/import_screen.dart';
 
 GoRouter createRouter(AuthProvider authProvider) {
   return GoRouter(
@@ -95,6 +96,10 @@ GoRouter createRouter(AuthProvider authProvider) {
       GoRoute(
         path: '/settings',
         builder: (context, state) => const SettingsScreen(),
+      ),
+      GoRoute(
+        path: '/import',
+        builder: (context, state) => const ImportScreen(),
       ),
       // Deep link routes for widget interactions
       GoRoute(
