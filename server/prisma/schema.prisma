@@ -28,6 +28,7 @@ model User {
   routines            Routine[]
   routineGroups       RoutineGroup[]
   categories          Category[]
+  holidaySubscriptions HolidaySubscription[]
   createdAt           DateTime           @default(now())
   updatedAt           DateTime           @updatedAt
 }
@@ -343,4 +344,26 @@ model Category {
   tasks     Task[]
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+model HolidaySubscription {
+  id          String @id @default(cuid())
+  userId      String
+  user        User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  countryCode String
+  createdAt   DateTime @default(now())
+
+  @@unique([userId, countryCode])
+}
+
+model Holiday {
+  id          String   @id @default(cuid())
+  countryCode String
+  date        DateTime
+  name        String
+  year        Int
+  createdAt   DateTime @default(now())
+
+  @@unique([countryCode, date])
+  @@index([countryCode, year])
 }

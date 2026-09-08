@@ -20,11 +20,14 @@
     "cors": "^2.8.5",
     "express": "^4.21.0",
     "express-rate-limit": "^8.3.2",
+    "firebase-admin": "^14.3.0",
     "googleapis": "^171.4.0",
     "helmet": "^8.1.0",
     "jsonwebtoken": "^9.0.2",
     "multer": "^2.3.0",
     "node-ical": "^0.27.1",
+    "rrule": "^2.8.1",
+    "tsdav": "^2.3.3",
     "zod": "^3.23.0"
   },
   "devDependencies": {
