@@ -1,0 +1,13 @@
+# OS
+.DS_Store
+
+# Playwright MCP logs/cache
+.playwright-mcp/
+
+# QA screenshots (generated during testing)
+qa-*.png
+
+# CocoaPods (managed per-platform, lock files regenerated)
+client/ios/Podfile.lock
+client/macos/Podfile
+client/macos/Podfile.lock
