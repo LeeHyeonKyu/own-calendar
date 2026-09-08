@@ -20,6 +20,8 @@ model User {
   familyMemberships   FamilyMembership[]
   createdFamilyGroups FamilyGroup[]      @relation("CreatedFamilyGroups")
   externalConnections ExternalCalendarConnection[]
+  defaultReminderMinutes Int            @default(10)
+  deviceTokens        DeviceToken[]
   createdAt           DateTime           @default(now())
   updatedAt           DateTime           @updatedAt
 }
@@ -78,6 +80,7 @@ model Event {
   location       String?
   notes          String?
   attendees      Json?
+  reminderMinutes Int?
   calendarId     String
   calendar    Calendar      @relation(fields: [calendarId], references: [id], onDelete: Cascade)
   createdById String
@@ -151,6 +154,21 @@ model ExternalCalendarConnection {
   updatedAt    DateTime @updatedAt
 
   @@unique([provider, externalId, userId])
+}
+
+enum DevicePlatform {
+  IOS
+  ANDROID
+  WEB
+}
+
+model DeviceToken {
+  id        String         @id @default(cuid())
+  token     String         @unique
+  platform  DevicePlatform
+  userId    String
+  user      User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime       @default(now())
 }
 
 enum TaskStatus {

@@ -155,15 +155,6 @@ export const googleSyncService = {
         where: { externalId: gEvent.id, calendarId: connection.calendarId },
       });
 
-      // Map Google Calendar metadata
-      const location = gEvent.location || null;
-      const attendees = gEvent.attendees
-        ? gEvent.attendees.map((a: any) => ({
-            name: a.displayName || a.email || '',
-            email: a.email || undefined,
-          }))
-        : null;
-
       if (existing) {
         await prisma.event.update({
           where: { id: existing.id },
@@ -173,17 +164,8 @@ export const googleSyncService = {
             startTime,
             endTime,
             isAllDay,
-            location,
-            attendees,
           },
         });
-
-        // Propagate metadata to inherited tasks
-        await prisma.task.updateMany({
-          where: { eventId: existing.id, metaInherited: true },
-          data: { location, attendees: attendees ?? undefined },
-        });
-
         updated++;
       } else {
         await prisma.event.create({
@@ -193,8 +175,6 @@ export const googleSyncService = {
             startTime,
             endTime,
             isAllDay,
-            location,
-            attendees,
             calendarId: connection.calendarId,
             createdById: userId,
             externalId: gEvent.id,
@@ -243,7 +223,6 @@ export const googleSyncService = {
     const gEventData: any = {
       summary: event.title,
       description: event.description || undefined,
-      location: event.location || undefined,
       start: event.isAllDay
         ? { date: event.startTime.toISOString().split('T')[0] }
         : { dateTime: event.startTime.toISOString() },
@@ -251,13 +230,6 @@ export const googleSyncService = {
         ? { date: event.endTime.toISOString().split('T')[0] }
         : { dateTime: event.endTime.toISOString() },
     };
-
-    // Map attendees to Google Calendar format
-    if (event.attendees && Array.isArray(event.attendees)) {
-      gEventData.attendees = (event.attendees as Array<{ name: string; email?: string }>)
-        .filter(a => a.email)
-        .map(a => ({ email: a.email, displayName: a.name }));
-    }
 
     if (event.externalId) {
       await calendarApi.events.update({
