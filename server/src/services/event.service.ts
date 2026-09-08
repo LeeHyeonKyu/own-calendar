@@ -1,65 +1,83 @@
 import prisma from '../lib/prisma';
+import { recurrenceService } from './recurrence.service';
 
-function generateRecurrenceInstances(event: any, queryStart: Date, queryEnd: Date): any[] {
-  if (event.recurrenceType === 'NONE') return [event];
+type EditMode = 'this' | 'thisAndFuture' | 'all';
+
+/**
+ * Split a (possibly virtual) instance id into its master id and the
+ * occurrence date encoded in the suffix, e.g.
+ * `${masterId}_${instanceDate.toISOString()}` -> { baseId: masterId, instanceDate }
+ */
+function resolveInstance(id: string, instanceDateParam?: string): { baseId: string; instanceDate: Date | null } {
+  let baseId = id;
+  let instanceDate: Date | null = null;
+
+  if (id.includes('_')) {
+    const idx = id.lastIndexOf('_');
+    const prefix = id.slice(0, idx);
+    const suffix = id.slice(idx + 1);
+    if (suffix.includes('T') && suffix.includes(':')) {
+      baseId = prefix;
+      const parsed = new Date(suffix);
+      if (!isNaN(parsed.getTime())) {
+        instanceDate = parsed;
+      }
+    }
+  }
+
+  if (instanceDateParam) {
+    const parsed = new Date(instanceDateParam);
+    if (!isNaN(parsed.getTime())) {
+      instanceDate = parsed;
+    }
+  }
+
+  return { baseId, instanceDate };
+}
+
+/**
+ * Expand a single master event into its concrete occurrences within
+ * [queryStart, queryEnd], applying any RecurrenceException overrides
+ * (edited or deleted instances) along the way.
+ */
+function expandEventInstances(event: any, queryStart: Date, queryEnd: Date): any[] {
+  const rruleStr = recurrenceService.resolveRRule(event);
+  if (!rruleStr) return [event];
+
+  const duration = event.endTime.getTime() - event.startTime.getTime();
+
+  let occurrences: Date[];
+  try {
+    occurrences = recurrenceService.expandInstances(rruleStr, event.startTime, queryStart, queryEnd);
+  } catch {
+    // Malformed rrule string - fall back to treating it as a single event.
+    return [event];
+  }
+
+  const exceptionsByDate = new Map<number, any>();
+  for (const ex of event.exceptions || []) {
+    exceptionsByDate.set(new Date(ex.originalDate).getTime(), ex);
+  }
 
   const instances: any[] = [];
-  const eventDuration = event.endTime.getTime() - event.startTime.getTime();
-  const origStart = event.startTime;
-  const recEnd = event.recurrenceEnd ? new Date(event.recurrenceEnd) : queryEnd;
-  const limit = recEnd < queryEnd ? recEnd : queryEnd;
+  for (const occStart of occurrences) {
+    const exception = exceptionsByDate.get(occStart.getTime());
+    if (exception?.isDeleted) continue;
 
-  let cursor = new Date(origStart);
+    const isOriginal = occStart.getTime() === event.startTime.getTime();
+    const instanceStart = exception?.startTime ?? occStart;
+    const instanceEnd = exception?.endTime ?? new Date(occStart.getTime() + duration);
 
-  for (let i = 0; i < 1000; i++) {
-    const instanceStart = new Date(cursor);
-    const instanceEnd = new Date(instanceStart.getTime() + eventDuration);
-
-    if (instanceStart > limit) break;
-
-    if (instanceEnd >= queryStart && instanceStart <= queryEnd) {
-      const isOriginal = instanceStart.getTime() === origStart.getTime();
-      instances.push({
-        ...event,
-        id: isOriginal ? event.id : `${event.id}_${instanceStart.toISOString()}`,
-        startTime: instanceStart,
-        endTime: instanceEnd,
-      });
-    }
-
-    switch (event.recurrenceType) {
-      case 'DAILY':
-        cursor.setDate(cursor.getDate() + 1);
-        break;
-      case 'WEEKLY':
-        cursor.setDate(cursor.getDate() + 7);
-        break;
-      case 'MONTHLY': {
-        const origDay = origStart.getDate();
-        const nextMonth = cursor.getMonth() + 1;
-        cursor.setMonth(nextMonth);
-        const daysInMonth = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 0).getDate();
-        if (origDay > daysInMonth) {
-          cursor.setDate(daysInMonth);
-        } else {
-          cursor.setDate(origDay);
-        }
-        break;
-      }
-      case 'YEARLY': {
-        const origMonth = origStart.getMonth();
-        const origDayY = origStart.getDate();
-        cursor.setFullYear(cursor.getFullYear() + 1);
-        cursor.setMonth(origMonth);
-        const daysInMonthY = new Date(cursor.getFullYear(), origMonth + 1, 0).getDate();
-        if (origDayY > daysInMonthY) {
-          cursor.setDate(daysInMonthY);
-        } else {
-          cursor.setDate(origDayY);
-        }
-        break;
-      }
-    }
+    instances.push({
+      ...event,
+      id: isOriginal ? event.id : `${event.id}_${occStart.toISOString()}`,
+      title: exception?.title ?? event.title,
+      description: exception?.description ?? event.description,
+      startTime: instanceStart,
+      endTime: instanceEnd,
+      isAllDay: exception?.isAllDay ?? event.isAllDay,
+      exceptions: undefined,
+    });
   }
 
   return instances;
@@ -91,32 +109,38 @@ export const eventService = {
           // Non-recurring: overlap check (event touches the query window)
           {
             recurrenceType: 'NONE',
+            rrule: null,
             ...(query.end ? { startTime: { lt: queryEnd } } : {}),
             ...(query.start ? { endTime: { gt: queryStart } } : {}),
           },
-          // Recurring: original start before query end, and (no recurrenceEnd OR recurrenceEnd after query start)
+          // Recurring (rrule field or legacy recurrenceType): original start before
+          // query end, and (no recurrenceEnd OR recurrenceEnd after query start).
+          // Note: recurrenceEnd may be null for rrule-based events even when the
+          // rrule itself carries an UNTIL - the real bound is enforced during expansion.
           {
-            recurrenceType: { not: 'NONE' },
-            startTime: { lte: queryEnd },
-            OR: [
-              { recurrenceEnd: null },
-              { recurrenceEnd: { gte: queryStart } },
+            AND: [
+              { OR: [{ recurrenceType: { not: 'NONE' } }, { rrule: { not: null } }] },
+              { startTime: { lte: queryEnd } },
+              { OR: [{ recurrenceEnd: null }, { recurrenceEnd: { gte: queryStart } }] },
             ],
           },
         ],
       },
       include: {
         calendar: true,
+        exceptions: true,
         ...(query.includeTasks === 'true' ? { tasks: { orderBy: [{ sortOrder: 'asc' as const }, { dueDate: 'asc' as const }] } } : {}),
       },
     });
 
     const result: any[] = [];
     for (const event of dbEvents) {
-      if (event.recurrenceType === 'NONE') {
-        result.push(event);
+      const rruleStr = recurrenceService.resolveRRule(event);
+      if (!rruleStr) {
+        const { exceptions, ...rest } = event as any;
+        result.push(rest);
       } else {
-        result.push(...generateRecurrenceInstances(event, queryStart, queryEnd));
+        result.push(...expandEventInstances(event, queryStart, queryEnd));
       }
     }
 
@@ -136,9 +160,7 @@ export const eventService = {
       tags?: string[];
       recurrenceType?: string;
       recurrenceEnd?: string | null;
-      location?: string | null;
-      notes?: string | null;
-      attendees?: Array<{ name: string; email?: string }> | null;
+      rrule?: string | null;
       calendarId: string;
     },
   ) {
@@ -170,9 +192,7 @@ export const eventService = {
         tags: data.tags,
         recurrenceType: (data.recurrenceType as any) || 'NONE',
         recurrenceEnd: data.recurrenceEnd ? new Date(data.recurrenceEnd) : null,
-        location: data.location ?? null,
-        notes: data.notes ?? null,
-        attendees: data.attendees ?? undefined,
+        rrule: data.rrule || null,
         calendarId: data.calendarId,
         createdById: userId,
       },
@@ -193,14 +213,12 @@ export const eventService = {
       tags?: string[];
       recurrenceType?: string;
       recurrenceEnd?: string | null;
-      location?: string | null;
-      notes?: string | null;
-      attendees?: Array<{ name: string; email?: string }> | null;
+      rrule?: string | null;
       calendarId?: string;
     },
   ) {
     // Strip recurrence instance suffix to find the original event
-    const baseId = eventId.includes('_') ? eventId.split('_').slice(0, -1).join('_') : eventId;
+    const { baseId } = resolveInstance(eventId);
     const event = await prisma.event.findUnique({ where: { id: baseId } });
 
     if (!event) {
@@ -234,6 +252,8 @@ export const eventService = {
     }
 
     const updateData: any = { ...data };
+    delete updateData.editMode;
+    delete updateData.instanceDate;
     if (data.startTime) {
       updateData.startTime = new Date(data.startTime);
     }
@@ -243,36 +263,142 @@ export const eventService = {
     if (data.recurrenceEnd !== undefined) {
       updateData.recurrenceEnd = data.recurrenceEnd ? new Date(data.recurrenceEnd) : null;
     }
-    if (data.location !== undefined) {
-      updateData.location = data.location;
-    }
-    if (data.notes !== undefined) {
-      updateData.notes = data.notes;
-    }
-    if (data.attendees !== undefined) {
-      updateData.attendees = data.attendees;
+    if (data.rrule !== undefined) {
+      updateData.rrule = data.rrule || null;
     }
 
-    const updated = await prisma.event.update({
+    return prisma.event.update({
       where: { id: baseId },
       data: updateData,
     });
+  },
 
-    // Propagate metadata changes to tasks that inherit from this event
-    const metaChanged = data.location !== undefined || data.notes !== undefined || data.attendees !== undefined;
-    if (metaChanged) {
-      const inheritedTaskUpdate: any = {};
-      if (data.location !== undefined) inheritedTaskUpdate.location = updated.location;
-      if (data.notes !== undefined) inheritedTaskUpdate.notes = updated.notes;
-      if (data.attendees !== undefined) inheritedTaskUpdate.attendees = updated.attendees;
+  /**
+   * Update an event honoring the recurrence edit scope:
+   *  - 'all'          - update the master event (and thus every occurrence).
+   *  - 'this'          - create/update a RecurrenceException for just this occurrence.
+   *  - 'thisAndFuture' - truncate the master's rrule to end right before this
+   *                      occurrence, and spin off a new master event (with the
+   *                      submitted data) that continues the series from here.
+   */
+  async updateWithMode(
+    userId: string,
+    eventId: string,
+    instanceDateParam: string | undefined,
+    editMode: EditMode,
+    data: {
+      title?: string;
+      description?: string | null;
+      startTime?: string;
+      endTime?: string;
+      isAllDay?: boolean;
+      isPrivate?: boolean;
+      category?: string;
+      tags?: string[];
+      recurrenceType?: string;
+      recurrenceEnd?: string | null;
+      rrule?: string | null;
+      calendarId?: string;
+    },
+  ) {
+    const { baseId, instanceDate } = resolveInstance(eventId, instanceDateParam);
 
-      await prisma.task.updateMany({
-        where: { eventId: baseId, metaInherited: true },
-        data: inheritedTaskUpdate,
-      });
+    if (editMode === 'all' || !instanceDate) {
+      return eventService.update(userId, baseId, data);
     }
 
-    return updated;
+    const event = await prisma.event.findUnique({ where: { id: baseId } });
+    if (!event) {
+      const error = new Error('Event not found');
+      (error as any).statusCode = 404;
+      throw error;
+    }
+    if (event.createdById !== userId) {
+      const error = new Error('Forbidden');
+      (error as any).statusCode = 403;
+      throw error;
+    }
+
+    if (editMode === 'this') {
+      const exceptionData: any = {
+        isDeleted: false,
+      };
+      if (data.title !== undefined) exceptionData.title = data.title;
+      if (data.description !== undefined) exceptionData.description = data.description;
+      if (data.startTime !== undefined) exceptionData.startTime = new Date(data.startTime);
+      if (data.endTime !== undefined) exceptionData.endTime = new Date(data.endTime);
+      if (data.isAllDay !== undefined) exceptionData.isAllDay = data.isAllDay;
+
+      const exception = await prisma.recurrenceException.upsert({
+        where: {
+          masterEventId_originalDate: {
+            masterEventId: baseId,
+            originalDate: instanceDate,
+          },
+        },
+        create: {
+          masterEventId: baseId,
+          originalDate: instanceDate,
+          ...exceptionData,
+        },
+        update: exceptionData,
+      });
+
+      const duration = event.endTime.getTime() - event.startTime.getTime();
+      return {
+        ...event,
+        id: `${event.id}_${instanceDate.toISOString()}`,
+        title: exception.title ?? event.title,
+        description: exception.description ?? event.description,
+        startTime: exception.startTime ?? instanceDate,
+        endTime: exception.endTime ?? new Date(instanceDate.getTime() + duration),
+        isAllDay: exception.isAllDay ?? event.isAllDay,
+      };
+    }
+
+    // thisAndFuture
+    const currentRRule = recurrenceService.resolveRRule(event);
+    if (!currentRRule) {
+      // Not actually recurring - fall back to a plain update.
+      return eventService.update(userId, baseId, data);
+    }
+
+    const untilBoundary = new Date(instanceDate.getTime() - 1000);
+    const truncatedRRule = recurrenceService.truncateRRule(currentRRule, untilBoundary);
+
+    await prisma.$transaction([
+      prisma.event.update({
+        where: { id: baseId },
+        data: { rrule: truncatedRRule },
+      }),
+      prisma.recurrenceException.deleteMany({
+        where: { masterEventId: baseId, originalDate: { gte: instanceDate } },
+      }),
+    ]);
+
+    const duration = event.endTime.getTime() - event.startTime.getTime();
+    const newStartTime = data.startTime ? new Date(data.startTime) : instanceDate;
+    const newEndTime = data.endTime ? new Date(data.endTime) : new Date(newStartTime.getTime() + duration);
+
+    return prisma.event.create({
+      data: {
+        title: data.title ?? event.title,
+        description: data.description !== undefined ? data.description : event.description,
+        startTime: newStartTime,
+        endTime: newEndTime,
+        isAllDay: data.isAllDay ?? event.isAllDay,
+        isPrivate: data.isPrivate ?? event.isPrivate,
+        category: (data.category as any) ?? event.category,
+        tags: data.tags ?? event.tags,
+        recurrenceType: (data.recurrenceType as any) ?? event.recurrenceType,
+        recurrenceEnd: data.recurrenceEnd !== undefined
+          ? (data.recurrenceEnd ? new Date(data.recurrenceEnd) : null)
+          : event.recurrenceEnd,
+        rrule: data.rrule !== undefined ? (data.rrule || null) : currentRRule,
+        calendarId: data.calendarId ?? event.calendarId,
+        createdById: userId,
+      },
+    });
   },
 
   async search(userId: string, query: string, start?: string, end?: string) {
@@ -298,8 +424,6 @@ export const eventService = {
         { title: { contains: query, mode: 'insensitive' } },
         { description: { contains: query, mode: 'insensitive' } },
         { tags: { has: query } },
-        { location: { contains: query, mode: 'insensitive' } },
-        { notes: { contains: query, mode: 'insensitive' } },
       ],
     };
 
@@ -315,7 +439,7 @@ export const eventService = {
 
   async delete(userId: string, eventId: string) {
     // Strip recurrence instance suffix
-    const baseId = eventId.includes('_') ? eventId.split('_').slice(0, -1).join('_') : eventId;
+    const { baseId } = resolveInstance(eventId);
     const event = await prisma.event.findUnique({ where: { id: baseId } });
 
     if (!event) {
@@ -331,5 +455,71 @@ export const eventService = {
     }
 
     await prisma.event.delete({ where: { id: baseId } });
+  },
+
+  /**
+   * Delete an event honoring the recurrence edit scope:
+   *  - 'all'          - delete the master event (and, via cascade, its exceptions).
+   *  - 'this'          - mark just this occurrence deleted via a RecurrenceException.
+   *  - 'thisAndFuture' - truncate the master's rrule to end right before this
+   *                      occurrence; nothing continues after it.
+   */
+  async deleteWithMode(userId: string, eventId: string, instanceDateParam: string | undefined, editMode: EditMode) {
+    const { baseId, instanceDate } = resolveInstance(eventId, instanceDateParam);
+
+    if (editMode === 'all' || !instanceDate) {
+      return eventService.delete(userId, baseId);
+    }
+
+    const event = await prisma.event.findUnique({ where: { id: baseId } });
+    if (!event) {
+      const error = new Error('Event not found');
+      (error as any).statusCode = 404;
+      throw error;
+    }
+    if (event.createdById !== userId) {
+      const error = new Error('Forbidden');
+      (error as any).statusCode = 403;
+      throw error;
+    }
+
+    if (editMode === 'this') {
+      await prisma.recurrenceException.upsert({
+        where: {
+          masterEventId_originalDate: {
+            masterEventId: baseId,
+            originalDate: instanceDate,
+          },
+        },
+        create: {
+          masterEventId: baseId,
+          originalDate: instanceDate,
+          isDeleted: true,
+        },
+        update: { isDeleted: true },
+      });
+      return;
+    }
+
+    // thisAndFuture
+    const currentRRule = recurrenceService.resolveRRule(event);
+    if (!currentRRule) {
+      // Not actually recurring - just delete the whole thing.
+      await eventService.delete(userId, baseId);
+      return;
+    }
+
+    const untilBoundary = new Date(instanceDate.getTime() - 1000);
+    const truncatedRRule = recurrenceService.truncateRRule(currentRRule, untilBoundary);
+
+    await prisma.$transaction([
+      prisma.event.update({
+        where: { id: baseId },
+        data: { rrule: truncatedRRule },
+      }),
+      prisma.recurrenceException.deleteMany({
+        where: { masterEventId: baseId, originalDate: { gte: instanceDate } },
+      }),
+    ]);
   },
 };

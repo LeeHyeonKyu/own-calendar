@@ -53,7 +53,10 @@ router.post('/', validate(createEventSchema), async (req: AuthRequest, res: Resp
 
 router.put('/:id', validate(updateEventSchema), async (req: AuthRequest, res: Response) => {
   try {
-    const result = await eventService.update(req.userId!, req.params.id as string, req.body);
+    const editMode = ((req.query.editMode as string) || (req.body as any).editMode || 'all') as 'this' | 'thisAndFuture' | 'all';
+    const instanceDate = (req.query.instanceDate as string) || (req.body as any).instanceDate;
+    const { editMode: _em, instanceDate: _id, ...data } = req.body as any;
+    const result = await eventService.updateWithMode(req.userId!, req.params.id as string, instanceDate, editMode, data);
     res.json(result);
   } catch (err: any) {
     const status = err.statusCode || 500;
@@ -63,7 +66,9 @@ router.put('/:id', validate(updateEventSchema), async (req: AuthRequest, res: Re
 
 router.delete('/:id', async (req: AuthRequest, res: Response) => {
   try {
-    await eventService.delete(req.userId!, req.params.id as string);
+    const editMode = ((req.query.editMode as string) || 'all') as 'this' | 'thisAndFuture' | 'all';
+    const instanceDate = req.query.instanceDate as string | undefined;
+    await eventService.deleteWithMode(req.userId!, req.params.id as string, instanceDate, editMode);
     res.status(204).send();
   } catch (err: any) {
     const status = err.statusCode || 500;

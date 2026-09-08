@@ -102,7 +102,7 @@ class TaskCard extends StatelessWidget {
                           ],
                           if (task.isRecurring) ...[
                             const SizedBox(width: 6),
-                            Icon(Icons.repeat, size: 13, color: Colors.grey[400]),
+                            Flexible(child: _RecurrenceBadge(summary: task.rruleSummary)),
                           ],
                         ],
                       ),
@@ -156,6 +156,36 @@ class _DueTag extends StatelessWidget {
       child: Text(
         label,
         style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: color),
+      ),
+    );
+  }
+}
+
+class _RecurrenceBadge extends StatelessWidget {
+  final String summary;
+  const _RecurrenceBadge({required this.summary});
+
+  @override
+  Widget build(BuildContext context) {
+    // Keep the inline badge short (e.g. "매주 월, 수요일"); the full
+    // summary (with the end condition) is available via the tooltip.
+    final shortSummary = summary.split(' · ').first;
+    return Tooltip(
+      message: summary,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.repeat, size: 12, color: Colors.grey[500]),
+          const SizedBox(width: 2),
+          Flexible(
+            child: Text(
+              shortSummary,
+              style: TextStyle(fontSize: 10, color: Colors.grey[500]),
+              overflow: TextOverflow.ellipsis,
+              maxLines: 1,
+            ),
+          ),
+        ],
       ),
     );
   }

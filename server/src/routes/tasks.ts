@@ -37,7 +37,10 @@ router.post('/', validate(createTaskSchema), async (req: AuthRequest, res: Respo
 
 router.put('/:id', validate(updateTaskSchema), async (req: AuthRequest, res: Response) => {
   try {
-    const result = await taskService.update(req.userId!, req.params.id as string, req.body);
+    const editMode = ((req.query.editMode as string) || (req.body as any).editMode || 'all') as 'this' | 'thisAndFuture' | 'all';
+    const instanceDate = (req.query.instanceDate as string) || (req.body as any).instanceDate;
+    const { editMode: _em, instanceDate: _id, ...data } = req.body as any;
+    const result = await taskService.updateWithMode(req.userId!, req.params.id as string, instanceDate, editMode, data);
     res.json(result);
   } catch (err: any) {
     const status = err.statusCode || 500;
@@ -47,7 +50,8 @@ router.put('/:id', validate(updateTaskSchema), async (req: AuthRequest, res: Res
 
 router.patch('/:id/complete', async (req: AuthRequest, res: Response) => {
   try {
-    const result = await taskService.toggleComplete(req.userId!, req.params.id as string);
+    const instanceDate = req.query.instanceDate as string | undefined;
+    const result = await taskService.toggleComplete(req.userId!, req.params.id as string, instanceDate);
     res.json(result);
   } catch (err: any) {
     const status = err.statusCode || 500;
@@ -67,7 +71,9 @@ router.patch('/:id/link', validate(linkEventSchema), async (req: AuthRequest, re
 
 router.delete('/:id', async (req: AuthRequest, res: Response) => {
   try {
-    await taskService.delete(req.userId!, req.params.id as string);
+    const editMode = ((req.query.editMode as string) || 'all') as 'this' | 'thisAndFuture' | 'all';
+    const instanceDate = req.query.instanceDate as string | undefined;
+    await taskService.deleteWithMode(req.userId!, req.params.id as string, instanceDate, editMode);
     res.status(204).send();
   } catch (err: any) {
     const status = err.statusCode || 500;

@@ -83,32 +83,16 @@ class EventCard extends StatelessWidget {
                         event.calendarName!,
                         style: TextStyle(fontSize: 12, color: Colors.grey[500]),
                       ),
-                    if (event.location != null && event.location!.isNotEmpty)
+                    if (event.isRecurring)
                       Padding(
                         padding: const EdgeInsets.only(top: 2),
                         child: Row(
+                          mainAxisSize: MainAxisSize.min,
                           children: [
-                            Icon(Icons.location_on_outlined, size: 12, color: Colors.grey[500]),
-                            const SizedBox(width: 2),
-                            Expanded(
-                              child: Text(
-                                event.location!,
-                                style: TextStyle(fontSize: 11, color: Colors.grey[500]),
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    if (event.attendees.isNotEmpty)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 2),
-                        child: Row(
-                          children: [
-                            Icon(Icons.people_outline, size: 12, color: Colors.grey[500]),
-                            const SizedBox(width: 2),
+                            Icon(Icons.repeat, size: 11, color: Colors.grey[500]),
+                            const SizedBox(width: 3),
                             Text(
-                              '${event.attendees.length}명',
+                              event.rruleSummary,
                               style: TextStyle(fontSize: 11, color: Colors.grey[500]),
                             ),
                           ],
@@ -148,7 +132,10 @@ class EventCard extends StatelessWidget {
               if (event.isRecurring)
                 Padding(
                   padding: const EdgeInsets.only(right: 4),
-                  child: Icon(Icons.repeat, size: 16, color: Colors.grey[400]),
+                  child: Tooltip(
+                    message: event.rruleSummary,
+                    child: Icon(Icons.repeat, size: 16, color: Colors.grey[400]),
+                  ),
                 ),
               if (event.isPrivate)
                 Icon(Icons.lock, size: 16, color: Colors.grey[400]),

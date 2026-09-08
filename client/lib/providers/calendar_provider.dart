@@ -259,8 +259,24 @@ class CalendarProvider extends ChangeNotifier {
     return false;
   }
 
-  Future<bool> updateEvent(String id, Map<String, dynamic> data) async {
-    final res = await _api.put('/events/$id', data);
+  String _withEditModeQuery(String path, {String? editMode, String? instanceDate}) {
+    final queryParams = <String, String>{};
+    if (editMode != null) queryParams['editMode'] = editMode;
+    if (instanceDate != null) queryParams['instanceDate'] = instanceDate;
+    final queryString = queryParams.entries
+        .map((e) => '${e.key}=${Uri.encodeQueryComponent(e.value)}')
+        .join('&');
+    return '$path${queryString.isNotEmpty ? "?$queryString" : ""}';
+  }
+
+  Future<bool> updateEvent(
+    String id,
+    Map<String, dynamic> data, {
+    String? editMode,
+    String? instanceDate,
+  }) async {
+    final path = _withEditModeQuery('/events/$id', editMode: editMode, instanceDate: instanceDate);
+    final res = await _api.put(path, data);
     if (res.statusCode == 200) {
       await loadEvents();
       return true;
@@ -268,8 +284,13 @@ class CalendarProvider extends ChangeNotifier {
     return false;
   }
 
-  Future<bool> deleteEvent(String id) async {
-    final res = await _api.delete('/events/$id');
+  Future<bool> deleteEvent(
+    String id, {
+    String? editMode,
+    String? instanceDate,
+  }) async {
+    final path = _withEditModeQuery('/events/$id', editMode: editMode, instanceDate: instanceDate);
+    final res = await _api.delete(path);
     if (res.statusCode == 204) {
       await loadEvents();
       return true;
@@ -313,8 +334,14 @@ class CalendarProvider extends ChangeNotifier {
     return false;
   }
 
-  Future<bool> updateTask(String id, Map<String, dynamic> data) async {
-    final res = await _api.put('/tasks/$id', data);
+  Future<bool> updateTask(
+    String id,
+    Map<String, dynamic> data, {
+    String? editMode,
+    String? instanceDate,
+  }) async {
+    final path = _withEditModeQuery('/tasks/$id', editMode: editMode, instanceDate: instanceDate);
+    final res = await _api.put(path, data);
     if (res.statusCode == 200) {
       await loadTasks();
       _updateHomeWidget();
@@ -324,8 +351,13 @@ class CalendarProvider extends ChangeNotifier {
     return false;
   }
 
-  Future<bool> deleteTask(String id) async {
-    final res = await _api.delete('/tasks/$id');
+  Future<bool> deleteTask(
+    String id, {
+    String? editMode,
+    String? instanceDate,
+  }) async {
+    final path = _withEditModeQuery('/tasks/$id', editMode: editMode, instanceDate: instanceDate);
+    final res = await _api.delete(path);
     if (res.statusCode == 204) {
       await loadTasks();
       _updateHomeWidget();
@@ -335,8 +367,9 @@ class CalendarProvider extends ChangeNotifier {
     return false;
   }
 
-  Future<bool> toggleTaskComplete(String id) async {
-    final res = await _api.patch('/tasks/$id/complete');
+  Future<bool> toggleTaskComplete(String id, {String? instanceDate}) async {
+    final path = _withEditModeQuery('/tasks/$id/complete', instanceDate: instanceDate);
+    final res = await _api.patch(path);
     if (res.statusCode == 200) {
       final json = jsonDecode(res.body);
       final updated = TaskModel.fromJson(json);

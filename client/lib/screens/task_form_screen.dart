@@ -4,6 +4,9 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import '../providers/calendar_provider.dart';
 import '../models/task.dart';
+import '../utils/rrule_utils.dart';
+import '../widgets/recurrence_picker.dart';
+import '../widgets/edit_mode_dialog.dart';
 
 class TaskFormScreen extends StatefulWidget {
   final String? taskId;
@@ -20,24 +23,20 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
   final _formKey = GlobalKey<FormState>();
   final _titleController = TextEditingController();
   final _descController = TextEditingController();
-  final _locationController = TextEditingController();
-  final _notesController = TextEditingController();
-  final _attendeeNameController = TextEditingController();
-  final _attendeeEmailController = TextEditingController();
   DateTime? _dueDate;
   DateTime? _scheduledDate;
   TimeOfDay? _scheduledTime;
   String _priority = 'NONE';
   String _recurrenceType = 'NONE';
   DateTime? _recurrenceEnd;
-  List<Map<String, dynamic>> _attendees = [];
-  bool _metaInherited = false;
-  bool _metadataExpanded = false;
+  String? _rrule;
   String? _selectedCalendarId;
   String? _selectedEventId;
   bool _isLoading = false;
+  TaskModel? _originalTask;
 
   bool get isEditing => widget.taskId != null;
+  bool get _isEditingInstance => _originalTask?.isVirtualInstance ?? false;
 
   @override
   void initState() {
@@ -55,10 +54,6 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
   void dispose() {
     _titleController.dispose();
     _descController.dispose();
-    _locationController.dispose();
-    _notesController.dispose();
-    _attendeeNameController.dispose();
-    _attendeeEmailController.dispose();
     super.dispose();
   }
 
@@ -79,6 +74,7 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
     final task = provider.tasks.where((t) => t.id == widget.taskId).firstOrNull;
     if (task != null) {
       setState(() {
+        _originalTask = task;
         _titleController.text = task.title;
         _descController.text = task.description ?? '';
         _dueDate = task.dueDate;
@@ -93,11 +89,7 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
         _priority = task.priority;
         _recurrenceType = task.recurrenceType;
         _recurrenceEnd = task.recurrenceEnd;
-        _locationController.text = task.location ?? '';
-        _notesController.text = task.notes ?? '';
-        _attendees = List.from(task.attendees);
-        _metaInherited = task.metaInherited;
-        _metadataExpanded = task.hasMetadata;
+        _rrule = task.rrule;
         _selectedCalendarId = task.calendarId;
         _selectedEventId = task.eventId;
       });
@@ -123,20 +115,6 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
     }
   }
 
-  void _addAttendee() {
-    final name = _attendeeNameController.text.trim();
-    if (name.isEmpty) return;
-    final email = _attendeeEmailController.text.trim();
-    setState(() {
-      _attendees.add({
-        'name': name,
-        if (email.isNotEmpty) 'email': email,
-      });
-      _attendeeNameController.clear();
-      _attendeeEmailController.clear();
-    });
-  }
-
   Future<void> _pickTime() async {
     final picked = await showTimePicker(
       context: context,
@@ -151,6 +129,13 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
     if (!_formKey.currentState!.validate()) return;
     if (_selectedCalendarId == null) return;
 
+    String? editMode;
+    if (isEditing && _isEditingInstance) {
+      editMode = await showEditModeDialog(context);
+      if (editMode == null) return; // cancelled
+    }
+
+    if (!mounted) return;
     setState(() => _isLoading = true);
 
     final data = <String, dynamic>{
@@ -159,13 +144,7 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
       'priority': _priority,
       'recurrenceType': _recurrenceType,
       'recurrenceEnd': _recurrenceEnd?.toIso8601String(),
-      'location': _locationController.text.trim().isEmpty
-          ? null
-          : _locationController.text.trim(),
-      'notes': _notesController.text.trim().isEmpty
-          ? null
-          : _notesController.text.trim(),
-      'attendees': _attendees.isEmpty ? null : _attendees,
+      'rrule': _rrule,
       'calendarId': _selectedCalendarId,
       'eventId': _selectedEventId,
     };
@@ -184,7 +163,12 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
     final provider = context.read<CalendarProvider>();
     bool success;
     if (isEditing) {
-      success = await provider.updateTask(widget.taskId!, data);
+      success = await provider.updateTask(
+        widget.taskId!,
+        data,
+        editMode: editMode,
+        instanceDate: _isEditingInstance ? _originalTask?.instanceDateString : null,
+      );
     } else {
       success = await provider.createTask(data);
     }
@@ -203,27 +187,39 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
 
   Future<void> _delete() async {
     if (!isEditing) return;
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Task 삭제'),
-        content: const Text('이 Task를 삭제하시겠습니까?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('취소'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('삭제', style: TextStyle(color: Colors.red)),
-          ),
-        ],
-      ),
-    );
-    if (confirmed == true && mounted) {
-      final success = await context.read<CalendarProvider>().deleteTask(widget.taskId!);
-      if (success && mounted) context.pop();
+
+    String? editMode;
+    if (_isEditingInstance) {
+      editMode = await showDeleteModeDialog(context);
+      if (editMode == null) return; // cancelled
+    } else {
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Task 삭제'),
+          content: const Text('이 Task를 삭제하시겠습니까?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('취소'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('삭제', style: TextStyle(color: Colors.red)),
+            ),
+          ],
+        ),
+      );
+      if (confirmed != true) return;
     }
+
+    if (!mounted) return;
+    final success = await context.read<CalendarProvider>().deleteTask(
+      widget.taskId!,
+      editMode: editMode,
+      instanceDate: _isEditingInstance ? _originalTask?.instanceDateString : null,
+    );
+    if (success && mounted) context.pop();
   }
 
   @override
@@ -343,201 +339,33 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
               onTap: _pickTime,
             ),
             const SizedBox(height: 8),
-            DropdownButtonFormField<String>(
-              value: _recurrenceType,
-              decoration: const InputDecoration(
-                labelText: '반복',
-                border: OutlineInputBorder(),
+            ListTile(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(4),
+                side: BorderSide(color: Theme.of(context).colorScheme.outline),
               ),
-              items: TaskModel.recurrenceLabels.entries
-                  .map((e) => DropdownMenuItem(
-                        value: e.key,
-                        child: Row(
-                          children: [
-                            if (e.key != 'NONE')
-                              const Padding(
-                                padding: EdgeInsets.only(right: 8),
-                                child: Icon(Icons.repeat, size: 16),
-                              ),
-                            Text(e.value),
-                          ],
-                        ),
-                      ))
-                  .toList(),
-              onChanged: (v) {
-                if (v != null) setState(() => _recurrenceType = v);
+              leading: const Icon(Icons.repeat),
+              title: const Text('반복'),
+              subtitle: Text(
+                rruleSummaryText(_rrule, legacyType: _recurrenceType, legacyEnd: _recurrenceEnd),
+              ),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () {
+                showRecurrencePicker(
+                  context: context,
+                  initialRrule: _rrule,
+                  initialRecurrenceType: _recurrenceType,
+                  initialRecurrenceEnd: _recurrenceEnd,
+                  referenceDate: _scheduledDate ?? _dueDate ?? DateTime.now(),
+                  onChanged: (result) {
+                    setState(() {
+                      _rrule = result.rrule;
+                      _recurrenceType = result.recurrenceType;
+                      _recurrenceEnd = result.recurrenceEnd;
+                    });
+                  },
+                );
               },
-            ),
-            if (_recurrenceType != 'NONE') ...[
-              const SizedBox(height: 8),
-              ListTile(
-                title: const Text('반복 종료일'),
-                subtitle: Text(
-                  _recurrenceEnd != null
-                      ? dateFormat.format(_recurrenceEnd!)
-                      : '없음 (무한 반복)',
-                ),
-                trailing: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (_recurrenceEnd != null)
-                      IconButton(
-                        icon: const Icon(Icons.clear),
-                        onPressed: () => setState(() => _recurrenceEnd = null),
-                      ),
-                    const Icon(Icons.calendar_today),
-                  ],
-                ),
-                onTap: () async {
-                  final picked = await showDatePicker(
-                    context: context,
-                    initialDate: _recurrenceEnd ?? DateTime.now().add(const Duration(days: 30)),
-                    firstDate: DateTime.now(),
-                    lastDate: DateTime(2030),
-                  );
-                  if (picked != null) setState(() => _recurrenceEnd = picked);
-                },
-              ),
-            ],
-            const SizedBox(height: 8),
-            // Metadata section (collapsible)
-            Card(
-              margin: EdgeInsets.zero,
-              child: Column(
-                children: [
-                  InkWell(
-                    onTap: () => setState(() => _metadataExpanded = !_metadataExpanded),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                      child: Row(
-                        children: [
-                          Icon(
-                            _metadataExpanded ? Icons.expand_less : Icons.expand_more,
-                            size: 20,
-                            color: Colors.grey[600],
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            '상세 정보',
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
-                              color: Colors.grey[700],
-                            ),
-                          ),
-                          if (_metaInherited)
-                            Padding(
-                              padding: const EdgeInsets.only(left: 8),
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                decoration: BoxDecoration(
-                                  color: Colors.blue.withAlpha(25),
-                                  borderRadius: BorderRadius.circular(4),
-                                ),
-                                child: const Text(
-                                  '이벤트에서 상속',
-                                  style: TextStyle(fontSize: 10, color: Colors.blue),
-                                ),
-                              ),
-                            ),
-                          if (!_metaInherited && (_attendees.isNotEmpty || _locationController.text.isNotEmpty || _notesController.text.isNotEmpty))
-                            Padding(
-                              padding: const EdgeInsets.only(left: 8),
-                              child: Icon(Icons.check_circle, size: 16, color: Colors.green[400]),
-                            ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  if (_metadataExpanded) ...[
-                    const Divider(height: 1),
-                    Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          TextFormField(
-                            controller: _locationController,
-                            decoration: const InputDecoration(
-                              labelText: '장소',
-                              prefixIcon: Icon(Icons.location_on_outlined),
-                              border: OutlineInputBorder(),
-                            ),
-                          ),
-                          const SizedBox(height: 12),
-                          // Attendees
-                          Text('참여자', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.grey[700])),
-                          const SizedBox(height: 8),
-                          if (_attendees.isNotEmpty)
-                            Wrap(
-                              spacing: 6,
-                              runSpacing: 4,
-                              children: _attendees.map((a) {
-                                final name = a['name'] ?? '';
-                                final email = a['email'] ?? '';
-                                return Chip(
-                                  avatar: const CircleAvatar(
-                                    child: Icon(Icons.person, size: 14),
-                                  ),
-                                  label: Text(email.isNotEmpty
-                                      ? '$name ($email)'
-                                      : name),
-                                  deleteIcon: const Icon(Icons.close, size: 16),
-                                  onDeleted: () => setState(() => _attendees.remove(a)),
-                                );
-                              }).toList(),
-                            ),
-                          const SizedBox(height: 8),
-                          Row(
-                            children: [
-                              Expanded(
-                                flex: 2,
-                                child: TextField(
-                                  controller: _attendeeNameController,
-                                  decoration: const InputDecoration(
-                                    labelText: '이름',
-                                    border: OutlineInputBorder(),
-                                    isDense: true,
-                                  ),
-                                  onSubmitted: (_) => _addAttendee(),
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                flex: 3,
-                                child: TextField(
-                                  controller: _attendeeEmailController,
-                                  decoration: const InputDecoration(
-                                    labelText: '이메일 (선택)',
-                                    border: OutlineInputBorder(),
-                                    isDense: true,
-                                  ),
-                                  onSubmitted: (_) => _addAttendee(),
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              IconButton.filled(
-                                onPressed: _addAttendee,
-                                icon: const Icon(Icons.person_add, size: 20),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 12),
-                          TextFormField(
-                            controller: _notesController,
-                            decoration: const InputDecoration(
-                              labelText: '메모',
-                              prefixIcon: Icon(Icons.notes_outlined),
-                              border: OutlineInputBorder(),
-                            ),
-                            maxLines: 3,
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ],
-              ),
             ),
             const SizedBox(height: 16),
             // Event 연결

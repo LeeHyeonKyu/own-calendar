@@ -10,12 +10,9 @@ const timeOrderRefinement = <T extends { startTime?: string; endTime?: string }>
   return true;
 };
 
-const timeOrderMessage = { message: 'endTime must be after startTime', path: ['endTime'] };
+const timeOrderMessage = { message: 'endTime must be after startTime', path: ['endTime'] as const };
 
-const attendeeSchema = z.object({
-  name: z.string(),
-  email: z.string().email().optional(),
-});
+const EDIT_MODES = ['this', 'thisAndFuture', 'all'] as const;
 
 export const createEventBaseSchema = z.object({
   title: z.string().min(1),
@@ -28,9 +25,7 @@ export const createEventBaseSchema = z.object({
   tags: z.array(z.string()).optional().default([]),
   recurrenceType: z.enum(RECURRENCE_TYPES).optional().default('NONE'),
   recurrenceEnd: z.string().nullable().optional(),
-  location: z.string().nullable().optional(),
-  notes: z.string().nullable().optional(),
-  attendees: z.array(attendeeSchema).nullable().optional(),
+  rrule: z.string().nullable().optional(),
   calendarId: z.string(),
 });
 
@@ -47,10 +42,12 @@ export const updateEventSchema = z.object({
   tags: z.array(z.string()).optional(),
   recurrenceType: z.enum(RECURRENCE_TYPES).optional(),
   recurrenceEnd: z.string().nullable().optional(),
-  location: z.string().nullable().optional(),
-  notes: z.string().nullable().optional(),
-  attendees: z.array(attendeeSchema).nullable().optional(),
+  rrule: z.string().nullable().optional(),
   calendarId: z.string().optional(),
+  // Recurrence edit scope - normally sent as query params (see routes/events.ts),
+  // but also accepted in the body for flexibility.
+  editMode: z.enum(EDIT_MODES).optional(),
+  instanceDate: z.string().optional(),
 }).refine(timeOrderRefinement, timeOrderMessage);
 
 export const queryEventSchema = z.object({

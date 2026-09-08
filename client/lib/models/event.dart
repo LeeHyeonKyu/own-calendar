@@ -1,22 +1,4 @@
-class Attendee {
-  final String name;
-  final String? email;
-
-  Attendee({required this.name, this.email});
-
-  factory Attendee.fromJson(Map<String, dynamic> json) {
-    return Attendee(
-      name: json['name'] ?? '',
-      email: json['email'],
-    );
-  }
-
-  Map<String, dynamic> toJson() {
-    final map = <String, dynamic>{'name': name};
-    if (email != null) map['email'] = email;
-    return map;
-  }
-}
+import '../utils/rrule_utils.dart' as rrule_utils;
 
 class EventModel {
   final String id;
@@ -30,9 +12,7 @@ class EventModel {
   final List<String> tags;
   final String recurrenceType;
   final DateTime? recurrenceEnd;
-  final String? location;
-  final String? notes;
-  final List<Attendee> attendees;
+  final String? rrule;
   final String calendarId;
   final String? calendarName;
   final String? calendarColor;
@@ -49,9 +29,7 @@ class EventModel {
     this.tags = const [],
     this.recurrenceType = 'NONE',
     this.recurrenceEnd,
-    this.location,
-    this.notes,
-    this.attendees = const [],
+    this.rrule,
     required this.calendarId,
     this.calendarName,
     this.calendarColor,
@@ -72,24 +50,32 @@ class EventModel {
       recurrenceEnd: json['recurrenceEnd'] != null
           ? DateTime.parse(json['recurrenceEnd'])
           : null,
-      location: json['location'],
-      notes: json['notes'],
-      attendees: (json['attendees'] as List<dynamic>?)
-              ?.map((a) => Attendee.fromJson(a as Map<String, dynamic>))
-              .toList() ??
-          [],
+      rrule: json['rrule'],
       calendarId: json['calendarId'],
       calendarName: json['calendar']?['name'],
       calendarColor: json['calendar']?['color'],
     );
   }
 
-  bool get hasMetadata =>
-      (location != null && location!.isNotEmpty) ||
-      (notes != null && notes!.isNotEmpty) ||
-      attendees.isNotEmpty;
+  bool get isRecurring => rrule != null || recurrenceType != 'NONE';
 
-  bool get isRecurring => recurrenceType != 'NONE';
+  /// True when this instance's id is a virtual composite id
+  /// (`${masterId}_${instanceDate.toISOString()}`) rather than the master id.
+  bool get isVirtualInstance => id != baseId;
+
+  /// The ISO date string embedded in a virtual composite id, or null when
+  /// this is not a virtual instance. Used as the `instanceDate` query param
+  /// when editing/deleting a single occurrence of a recurring event.
+  String? get instanceDateString =>
+      isVirtualInstance ? id.substring(baseId.length + 1) : null;
+
+  /// Human-readable Korean summary of the recurrence rule, falling back to
+  /// the legacy recurrenceType/recurrenceEnd fields when no rrule is set.
+  String get rruleSummary => rrule_utils.rruleSummaryText(
+        rrule,
+        legacyType: recurrenceType,
+        legacyEnd: recurrenceEnd,
+      );
 
   String get baseId {
     if (id.contains('_')) {
@@ -131,6 +117,9 @@ class EventModel {
     'MONTHLY': '매월',
     'YEARLY': '매년',
   };
+
+  /// Common RRULE presets keyed by a short id.
+  static const rrulePresets = rrule_utils.rrulePresets;
 
   String get categoryLabel => categoryLabels[category] ?? '기타';
   int get categoryColorValue => categoryColors[category] ?? 0xFF95A5A6;

@@ -1,3 +1,5 @@
+import '../utils/rrule_utils.dart' as rrule_utils;
+
 class TaskModel {
   final String id;
   final String title;
@@ -9,11 +11,8 @@ class TaskModel {
   final String? scheduledTime;
   final String recurrenceType;
   final DateTime? recurrenceEnd;
+  final String? rrule;
   final DateTime? completedAt;
-  final String? location;
-  final String? notes;
-  final List<Map<String, dynamic>> attendees;
-  final bool metaInherited;
   final String? eventId;
   final String calendarId;
   final String? calendarName;
@@ -30,11 +29,8 @@ class TaskModel {
     this.scheduledTime,
     this.recurrenceType = 'NONE',
     this.recurrenceEnd,
+    this.rrule,
     this.completedAt,
-    this.location,
-    this.notes,
-    this.attendees = const [],
-    this.metaInherited = false,
     this.eventId,
     required this.calendarId,
     this.calendarName,
@@ -58,16 +54,10 @@ class TaskModel {
       recurrenceEnd: json['recurrenceEnd'] != null
           ? DateTime.parse(json['recurrenceEnd'])
           : null,
+      rrule: json['rrule'],
       completedAt: json['completedAt'] != null
           ? DateTime.parse(json['completedAt'])
           : null,
-      location: json['location'],
-      notes: json['notes'],
-      attendees: (json['attendees'] as List<dynamic>?)
-              ?.map((a) => Map<String, dynamic>.from(a as Map))
-              .toList() ??
-          [],
-      metaInherited: json['metaInherited'] ?? false,
       eventId: json['eventId'],
       calendarId: json['calendarId'],
       calendarName: json['calendar']?['name'],
@@ -76,18 +66,31 @@ class TaskModel {
     );
   }
 
-  bool get hasMetadata =>
-      (location != null && location!.isNotEmpty) ||
-      (notes != null && notes!.isNotEmpty) ||
-      attendees.isNotEmpty;
-
   bool get isDone => status == 'DONE';
   bool get isCancelled => status == 'CANCELLED';
   bool get isTodo => status == 'TODO';
   bool get hasEvent => eventId != null;
   bool get hasTime => scheduledTime != null;
   bool get hasDueDate => dueDate != null;
-  bool get isRecurring => recurrenceType != 'NONE';
+  bool get isRecurring => rrule != null || recurrenceType != 'NONE';
+
+  /// True when this instance's id is a virtual composite id
+  /// (`${masterId}_${instanceDate.toISOString()}`) rather than the master id.
+  bool get isVirtualInstance => id != baseId;
+
+  /// The ISO date string embedded in a virtual composite id, or null when
+  /// this is not a virtual instance. Used as the `instanceDate` query param
+  /// when editing/deleting a single occurrence of a recurring task.
+  String? get instanceDateString =>
+      isVirtualInstance ? id.substring(baseId.length + 1) : null;
+
+  /// Human-readable Korean summary of the recurrence rule, falling back to
+  /// the legacy recurrenceType/recurrenceEnd fields when no rrule is set.
+  String get rruleSummary => rrule_utils.rruleSummaryText(
+        rrule,
+        legacyType: recurrenceType,
+        legacyEnd: recurrenceEnd,
+      );
 
   bool get isOverdue {
     if (isDone || isCancelled || dueDate == null) return false;
@@ -142,6 +145,9 @@ class TaskModel {
     'MONTHLY': '매월',
     'YEARLY': '매년',
   };
+
+  /// Common RRULE presets keyed by a short id.
+  static const rrulePresets = rrule_utils.rrulePresets;
 
   String get statusLabel => statusLabels[status] ?? '할 일';
   String get priorityLabel => priorityLabels[priority] ?? '없음';
