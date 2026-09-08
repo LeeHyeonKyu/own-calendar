@@ -75,6 +75,9 @@ model Event {
   tags           String[]       @default([])
   recurrenceType RecurrenceType @default(NONE)
   recurrenceEnd  DateTime?
+  location       String?
+  notes          String?
+  attendees      Json?
   calendarId     String
   calendar    Calendar      @relation(fields: [calendarId], references: [id], onDelete: Cascade)
   createdById String
@@ -175,6 +178,10 @@ model Task {
   recurrenceType RecurrenceType @default(NONE)
   recurrenceEnd  DateTime?
   completedAt    DateTime?
+  location       String?
+  notes          String?
+  attendees      Json?
+  metaInherited  Boolean        @default(false)
   eventId        String?
   event          Event?         @relation(fields: [eventId], references: [id], onDelete: SetNull)
   calendarId     String

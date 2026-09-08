@@ -10,7 +10,12 @@ const timeOrderRefinement = <T extends { startTime?: string; endTime?: string }>
   return true;
 };
 
-const timeOrderMessage = { message: 'endTime must be after startTime', path: ['endTime'] as const };
+const timeOrderMessage = { message: 'endTime must be after startTime', path: ['endTime'] };
+
+const attendeeSchema = z.object({
+  name: z.string(),
+  email: z.string().email().optional(),
+});
 
 export const createEventBaseSchema = z.object({
   title: z.string().min(1),
@@ -23,6 +28,9 @@ export const createEventBaseSchema = z.object({
   tags: z.array(z.string()).optional().default([]),
   recurrenceType: z.enum(RECURRENCE_TYPES).optional().default('NONE'),
   recurrenceEnd: z.string().nullable().optional(),
+  location: z.string().nullable().optional(),
+  notes: z.string().nullable().optional(),
+  attendees: z.array(attendeeSchema).nullable().optional(),
   calendarId: z.string(),
 });
 
@@ -39,6 +47,9 @@ export const updateEventSchema = z.object({
   tags: z.array(z.string()).optional(),
   recurrenceType: z.enum(RECURRENCE_TYPES).optional(),
   recurrenceEnd: z.string().nullable().optional(),
+  location: z.string().nullable().optional(),
+  notes: z.string().nullable().optional(),
+  attendees: z.array(attendeeSchema).nullable().optional(),
   calendarId: z.string().optional(),
 }).refine(timeOrderRefinement, timeOrderMessage);
 

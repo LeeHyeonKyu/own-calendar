@@ -10,6 +10,10 @@ class TaskModel {
   final String recurrenceType;
   final DateTime? recurrenceEnd;
   final DateTime? completedAt;
+  final String? location;
+  final String? notes;
+  final List<Map<String, dynamic>> attendees;
+  final bool metaInherited;
   final String? eventId;
   final String calendarId;
   final String? calendarName;
@@ -27,6 +31,10 @@ class TaskModel {
     this.recurrenceType = 'NONE',
     this.recurrenceEnd,
     this.completedAt,
+    this.location,
+    this.notes,
+    this.attendees = const [],
+    this.metaInherited = false,
     this.eventId,
     required this.calendarId,
     this.calendarName,
@@ -53,6 +61,13 @@ class TaskModel {
       completedAt: json['completedAt'] != null
           ? DateTime.parse(json['completedAt'])
           : null,
+      location: json['location'],
+      notes: json['notes'],
+      attendees: (json['attendees'] as List<dynamic>?)
+              ?.map((a) => Map<String, dynamic>.from(a as Map))
+              .toList() ??
+          [],
+      metaInherited: json['metaInherited'] ?? false,
       eventId: json['eventId'],
       calendarId: json['calendarId'],
       calendarName: json['calendar']?['name'],
@@ -60,6 +75,11 @@ class TaskModel {
       eventTitle: json['event']?['title'],
     );
   }
+
+  bool get hasMetadata =>
+      (location != null && location!.isNotEmpty) ||
+      (notes != null && notes!.isNotEmpty) ||
+      attendees.isNotEmpty;
 
   bool get isDone => status == 'DONE';
   bool get isCancelled => status == 'CANCELLED';

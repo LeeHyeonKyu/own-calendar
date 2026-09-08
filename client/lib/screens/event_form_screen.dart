@@ -3,7 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import '../providers/calendar_provider.dart';
-import '../models/event.dart';
+import '../models/event.dart' show EventModel, Attendee;
 
 class EventFormScreen extends StatefulWidget {
   final String? eventId;
@@ -20,6 +20,10 @@ class _EventFormScreenState extends State<EventFormScreen> {
   final _titleController = TextEditingController();
   final _descController = TextEditingController();
   final _tagController = TextEditingController();
+  final _locationController = TextEditingController();
+  final _notesController = TextEditingController();
+  final _attendeeNameController = TextEditingController();
+  final _attendeeEmailController = TextEditingController();
   late DateTime _startDate;
   late TimeOfDay _startTime;
   late DateTime _endDate;
@@ -30,6 +34,8 @@ class _EventFormScreenState extends State<EventFormScreen> {
   List<String> _tags = [];
   String _recurrenceType = 'NONE';
   DateTime? _recurrenceEnd;
+  List<Attendee> _attendees = [];
+  bool _metadataExpanded = false;
   String? _selectedCalendarId;
   bool _isLoading = false;
 
@@ -55,6 +61,10 @@ class _EventFormScreenState extends State<EventFormScreen> {
     _titleController.dispose();
     _descController.dispose();
     _tagController.dispose();
+    _locationController.dispose();
+    _notesController.dispose();
+    _attendeeNameController.dispose();
+    _attendeeEmailController.dispose();
     super.dispose();
   }
 
@@ -88,6 +98,10 @@ class _EventFormScreenState extends State<EventFormScreen> {
         _tags = List.from(event.tags);
         _recurrenceType = event.recurrenceType;
         _recurrenceEnd = event.recurrenceEnd;
+        _locationController.text = event.location ?? '';
+        _notesController.text = event.notes ?? '';
+        _attendees = List.from(event.attendees);
+        _metadataExpanded = event.hasMetadata;
         _selectedCalendarId = event.calendarId;
       });
     }
@@ -131,6 +145,17 @@ class _EventFormScreenState extends State<EventFormScreen> {
     }
   }
 
+  void _addAttendee() {
+    final name = _attendeeNameController.text.trim();
+    if (name.isEmpty) return;
+    final email = _attendeeEmailController.text.trim();
+    setState(() {
+      _attendees.add(Attendee(name: name, email: email.isEmpty ? null : email));
+      _attendeeNameController.clear();
+      _attendeeEmailController.clear();
+    });
+  }
+
   void _addTag() {
     final tag = _tagController.text.trim();
     if (tag.isNotEmpty && !_tags.contains(tag)) {
@@ -165,6 +190,15 @@ class _EventFormScreenState extends State<EventFormScreen> {
       'tags': _tags,
       'recurrenceType': _recurrenceType,
       'recurrenceEnd': _recurrenceEnd?.toIso8601String(),
+      'location': _locationController.text.trim().isEmpty
+          ? null
+          : _locationController.text.trim(),
+      'notes': _notesController.text.trim().isEmpty
+          ? null
+          : _notesController.text.trim(),
+      'attendees': _attendees.isEmpty
+          ? null
+          : _attendees.map((a) => a.toJson()).toList(),
       'calendarId': _selectedCalendarId,
     };
 
@@ -364,6 +398,127 @@ class _EventFormScreenState extends State<EventFormScreen> {
               title: const Text('비공개'),
               value: _isPrivate,
               onChanged: (v) => setState(() => _isPrivate = v),
+            ),
+            const SizedBox(height: 8),
+            // Metadata section (collapsible)
+            Card(
+              margin: EdgeInsets.zero,
+              child: Column(
+                children: [
+                  InkWell(
+                    onTap: () => setState(() => _metadataExpanded = !_metadataExpanded),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      child: Row(
+                        children: [
+                          Icon(
+                            _metadataExpanded ? Icons.expand_less : Icons.expand_more,
+                            size: 20,
+                            color: Colors.grey[600],
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            '상세 정보',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.grey[700],
+                            ),
+                          ),
+                          if (_attendees.isNotEmpty || _locationController.text.isNotEmpty || _notesController.text.isNotEmpty)
+                            Padding(
+                              padding: const EdgeInsets.only(left: 8),
+                              child: Icon(Icons.check_circle, size: 16, color: Colors.green[400]),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  if (_metadataExpanded) ...[
+                    const Divider(height: 1),
+                    Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          TextFormField(
+                            controller: _locationController,
+                            decoration: const InputDecoration(
+                              labelText: '장소',
+                              prefixIcon: Icon(Icons.location_on_outlined),
+                              border: OutlineInputBorder(),
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          // Attendees
+                          Text('참여자', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.grey[700])),
+                          const SizedBox(height: 8),
+                          if (_attendees.isNotEmpty)
+                            Wrap(
+                              spacing: 6,
+                              runSpacing: 4,
+                              children: _attendees.map((a) => Chip(
+                                avatar: const CircleAvatar(
+                                  child: Icon(Icons.person, size: 14),
+                                ),
+                                label: Text(a.email != null && a.email!.isNotEmpty
+                                    ? '${a.name} (${a.email})'
+                                    : a.name),
+                                deleteIcon: const Icon(Icons.close, size: 16),
+                                onDeleted: () => setState(() => _attendees.remove(a)),
+                              )).toList(),
+                            ),
+                          const SizedBox(height: 8),
+                          Row(
+                            children: [
+                              Expanded(
+                                flex: 2,
+                                child: TextField(
+                                  controller: _attendeeNameController,
+                                  decoration: const InputDecoration(
+                                    labelText: '이름',
+                                    border: OutlineInputBorder(),
+                                    isDense: true,
+                                  ),
+                                  onSubmitted: (_) => _addAttendee(),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                flex: 3,
+                                child: TextField(
+                                  controller: _attendeeEmailController,
+                                  decoration: const InputDecoration(
+                                    labelText: '이메일 (선택)',
+                                    border: OutlineInputBorder(),
+                                    isDense: true,
+                                  ),
+                                  onSubmitted: (_) => _addAttendee(),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              IconButton.filled(
+                                onPressed: _addAttendee,
+                                icon: const Icon(Icons.person_add, size: 20),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+                          TextFormField(
+                            controller: _notesController,
+                            decoration: const InputDecoration(
+                              labelText: '메모',
+                              prefixIcon: Icon(Icons.notes_outlined),
+                              border: OutlineInputBorder(),
+                            ),
+                            maxLines: 3,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ],
+              ),
             ),
             const SizedBox(height: 16),
             DropdownButtonFormField<String>(

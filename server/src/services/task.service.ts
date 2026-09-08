@@ -166,6 +166,9 @@ export const taskService = {
       scheduledTime?: string | null;
       recurrenceType?: string;
       recurrenceEnd?: string | null;
+      location?: string | null;
+      notes?: string | null;
+      attendees?: Array<{ name: string; email?: string }> | null;
       eventId?: string | null;
       calendarId: string;
       sortOrder?: number;
@@ -187,12 +190,27 @@ export const taskService = {
       throw error;
     }
 
+    // Determine metadata: inherit from event if task's own metadata is empty
+    let location = data.location ?? null;
+    let notes = data.notes ?? null;
+    let attendees: any = data.attendees ?? null;
+    let metaInherited = false;
+
     if (data.eventId) {
       const event = await prisma.event.findUnique({ where: { id: data.eventId } });
       if (!event) {
         const error = new Error('Event not found');
         (error as any).statusCode = 404;
         throw error;
+      }
+
+      // Auto-inherit event metadata if task metadata is empty
+      const hasOwnMeta = location || notes || (attendees && attendees.length > 0);
+      if (!hasOwnMeta && (event.location || event.notes || event.attendees)) {
+        location = event.location;
+        notes = event.notes;
+        attendees = event.attendees;
+        metaInherited = true;
       }
     }
 
@@ -206,6 +224,10 @@ export const taskService = {
         scheduledTime: data.scheduledTime || null,
         recurrenceType: (data.recurrenceType as any) || 'NONE',
         recurrenceEnd: data.recurrenceEnd ? new Date(data.recurrenceEnd) : null,
+        location,
+        notes,
+        attendees: attendees ?? undefined,
+        metaInherited,
         eventId: data.eventId || null,
         calendarId: data.calendarId,
         createdById: userId,
@@ -231,6 +253,9 @@ export const taskService = {
       scheduledTime?: string | null;
       recurrenceType?: string;
       recurrenceEnd?: string | null;
+      location?: string | null;
+      notes?: string | null;
+      attendees?: Array<{ name: string; email?: string }> | null;
       eventId?: string | null;
       calendarId?: string;
       sortOrder?: number;
@@ -290,6 +315,34 @@ export const taskService = {
     if (data.calendarId !== undefined) updateData.calendarId = data.calendarId;
     if (data.sortOrder !== undefined) updateData.sortOrder = data.sortOrder;
 
+    // Handle metadata fields
+    if (data.location !== undefined) updateData.location = data.location;
+    if (data.notes !== undefined) updateData.notes = data.notes;
+    if (data.attendees !== undefined) updateData.attendees = data.attendees;
+
+    // If user explicitly sets metadata, mark as not inherited
+    const userSetMeta = data.location !== undefined || data.notes !== undefined || data.attendees !== undefined;
+    if (userSetMeta) {
+      updateData.metaInherited = false;
+    }
+
+    // If linking to an event and task has no own metadata, inherit from event
+    if (data.eventId && data.eventId !== task.eventId) {
+      const event = await prisma.event.findUnique({ where: { id: data.eventId } });
+      if (event) {
+        const taskLocation = data.location !== undefined ? data.location : task.location;
+        const taskNotes = data.notes !== undefined ? data.notes : task.notes;
+        const taskAttendees = data.attendees !== undefined ? data.attendees : task.attendees;
+        const hasOwnMeta = taskLocation || taskNotes || (taskAttendees && (taskAttendees as any[]).length > 0);
+        if (!hasOwnMeta && (event.location || event.notes || event.attendees)) {
+          updateData.location = event.location;
+          updateData.notes = event.notes;
+          updateData.attendees = event.attendees;
+          updateData.metaInherited = true;
+        }
+      }
+    }
+
     return prisma.task.update({
       where: { id: baseId },
       data: updateData,
@@ -346,6 +399,8 @@ export const taskService = {
       throw error;
     }
 
+    const updateData: any = { eventId };
+
     if (eventId) {
       const event = await prisma.event.findUnique({ where: { id: eventId } });
       if (!event) {
@@ -353,11 +408,28 @@ export const taskService = {
         (error as any).statusCode = 404;
         throw error;
       }
+
+      // Auto-inherit metadata if task's own metadata is empty
+      const hasOwnMeta = task.location || task.notes || (task.attendees && (task.attendees as any[]).length > 0);
+      if (!hasOwnMeta && (event.location || event.notes || event.attendees)) {
+        updateData.location = event.location;
+        updateData.notes = event.notes;
+        updateData.attendees = event.attendees;
+        updateData.metaInherited = true;
+      }
+    } else {
+      // Unlinking from event: clear inherited metadata
+      if (task.metaInherited) {
+        updateData.location = null;
+        updateData.notes = null;
+        updateData.attendees = null;
+        updateData.metaInherited = false;
+      }
     }
 
     return prisma.task.update({
       where: { id: baseId },
-      data: { eventId },
+      data: updateData,
       include: {
         calendar: { select: { id: true, name: true, color: true } },
         event: { select: { id: true, title: true, startTime: true } },

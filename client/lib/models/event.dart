@@ -1,3 +1,23 @@
+class Attendee {
+  final String name;
+  final String? email;
+
+  Attendee({required this.name, this.email});
+
+  factory Attendee.fromJson(Map<String, dynamic> json) {
+    return Attendee(
+      name: json['name'] ?? '',
+      email: json['email'],
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    final map = <String, dynamic>{'name': name};
+    if (email != null) map['email'] = email;
+    return map;
+  }
+}
+
 class EventModel {
   final String id;
   final String title;
@@ -10,6 +30,9 @@ class EventModel {
   final List<String> tags;
   final String recurrenceType;
   final DateTime? recurrenceEnd;
+  final String? location;
+  final String? notes;
+  final List<Attendee> attendees;
   final String calendarId;
   final String? calendarName;
   final String? calendarColor;
@@ -26,6 +49,9 @@ class EventModel {
     this.tags = const [],
     this.recurrenceType = 'NONE',
     this.recurrenceEnd,
+    this.location,
+    this.notes,
+    this.attendees = const [],
     required this.calendarId,
     this.calendarName,
     this.calendarColor,
@@ -46,11 +72,22 @@ class EventModel {
       recurrenceEnd: json['recurrenceEnd'] != null
           ? DateTime.parse(json['recurrenceEnd'])
           : null,
+      location: json['location'],
+      notes: json['notes'],
+      attendees: (json['attendees'] as List<dynamic>?)
+              ?.map((a) => Attendee.fromJson(a as Map<String, dynamic>))
+              .toList() ??
+          [],
       calendarId: json['calendarId'],
       calendarName: json['calendar']?['name'],
       calendarColor: json['calendar']?['color'],
     );
   }
+
+  bool get hasMetadata =>
+      (location != null && location!.isNotEmpty) ||
+      (notes != null && notes!.isNotEmpty) ||
+      attendees.isNotEmpty;
 
   bool get isRecurring => recurrenceType != 'NONE';
 

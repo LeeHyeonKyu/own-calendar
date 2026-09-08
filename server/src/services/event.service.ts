@@ -136,6 +136,9 @@ export const eventService = {
       tags?: string[];
       recurrenceType?: string;
       recurrenceEnd?: string | null;
+      location?: string | null;
+      notes?: string | null;
+      attendees?: Array<{ name: string; email?: string }> | null;
       calendarId: string;
     },
   ) {
@@ -167,6 +170,9 @@ export const eventService = {
         tags: data.tags,
         recurrenceType: (data.recurrenceType as any) || 'NONE',
         recurrenceEnd: data.recurrenceEnd ? new Date(data.recurrenceEnd) : null,
+        location: data.location ?? null,
+        notes: data.notes ?? null,
+        attendees: data.attendees ?? undefined,
         calendarId: data.calendarId,
         createdById: userId,
       },
@@ -187,6 +193,9 @@ export const eventService = {
       tags?: string[];
       recurrenceType?: string;
       recurrenceEnd?: string | null;
+      location?: string | null;
+      notes?: string | null;
+      attendees?: Array<{ name: string; email?: string }> | null;
       calendarId?: string;
     },
   ) {
@@ -234,11 +243,36 @@ export const eventService = {
     if (data.recurrenceEnd !== undefined) {
       updateData.recurrenceEnd = data.recurrenceEnd ? new Date(data.recurrenceEnd) : null;
     }
+    if (data.location !== undefined) {
+      updateData.location = data.location;
+    }
+    if (data.notes !== undefined) {
+      updateData.notes = data.notes;
+    }
+    if (data.attendees !== undefined) {
+      updateData.attendees = data.attendees;
+    }
 
-    return prisma.event.update({
+    const updated = await prisma.event.update({
       where: { id: baseId },
       data: updateData,
     });
+
+    // Propagate metadata changes to tasks that inherit from this event
+    const metaChanged = data.location !== undefined || data.notes !== undefined || data.attendees !== undefined;
+    if (metaChanged) {
+      const inheritedTaskUpdate: any = {};
+      if (data.location !== undefined) inheritedTaskUpdate.location = updated.location;
+      if (data.notes !== undefined) inheritedTaskUpdate.notes = updated.notes;
+      if (data.attendees !== undefined) inheritedTaskUpdate.attendees = updated.attendees;
+
+      await prisma.task.updateMany({
+        where: { eventId: baseId, metaInherited: true },
+        data: inheritedTaskUpdate,
+      });
+    }
+
+    return updated;
   },
 
   async search(userId: string, query: string, start?: string, end?: string) {
@@ -264,6 +298,8 @@ export const eventService = {
         { title: { contains: query, mode: 'insensitive' } },
         { description: { contains: query, mode: 'insensitive' } },
         { tags: { has: query } },
+        { location: { contains: query, mode: 'insensitive' } },
+        { notes: { contains: query, mode: 'insensitive' } },
       ],
     };
 

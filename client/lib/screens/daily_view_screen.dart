@@ -458,6 +458,37 @@ class _DailyViewScreenState extends State<DailyViewScreen> {
                               : '${timeFormat.format(event.startTime)} – ${timeFormat.format(event.endTime)}',
                           style: TextStyle(fontSize: 11, color: Colors.grey[500]),
                         ),
+                        if (event.location != null && event.location!.isNotEmpty)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 2),
+                            child: Row(
+                              children: [
+                                Icon(Icons.location_on_outlined, size: 12, color: Colors.grey[500]),
+                                const SizedBox(width: 2),
+                                Expanded(
+                                  child: Text(
+                                    event.location!,
+                                    style: TextStyle(fontSize: 11, color: Colors.grey[500]),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        if (event.attendees.isNotEmpty)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 2),
+                            child: Row(
+                              children: [
+                                Icon(Icons.people_outline, size: 12, color: Colors.grey[500]),
+                                const SizedBox(width: 2),
+                                Text(
+                                  '${event.attendees.length}명',
+                                  style: TextStyle(fontSize: 11, color: Colors.grey[500]),
+                                ),
+                              ],
+                            ),
+                          ),
                       ],
                     ),
                   ),
