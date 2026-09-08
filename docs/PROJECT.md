@@ -174,7 +174,7 @@ lastEvolve: 2026-08-31
 | 005 | [월별 캘린더 위젯](features/005-monthly-widget.md) | P0 | 004 | complete |
 | 006 | [Task 관리 (Event-Task N:1 관계)](features/006-task-management.md) | P0 | 001 | complete |
 | 007 | [Google Calendar Follow (단방향 동기화)](features/007-google-calendar-follow.md) | P0 | 001, 006 | spec-complete |
-| 008 | [범용 ICS Import](features/008-ics-import.md) | P0 | 001 | spec-complete |
+| 008 | [범용 ICS Import](features/008-ics-import.md) | P0 | 001 | complete |
 | 009 | [Naver Calendar 자동 Pull](features/009-naver-calendar-pull.md) | P1 | 001, 008 | spec-complete |
 | 010 | [일정 알람 (N분 전 / 정시 알림)](features/010-event-alarm.md) | P0 | 001 | spec-complete |
 | 011 | [Daily Routine (습관/루틴)](features/011-daily-routine.md) | P1 | 001, 010 | spec-complete |
@@ -185,7 +185,7 @@ lastEvolve: 2026-08-31
 | 016 | [그룹 및 Follow/Invite 시스템](features/016-group-and-follow.md) | P1 | 001 | spec-complete |
 | 017 | [Custom Category (색상/이모지)](features/017-custom-category.md) | P2 | 001, 006 | spec-complete |
 | 018 | [Event/Task 메타데이터 (참여자, 장소, 메모)](features/018-event-task-metadata.md) | P0 | 001, 006 | spec-complete |
-| 019 | [네이티브 앱 패키징 (iOS/macOS + CI/CD)](features/019-native-app-packaging.md) | P0 | 001 | spec-complete |
+| 019 | [네이티브 앱 패키징 (iOS/macOS + CI/CD)](features/019-native-app-packaging.md) | P0 | 001 | complete |
 
 **Technical Foundation:** [TECHNICAL.md](TECHNICAL.md)
 
