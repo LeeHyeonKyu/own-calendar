@@ -173,13 +173,13 @@ lastEvolve: 2026-08-31
 | 004 | [위젯 인증 상태 연동](features/004-widget-auth-state.md) | P1 | 003 | complete |
 | 005 | [월별 캘린더 위젯](features/005-monthly-widget.md) | P0 | 004 | complete |
 | 006 | [Task 관리 (Event-Task N:1 관계)](features/006-task-management.md) | P0 | 001 | complete |
-| 007 | [Google Calendar Follow (단방향 동기화)](features/007-google-calendar-follow.md) | P0 | 001, 006 | spec-complete |
+| 007 | [Google Calendar Follow (단방향 동기화)](features/007-google-calendar-follow.md) | P0 | 001, 006 | complete |
 | 008 | [범용 ICS Import](features/008-ics-import.md) | P0 | 001 | complete |
-| 009 | [Naver Calendar 자동 Pull](features/009-naver-calendar-pull.md) | P1 | 001, 008 | spec-complete |
-| 010 | [일정 알람 (N분 전 / 정시 알림)](features/010-event-alarm.md) | P0 | 001 | spec-complete |
+| 009 | [Naver Calendar 자동 Pull](features/009-naver-calendar-pull.md) | P1 | 001, 008 | complete |
+| 010 | [일정 알람 (N분 전 / 정시 알림)](features/010-event-alarm.md) | P0 | 001 | complete |
 | 011 | [Daily Routine (습관/루틴)](features/011-daily-routine.md) | P1 | 001, 010 | spec-complete |
 | 012 | [반복 규칙 엔진 (Event + Task)](features/012-recurrence-engine.md) | P0 | 001, 006 | spec-complete |
-| 013 | [공휴일 연동 (국가별 구독)](features/013-public-holidays.md) | P1 | 001 | spec-complete |
+| 013 | [공휴일 연동 (국가별 구독)](features/013-public-holidays.md) | P1 | 001 | complete |
 | 014 | [DB 클라우드 이전 및 백업 체계](features/014-cloud-db-migration.md) | P1 | 001 | complete |
 | 015 | [하단 네비게이션 통일 및 커스터마이징](features/015-navigation-customization.md) | P1 | 001 | spec-complete |
 | 016 | [그룹 및 Follow/Invite 시스템](features/016-group-and-follow.md) | P1 | 001 | spec-complete |
