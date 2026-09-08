@@ -106,6 +106,36 @@ All implementation is delegated to sub-agents with explicit scope and goals.
    - Loop continues until ALL reviewers' criteria are `[x]`
    - Only when all three reviewers fully pass does `/know-thy-build:finish` proceed
 
+### 배포 파이프라인 (NON-NEGOTIABLE)
+
+Feature 구현 완료 후 배포는 반드시 `scripts/deploy.sh`를 통해 진행한다.
+수동으로 개별 단계를 실행하지 않는다 — 파이프라인이 merge → push → 서버 빌드 → 웹 빌드 → 배포 → 헬스체크 → 검증을 순서대로 강제 실행한다.
+
+```bash
+# Feature 브랜치에서 배포까지 한번에
+./scripts/deploy.sh --from feature/NNN-name
+
+# main에서 이미 merge된 상태라면
+./scripts/deploy.sh
+
+# 부분 배포
+./scripts/deploy.sh --web-only      # 웹만
+./scripts/deploy.sh --server-only   # 서버만
+```
+
+파이프라인이 수행하는 것:
+1. Pre-flight (Docker, Flutter, git 상태 확인)
+2. Squash merge + push (--from 사용 시)
+3. 서버 빌드 (docker compose up -d --build api)
+4. 서버 헬스체크 (60초 타임아웃)
+5. DB Migration 확인
+6. 서버 에러 로그 확인
+7. Flutter Web 빌드 + nginx 배포
+8. Web HTTP 200 + Flutter 부트스트랩 확인
+9. Feature 브랜치 정리
+
+**배포 없이 "구현 완료"를 선언하지 않는다.**
+
 ### iOS Build (Widget / Native)
 
 Intel iMac (macOS 15.x) 환경 제약:
