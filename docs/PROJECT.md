@@ -172,6 +172,7 @@ lastEvolve: 2026-08-31
 | 003 | [자동 로그인 (세션 유지)](features/003-auto-login.md) | P1 | 001 | complete |
 | 004 | [위젯 인증 상태 연동](features/004-widget-auth-state.md) | P1 | 003 | complete |
 | 005 | [월별 캘린더 위젯](features/005-monthly-widget.md) | P0 | 004 | complete |
+| 006 | [Task 관리 (Event-Task N:1 관계)](features/006-task-management.md) | P0 | 001 | in-progress |
 
 **Technical Foundation:** [TECHNICAL.md](TECHNICAL.md)
 

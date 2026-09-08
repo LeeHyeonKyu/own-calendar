@@ -4,6 +4,9 @@ import SwiftUI
 struct EventEntry: TimelineEntry {
     let date: Date
     let events: [CalendarEvent]
+    let tasks: [CalendarTask]
+    let taskDone: Int
+    let taskTotal: Int
     let isLoggedIn: Bool
 }
 
@@ -14,13 +17,25 @@ struct CalendarEvent: Codable, Identifiable {
     var id: String { "\(title)_\(time)" }
 }
 
+struct CalendarTask: Codable, Identifiable {
+    let title: String
+    let status: String
+    let priority: String
+    let time: String
+    let dueDate: String
+    let eventTitle: String
+    let isOverdue: Bool
+    var id: String { "\(title)_\(status)_\(time)" }
+    var isDone: Bool { status == "DONE" }
+}
+
 struct OwnCalendarProvider: TimelineProvider {
     let userDefaults = UserDefaults(suiteName: "group.com.owncalendar.ownCalendar")
 
     func placeholder(in context: Context) -> EventEntry {
         EventEntry(date: Date(), events: [
             CalendarEvent(title: "일정 로딩 중...", time: "09:00", category: "PERSONAL")
-        ], isLoggedIn: true)
+        ], tasks: [], taskDone: 0, taskTotal: 0, isLoggedIn: true)
     }
 
     func getSnapshot(in context: Context, completion: @escaping (EventEntry) -> Void) {
@@ -38,15 +53,28 @@ struct OwnCalendarProvider: TimelineProvider {
         let isLoggedIn = userDefaults?.bool(forKey: "isLoggedIn") ?? false
 
         guard isLoggedIn else {
-            return EventEntry(date: Date(), events: [], isLoggedIn: false)
+            return EventEntry(date: Date(), events: [], tasks: [], taskDone: 0, taskTotal: 0, isLoggedIn: false)
         }
 
-        guard let jsonStr = userDefaults?.string(forKey: "todayEvents"),
-              let data = jsonStr.data(using: .utf8),
-              let events = try? JSONDecoder().decode([CalendarEvent].self, from: data) else {
-            return EventEntry(date: Date(), events: [], isLoggedIn: true)
+        var events: [CalendarEvent] = []
+        if let jsonStr = userDefaults?.string(forKey: "todayEvents"),
+           let data = jsonStr.data(using: .utf8),
+           let decoded = try? JSONDecoder().decode([CalendarEvent].self, from: data) {
+            events = decoded
         }
-        return EventEntry(date: Date(), events: events, isLoggedIn: true)
+
+        var tasks: [CalendarTask] = []
+        if let jsonStr = userDefaults?.string(forKey: "todayTasks"),
+           let data = jsonStr.data(using: .utf8),
+           let decoded = try? JSONDecoder().decode([CalendarTask].self, from: data) {
+            tasks = decoded
+        }
+
+        let taskDone = userDefaults?.integer(forKey: "taskDone") ?? 0
+        let taskTotal = userDefaults?.integer(forKey: "taskTotal") ?? 0
+
+        return EventEntry(date: Date(), events: events, tasks: tasks,
+                          taskDone: taskDone, taskTotal: taskTotal, isLoggedIn: true)
     }
 }
 
@@ -55,12 +83,28 @@ struct OwnCalendarWidgetView: View {
 
     @Environment(\.widgetFamily) var family
 
+    private static let taskColor = Color(red: 240/255, green: 160/255, blue: 80/255)
+    private static let overdueColor = Color(red: 239/255, green: 107/255, blue: 107/255)
+    private static let doneColor = Color(red: 74/255, green: 222/255, blue: 128/255)
+
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
+            // Header
             HStack {
-                Text("오늘 일정")
+                Text("오늘")
                     .font(.headline)
                     .fontWeight(.bold)
+                if entry.taskTotal > 0 {
+                    Text("\(entry.taskDone)/\(entry.taskTotal)")
+                        .font(.caption)
+                        .fontWeight(.semibold)
+                        .foregroundColor(Self.doneColor)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 1)
+                        .background(
+                            Capsule().fill(Self.doneColor.opacity(0.15))
+                        )
+                }
                 Spacer()
                 Text(formattedDate)
                     .font(.caption)
@@ -86,7 +130,7 @@ struct OwnCalendarWidgetView: View {
                     Spacer()
                 }
                 Spacer()
-            } else if entry.events.isEmpty {
+            } else if entry.events.isEmpty && entry.tasks.isEmpty {
                 Spacer()
                 HStack {
                     Spacer()
@@ -97,24 +141,58 @@ struct OwnCalendarWidgetView: View {
                 }
                 Spacer()
             } else {
+                // Events
                 ForEach(entry.events.prefix(eventLimit)) { event in
-                    HStack(spacing: 8) {
+                    HStack(spacing: 6) {
                         Circle()
                             .fill(categoryColor(event.category))
-                            .frame(width: 8, height: 8)
+                            .frame(width: 7, height: 7)
                         Text(event.time)
-                            .font(.caption)
+                            .font(.system(size: 10))
                             .foregroundColor(.secondary)
-                            .frame(width: 36, alignment: .leading)
+                            .frame(width: 32, alignment: .leading)
                         Text(event.title)
-                            .font(.subheadline)
+                            .font(.system(size: 12))
                             .lineLimit(1)
                     }
                 }
                 if entry.events.count > eventLimit {
                     Text("+\(entry.events.count - eventLimit)건 더")
-                        .font(.caption)
+                        .font(.system(size: 10))
                         .foregroundColor(.secondary)
+                }
+
+                // Tasks (undone only)
+                let undoneTasks = entry.tasks.filter { !$0.isDone }
+                if !undoneTasks.isEmpty {
+                    if !entry.events.isEmpty {
+                        Rectangle()
+                            .fill(Color.secondary.opacity(0.2))
+                            .frame(height: 1)
+                            .padding(.vertical, 1)
+                    }
+                    ForEach(undoneTasks.prefix(taskLimit)) { task in
+                        HStack(spacing: 6) {
+                            RoundedRectangle(cornerRadius: 2)
+                                .stroke(task.isOverdue ? Self.overdueColor : Self.taskColor, lineWidth: 1.5)
+                                .frame(width: 11, height: 11)
+                            if !task.time.isEmpty {
+                                Text(task.time)
+                                    .font(.system(size: 10))
+                                    .foregroundColor(.secondary)
+                                    .frame(width: 32, alignment: .leading)
+                            }
+                            Text(task.title)
+                                .font(.system(size: 12))
+                                .foregroundColor(task.isOverdue ? Self.overdueColor : .primary)
+                                .lineLimit(1)
+                        }
+                    }
+                    if undoneTasks.count > taskLimit {
+                        Text("+\(undoneTasks.count - taskLimit)건 할 일 더")
+                            .font(.system(size: 10))
+                            .foregroundColor(Self.taskColor)
+                    }
                 }
             }
             Spacer(minLength: 0)
@@ -124,10 +202,19 @@ struct OwnCalendarWidgetView: View {
 
     var eventLimit: Int {
         switch family {
-        case .systemSmall: return 3
-        case .systemMedium: return 4
-        case .systemLarge: return 8
-        default: return 4
+        case .systemSmall: return 2
+        case .systemMedium: return 3
+        case .systemLarge: return 5
+        default: return 3
+        }
+    }
+
+    var taskLimit: Int {
+        switch family {
+        case .systemSmall: return 1
+        case .systemMedium: return 2
+        case .systemLarge: return 4
+        default: return 2
         }
     }
 

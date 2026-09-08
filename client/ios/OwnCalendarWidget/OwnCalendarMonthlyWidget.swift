@@ -10,6 +10,7 @@ struct MonthlyEntry: TimelineEntry {
     let year: Int
     let month: Int
     let events: [Int: [MonthlyEvent]]  // day -> events
+    let taskDays: Set<Int>             // days that have tasks (orange dots)
     let selectedDay: Int
     let eventPage: Int
     let showFamilyEvents: Bool
@@ -135,7 +136,7 @@ struct MonthlyWidgetProvider: AppIntentTimelineProvider {
             date: now, isLoggedIn: true,
             year: cal.component(.year, from: now),
             month: cal.component(.month, from: now),
-            events: [:],
+            events: [:], taskDays: [],
             selectedDay: cal.component(.day, from: now),
             eventPage: 0, showFamilyEvents: true, filterIndex: 0,
             filterPresets: defaultPresets
@@ -170,7 +171,7 @@ struct MonthlyWidgetProvider: AppIntentTimelineProvider {
                 date: now, isLoggedIn: false,
                 year: cal.component(.year, from: now),
                 month: cal.component(.month, from: now),
-                events: [:],
+                events: [:], taskDays: [],
                 selectedDay: cal.component(.day, from: now),
                 eventPage: 0, showFamilyEvents: true, filterIndex: 0,
                 filterPresets: presets
@@ -181,6 +182,7 @@ struct MonthlyWidgetProvider: AppIntentTimelineProvider {
         var year  = cal.component(.year, from: now)
         var month = cal.component(.month, from: now)
         var events: [Int: [MonthlyEvent]] = [:]
+        var taskDays: Set<Int> = []
 
         if let jsonStr = userDefaults?.string(forKey: "monthlyData"),
            let data = jsonStr.data(using: .utf8),
@@ -207,6 +209,15 @@ struct MonthlyWidgetProvider: AppIntentTimelineProvider {
                         ))
                     }
                     events[day] = dayEvents
+                }
+            }
+
+            // Parse task days
+            if let taskDaysDict = json["taskDays"] as? [String: Any] {
+                for (dayStr, _) in taskDaysDict {
+                    if let day = Int(dayStr) {
+                        taskDays.insert(day)
+                    }
                 }
             }
         }
@@ -239,7 +250,7 @@ struct MonthlyWidgetProvider: AppIntentTimelineProvider {
 
         return MonthlyEntry(
             date: now, isLoggedIn: true,
-            year: year, month: month, events: events,
+            year: year, month: month, events: events, taskDays: taskDays,
             selectedDay: selectedDay, eventPage: eventPage,
             showFamilyEvents: showFamilyEvents,
             filterIndex: min(filterIndex, presets.count),
@@ -349,12 +360,16 @@ private struct DayCellView: View {
     let isToday: Bool
     let isSelected: Bool
     let column: Int           // 0=Sunday ... 6=Saturday
-    let categories: [String]  // for dots
+    let categories: [String]  // for event dots
+    let hasTask: Bool         // show orange task dot
     let colorScheme: ColorScheme
     let dayFontSize: CGFloat
     let dotSize: CGFloat
 
     private var circleSize: CGFloat { dayFontSize < 12 ? 15 : 20 }
+
+    // Task dot color (orange)
+    private static let taskColor = Color(red: 240/255, green: 160/255, blue: 80/255) // #F0A050
 
     var body: some View {
         VStack(spacing: 1) {
@@ -376,11 +391,18 @@ private struct DayCellView: View {
             }
             .frame(height: circleSize)
 
-            if isCurrentMonth && !categories.isEmpty {
+            if isCurrentMonth && (!categories.isEmpty || hasTask) {
                 HStack(spacing: 1.5) {
-                    ForEach(categories, id: \.self) { cat in
+                    // Event category dots (max 2 to leave room for task dot)
+                    ForEach(categories.prefix(hasTask ? 2 : 3), id: \.self) { cat in
                         Circle()
                             .fill(MonthlyColors.categoryColor(cat))
+                            .frame(width: dotSize, height: dotSize)
+                    }
+                    // Task dot (orange)
+                    if hasTask {
+                        Circle()
+                            .fill(Self.taskColor)
                             .frame(width: dotSize, height: dotSize)
                     }
                 }
@@ -483,22 +505,20 @@ private struct CalendarGridView: View {
         let isToday: Bool
         let isSelected: Bool
         let categories: [String]
+        let hasTask: Bool
     }
 
     private func dayInfo(index: Int, data: CalendarGridData) -> DayInfo {
         if index < data.firstWeekday {
-            // Previous month trailing days
             let day = data.previousMonthDays - data.firstWeekday + index + 1
             return DayInfo(dayNumber: day, isCurrentMonth: false,
-                           isToday: false, isSelected: false, categories: [])
+                           isToday: false, isSelected: false, categories: [], hasTask: false)
         }
         if index >= data.firstWeekday + data.daysInMonth {
-            // Next month leading days
             let day = index - data.firstWeekday - data.daysInMonth + 1
             return DayInfo(dayNumber: day, isCurrentMonth: false,
-                           isToday: false, isSelected: false, categories: [])
+                           isToday: false, isSelected: false, categories: [], hasTask: false)
         }
-        // Current month
         let day = index - data.firstWeekday + 1
         let cats = categoriesForDay(
             allEvents: entry.events, day: day,
@@ -510,7 +530,8 @@ private struct CalendarGridView: View {
             isCurrentMonth: true,
             isToday: isCurrentMonth && day == todayDay,
             isSelected: day == entry.selectedDay,
-            categories: cats
+            categories: cats,
+            hasTask: entry.taskDays.contains(day)
         )
     }
 
@@ -523,6 +544,7 @@ private struct CalendarGridView: View {
             isSelected: info.isSelected,
             column: col,
             categories: info.categories,
+            hasTask: info.hasTask,
             colorScheme: colorScheme,
             dayFontSize: dayFontSize,
             dotSize: dotSize

@@ -15,6 +15,7 @@ model User {
   passwordHash        String
   calendars           Calendar[]
   events              Event[]            @relation("CreatedEvents")
+  tasks               Task[]             @relation("CreatedTasks")
   refreshTokens       RefreshToken[]
   familyMemberships   FamilyMembership[]
   createdFamilyGroups FamilyGroup[]      @relation("CreatedFamilyGroups")
@@ -55,6 +56,7 @@ model Calendar {
   familyGroupId String?            @unique
   familyGroup   FamilyGroup?       @relation(fields: [familyGroupId], references: [id])
   events        Event[]
+  tasks         Task[]
   externalConnection ExternalCalendarConnection?
   createdAt     DateTime           @default(now())
   updatedAt     DateTime           @updatedAt
@@ -77,6 +79,7 @@ model Event {
   calendar    Calendar      @relation(fields: [calendarId], references: [id], onDelete: Cascade)
   createdById String
   createdBy   User          @relation("CreatedEvents", fields: [createdById], references: [id])
+  tasks       Task[]
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
 }
@@ -145,4 +148,45 @@ model ExternalCalendarConnection {
   updatedAt    DateTime @updatedAt
 
   @@unique([provider, externalId, userId])
+}
+
+enum TaskStatus {
+  TODO
+  DONE
+  CANCELLED
+}
+
+enum TaskPriority {
+  HIGH
+  MEDIUM
+  LOW
+  NONE
+}
+
+model Task {
+  id             String         @id @default(cuid())
+  title          String
+  description    String?
+  status         TaskStatus     @default(TODO)
+  priority       TaskPriority   @default(NONE)
+  dueDate        DateTime?
+  scheduledDate  DateTime?
+  scheduledTime  String?
+  recurrenceType RecurrenceType @default(NONE)
+  recurrenceEnd  DateTime?
+  completedAt    DateTime?
+  eventId        String?
+  event          Event?         @relation(fields: [eventId], references: [id], onDelete: SetNull)
+  calendarId     String
+  calendar       Calendar       @relation(fields: [calendarId], references: [id], onDelete: Cascade)
+  createdById    String
+  createdBy      User           @relation("CreatedTasks", fields: [createdById], references: [id])
+  sortOrder      Int            @default(0)
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  @@index([calendarId])
+  @@index([eventId])
+  @@index([status])
+  @@index([dueDate])
 }

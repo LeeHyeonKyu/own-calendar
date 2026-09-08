@@ -66,7 +66,7 @@ function generateRecurrenceInstances(event: any, queryStart: Date, queryEnd: Dat
 }
 
 export const eventService = {
-  async list(userId: string, query: { calendarId?: string; category?: string; start?: string; end?: string }) {
+  async list(userId: string, query: { calendarId?: string; category?: string; start?: string; end?: string; includeTasks?: string }) {
     const where: any = {
       calendar: { ownerId: userId },
     };
@@ -105,7 +105,10 @@ export const eventService = {
           },
         ],
       },
-      include: { calendar: true },
+      include: {
+        calendar: true,
+        ...(query.includeTasks === 'true' ? { tasks: { orderBy: [{ sortOrder: 'asc' as const }, { dueDate: 'asc' as const }] } } : {}),
+      },
     });
 
     const result: any[] = [];

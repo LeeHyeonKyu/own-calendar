@@ -6,6 +6,7 @@ import { config } from './config';
 import authRoutes from './routes/auth';
 import calendarRoutes from './routes/calendars';
 import eventRoutes from './routes/events';
+import taskRoutes from './routes/tasks';
 import familyRoutes from './routes/family';
 import googleRoutes from './routes/google';
 
@@ -53,6 +54,7 @@ app.use('/api/family/join', authLimiter);
 app.use('/api/auth', authRoutes);
 app.use('/api/calendars', calendarRoutes);
 app.use('/api/events', eventRoutes);
+app.use('/api/tasks', taskRoutes);
 app.use('/api/family', familyRoutes);
 app.use('/api/google', googleRoutes);
 

@@ -47,6 +47,7 @@ export const queryEventSchema = z.object({
   category: z.enum(EVENT_CATEGORIES).optional(),
   start: z.string().optional(),
   end: z.string().optional(),
+  includeTasks: z.string().optional(),
 });
 
 export const searchEventSchema = z.object({

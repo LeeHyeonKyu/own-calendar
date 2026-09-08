@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:home_widget/home_widget.dart';
 import '../models/calendar.dart';
 import '../models/event.dart';
+import '../models/task.dart';
 import '../services/api_service.dart';
 
 class CalendarProvider extends ChangeNotifier {
@@ -10,6 +11,7 @@ class CalendarProvider extends ChangeNotifier {
   List<CalendarModel> _calendars = [];
   List<EventModel> _events = [];
   List<EventModel> _familyEvents = [];
+  List<TaskModel> _tasks = [];
   bool _isLoading = false;
   bool _showFamilyEvents = true;
   Set<String> _selectedCategories = {
@@ -19,6 +21,7 @@ class CalendarProvider extends ChangeNotifier {
   List<CalendarModel> get calendars => _calendars;
   List<EventModel> get events => _events;
   List<EventModel> get familyEvents => _familyEvents;
+  List<TaskModel> get tasks => _tasks;
   List<EventModel> get allVisibleEvents {
     final merged = _showFamilyEvents ? [..._events, ..._familyEvents] : _events;
     if (_selectedCategories.length == EventModel.categoryLabels.length) {
@@ -101,10 +104,20 @@ class CalendarProvider extends ChangeNotifier {
         }
       }
 
+      // Build task days: which days have tasks
+      final Map<String, bool> taskDaysMap = {};
+      for (final task in _tasks) {
+        final date = task.scheduledDate ?? task.dueDate;
+        if (date == null) continue;
+        if (date.month != now.month || date.year != now.year) continue;
+        taskDaysMap[date.day.toString()] = true;
+      }
+
       final monthlyData = {
         'year': now.year,
         'month': now.month,
         'events': eventsMap,
+        'taskDays': taskDaysMap,
       };
 
       await HomeWidget.saveWidgetData('monthlyData', jsonEncode(monthlyData));
@@ -137,7 +150,42 @@ class CalendarProvider extends ChangeNotifier {
               })
           .toList();
 
+      // Task data for widget
+      final todayTasks = _tasks.where((t) {
+        final date = t.scheduledDate ?? t.dueDate;
+        if (date == null) return t.isTodo; // include unscheduled TODOs
+        return date.isAfter(todayStart.subtract(const Duration(seconds: 1))) &&
+               date.isBefore(todayEnd);
+      }).toList()
+        ..sort((a, b) {
+          // Overdue first, then by time
+          if (a.isOverdue && !b.isOverdue) return -1;
+          if (!a.isOverdue && b.isOverdue) return 1;
+          final aTime = a.scheduledDate ?? a.dueDate;
+          final bTime = b.scheduledDate ?? b.dueDate;
+          if (aTime == null && bTime == null) return 0;
+          if (aTime == null) return 1;
+          if (bTime == null) return -1;
+          return aTime.compareTo(bTime);
+        });
+
+      final taskWidgetData = todayTasks.take(8).map((t) => {
+        'title': t.title,
+        'status': t.status,
+        'priority': t.priority,
+        'time': t.scheduledTime ?? '',
+        'dueDate': t.dueDate?.toIso8601String() ?? '',
+        'eventTitle': t.eventTitle ?? '',
+        'isOverdue': t.isOverdue,
+      }).toList();
+
+      final doneCount = todayTasks.where((t) => t.isDone).length;
+      final totalCount = todayTasks.length;
+
       await HomeWidget.saveWidgetData('todayEvents', jsonEncode(widgetData));
+      await HomeWidget.saveWidgetData('todayTasks', jsonEncode(taskWidgetData));
+      await HomeWidget.saveWidgetData('taskDone', doneCount);
+      await HomeWidget.saveWidgetData('taskTotal', totalCount);
       await HomeWidget.saveWidgetData(
           'lastUpdated', DateTime.now().toIso8601String());
       await HomeWidget.saveWidgetData<bool>('isLoggedIn', true);
@@ -236,5 +284,100 @@ class CalendarProvider extends ChangeNotifier {
       return list.map((j) => EventModel.fromJson(j)).toList();
     }
     return [];
+  }
+
+  // ─── Task methods ───
+
+  Future<void> loadTasks({DateTime? start, DateTime? end, String? status, String? eventId}) async {
+    String query = '';
+    if (start != null) query += 'start=${start.toIso8601String()}&';
+    if (end != null) query += 'end=${end.toIso8601String()}&';
+    if (status != null) query += 'status=$status&';
+    if (eventId != null) query += 'eventId=$eventId&';
+    final res = await _api.get('/tasks${query.isNotEmpty ? "?$query" : ""}');
+    if (res.statusCode == 200) {
+      final list = jsonDecode(res.body) as List;
+      _tasks = list.map((j) => TaskModel.fromJson(j)).toList();
+      notifyListeners();
+    }
+  }
+
+  Future<bool> createTask(Map<String, dynamic> data) async {
+    final res = await _api.post('/tasks', data);
+    if (res.statusCode == 201) {
+      await loadTasks();
+      _updateHomeWidget();
+      _updateMonthlyWidget();
+      return true;
+    }
+    return false;
+  }
+
+  Future<bool> updateTask(String id, Map<String, dynamic> data) async {
+    final res = await _api.put('/tasks/$id', data);
+    if (res.statusCode == 200) {
+      await loadTasks();
+      _updateHomeWidget();
+      _updateMonthlyWidget();
+      return true;
+    }
+    return false;
+  }
+
+  Future<bool> deleteTask(String id) async {
+    final res = await _api.delete('/tasks/$id');
+    if (res.statusCode == 204) {
+      await loadTasks();
+      _updateHomeWidget();
+      _updateMonthlyWidget();
+      return true;
+    }
+    return false;
+  }
+
+  Future<bool> toggleTaskComplete(String id) async {
+    final res = await _api.patch('/tasks/$id/complete');
+    if (res.statusCode == 200) {
+      final json = jsonDecode(res.body);
+      final updated = TaskModel.fromJson(json);
+      final idx = _tasks.indexWhere((t) => t.id == id);
+      if (idx >= 0) {
+        _tasks[idx] = updated;
+        notifyListeners();
+      }
+      _updateHomeWidget();
+      _updateMonthlyWidget();
+      return true;
+    }
+    return false;
+  }
+
+  Future<bool> linkTaskToEvent(String taskId, String? eventId) async {
+    final res = await _api.patch('/tasks/$taskId/link', {'eventId': eventId});
+    if (res.statusCode == 200) {
+      await loadTasks();
+      _updateHomeWidget();
+      return true;
+    }
+    return false;
+  }
+
+  List<TaskModel> tasksForDay(DateTime day) {
+    final dayStart = DateTime(day.year, day.month, day.day);
+    final dayEnd = dayStart.add(const Duration(days: 1));
+    return _tasks.where((t) {
+      final date = t.scheduledDate ?? t.dueDate;
+      if (date == null) return false;
+      return date.isAfter(dayStart.subtract(const Duration(seconds: 1))) &&
+             date.isBefore(dayEnd);
+    }).toList();
+  }
+
+  List<TaskModel> tasksForEvent(String eventId) {
+    return _tasks.where((t) => t.eventId == eventId).toList();
+  }
+
+  List<TaskModel> get unscheduledTasks {
+    return _tasks.where((t) => t.scheduledDate == null && t.dueDate == null && t.isTodo).toList();
   }
 }

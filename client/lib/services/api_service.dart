@@ -99,6 +99,25 @@ class ApiService {
     return response;
   }
 
+  Future<http.Response> patch(String path, [Map<String, dynamic>? body]) async {
+    final response = await http.patch(
+      Uri.parse('$baseUrl$path'),
+      headers: await _headers(),
+      body: body != null ? jsonEncode(body) : null,
+    );
+    if (response.statusCode == 401) {
+      final refreshed = await _refreshTokens();
+      if (refreshed) {
+        return http.patch(
+          Uri.parse('$baseUrl$path'),
+          headers: await _headers(),
+          body: body != null ? jsonEncode(body) : null,
+        );
+      }
+    }
+    return response;
+  }
+
   Future<http.Response> delete(String path) async {
     final response = await http.delete(
       Uri.parse('$baseUrl$path'),

@@ -7,6 +7,7 @@ import 'screens/weekly_view_screen.dart';
 import 'screens/yearly_view_screen.dart';
 import 'screens/family_screen.dart';
 import 'screens/event_form_screen.dart';
+import 'screens/task_form_screen.dart';
 import 'screens/search_screen.dart';
 import 'screens/settings_screen.dart';
 
@@ -70,6 +71,21 @@ GoRouter createRouter(AuthProvider authProvider) {
         path: '/event/:id/edit',
         builder: (context, state) => EventFormScreen(
           eventId: state.pathParameters['id'],
+        ),
+      ),
+      GoRoute(
+        path: '/task/new',
+        builder: (context, state) {
+          final dateStr = state.uri.queryParameters['date'];
+          final date = dateStr != null ? DateTime.tryParse(dateStr) : null;
+          final eventId = state.uri.queryParameters['eventId'];
+          return TaskFormScreen(initialDate: date, initialEventId: eventId);
+        },
+      ),
+      GoRoute(
+        path: '/task/:id/edit',
+        builder: (context, state) => TaskFormScreen(
+          taskId: state.pathParameters['id'],
         ),
       ),
       GoRoute(

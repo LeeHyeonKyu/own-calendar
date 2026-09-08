@@ -4,6 +4,8 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import '../providers/calendar_provider.dart';
 import '../models/event.dart';
+import '../models/task.dart';
+import '../widgets/task_card.dart';
 
 void showCategoryFilterDialog(BuildContext context) {
   showModalBottomSheet(
@@ -69,34 +71,43 @@ class MonthlyViewScreen extends StatefulWidget {
 
 class _MonthlyViewScreenState extends State<MonthlyViewScreen> {
   late DateTime _currentMonth;
+  DateTime? _selectedDay;
 
   @override
   void initState() {
     super.initState();
     final m = widget.initialMonth ?? DateTime.now();
     _currentMonth = DateTime(m.year, m.month);
-    WidgetsBinding.instance.addPostFrameCallback((_) => _loadEvents());
+    final now = DateTime.now();
+    if (m.year == now.year && m.month == now.month) {
+      _selectedDay = DateTime(now.year, now.month, now.day);
+    }
+    WidgetsBinding.instance.addPostFrameCallback((_) => _loadData());
   }
 
-  Future<void> _loadEvents() async {
+  Future<void> _loadData() async {
     final start = _currentMonth;
     final end = DateTime(_currentMonth.year, _currentMonth.month + 1);
-    await context.read<CalendarProvider>().loadEvents(start: start, end: end);
-    await context.read<CalendarProvider>().loadFamilyEvents(start: start, end: end);
+    final provider = context.read<CalendarProvider>();
+    await provider.loadEvents(start: start, end: end);
+    await provider.loadFamilyEvents(start: start, end: end);
+    await provider.loadTasks(start: start, end: end);
   }
 
   void _previousMonth() {
     setState(() {
       _currentMonth = DateTime(_currentMonth.year, _currentMonth.month - 1);
+      _selectedDay = null;
     });
-    _loadEvents();
+    _loadData();
   }
 
   void _nextMonth() {
     setState(() {
       _currentMonth = DateTime(_currentMonth.year, _currentMonth.month + 1);
+      _selectedDay = null;
     });
-    _loadEvents();
+    _loadData();
   }
 
   Color _parseColor(String? hex) {
@@ -117,10 +128,121 @@ class _MonthlyViewScreenState extends State<MonthlyViewScreen> {
         .toList();
   }
 
+  List<TaskModel> _tasksForDay(DateTime day, List<TaskModel> allTasks) {
+    final dayStart = DateTime(day.year, day.month, day.day);
+    final dayEnd = dayStart.add(const Duration(days: 1));
+    return allTasks.where((t) {
+      final date = t.scheduledDate ?? t.dueDate;
+      if (date == null) return false;
+      return !date.isBefore(dayStart) && date.isBefore(dayEnd);
+    }).toList();
+  }
+
+  Widget _buildDayDetailPanel(CalendarProvider calProvider, List<EventModel> allEvents, List<TaskModel> allTasks) {
+    final day = _selectedDay!;
+    final dayEvents = _eventsForDay(day, allEvents);
+    final dayTasks = _tasksForDay(day, allTasks);
+    final dateStr = DateFormat('M월 d일 (E)', 'ko').format(day);
+
+    dayEvents.sort((a, b) => a.startTime.compareTo(b.startTime));
+
+    // Group tasks: event-related vs standalone
+    final Map<String, List<TaskModel>> eventTaskMap = {};
+    final List<TaskModel> standaloneTasks = [];
+    for (final task in dayTasks) {
+      if (task.eventId != null) {
+        eventTaskMap.putIfAbsent(task.eventId!, () => []).add(task);
+      } else {
+        standaloneTasks.add(task);
+      }
+    }
+
+    return Container(
+      decoration: BoxDecoration(
+        border: Border(top: BorderSide(color: Theme.of(context).dividerColor)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+            child: Row(
+              children: [
+                Text(dateStr, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                const Spacer(),
+                if (dayEvents.isNotEmpty)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    margin: const EdgeInsets.only(right: 6),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF5B8DEF).withAlpha(25),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      '${dayEvents.length}',
+                      style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF5B8DEF)),
+                    ),
+                  ),
+                if (dayTasks.isNotEmpty)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF0A050).withAlpha(25),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      '${dayTasks.length}',
+                      style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFFF0A050)),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          Expanded(
+            child: (dayEvents.isEmpty && dayTasks.isEmpty)
+                ? Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.event_available, size: 40, color: Colors.grey[400]),
+                        const SizedBox(height: 8),
+                        Text('일정이 없습니다', style: TextStyle(color: Colors.grey[500])),
+                      ],
+                    ),
+                  )
+                : ListView(
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    children: [
+                      // Events with nested tasks
+                      ...dayEvents.map((event) {
+                        final nestedTasks = eventTaskMap[event.id] ?? [];
+                        return _EventCardWithTasks(
+                          event: event,
+                          tasks: nestedTasks,
+                          onEventTap: () => context.push('/event/${event.id}/edit'),
+                          onTaskToggle: (taskId) => calProvider.toggleTaskComplete(taskId),
+                          parseColor: _parseColor,
+                        );
+                      }),
+                      // Standalone tasks
+                      ...standaloneTasks.map((task) => TaskCard(
+                        task: task,
+                        onTap: () => context.push('/task/${task.baseId}/edit'),
+                        onToggleComplete: () => calProvider.toggleTaskComplete(task.baseId),
+                      )),
+                    ],
+                  ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final calProvider = context.watch<CalendarProvider>();
     final allEvents = calProvider.allVisibleEvents;
+    final allTasks = calProvider.tasks;
     final today = DateTime.now();
     final monthLabel = DateFormat('yyyy년 M월', 'ko').format(_currentMonth);
 
@@ -176,7 +298,7 @@ class _MonthlyViewScreenState extends State<MonthlyViewScreen> {
                     setState(() {
                       _currentMonth = DateTime(today.year, today.month);
                     });
-                    _loadEvents();
+                    _loadData();
                   },
                   child: Text(
                     monthLabel,
@@ -220,143 +342,160 @@ class _MonthlyViewScreenState extends State<MonthlyViewScreen> {
           // Calendar grid
           if (calProvider.isLoading)
             const Expanded(child: Center(child: CircularProgressIndicator()))
-          else
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 4),
-                child: Column(
-                  children: List.generate(rows, (row) {
-                    return Expanded(
-                      child: Row(
-                        children: List.generate(7, (col) {
-                          final cellIndex = row * 7 + col;
-                          final dayNum = cellIndex - startWeekday + 1;
+          else ...[
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              child: Column(
+                children: List.generate(rows, (row) {
+                  return Row(
+                    children: List.generate(7, (col) {
+                      final cellIndex = row * 7 + col;
+                      final dayNum = cellIndex - startWeekday + 1;
 
-                          if (dayNum < 1 || dayNum > totalDays) {
-                            return const Expanded(child: SizedBox());
-                          }
+                      if (dayNum < 1 || dayNum > totalDays) {
+                        return const Expanded(child: SizedBox(height: 48));
+                      }
 
-                          final day = DateTime(
-                            _currentMonth.year,
-                            _currentMonth.month,
-                            dayNum,
-                          );
-                          final isToday = day.year == today.year &&
-                              day.month == today.month &&
-                              day.day == today.day;
-                          final dayEvents = _eventsForDay(day, allEvents);
+                      final day = DateTime(
+                        _currentMonth.year,
+                        _currentMonth.month,
+                        dayNum,
+                      );
+                      final isToday = day.year == today.year &&
+                          day.month == today.month &&
+                          day.day == today.day;
+                      final isSelected = _selectedDay != null &&
+                          day.year == _selectedDay!.year &&
+                          day.month == _selectedDay!.month &&
+                          day.day == _selectedDay!.day;
+                      final dayEvents = _eventsForDay(day, allEvents);
+                      final dayTasks = _tasksForDay(day, allTasks);
+                      final hasEvents = dayEvents.isNotEmpty;
+                      final hasTasks = dayTasks.isNotEmpty;
 
-                          return Expanded(
-                            child: GestureDetector(
-                              onTap: () => context.push('/daily?date=${day.toIso8601String()}'),
-                              child: Container(
-                                margin: const EdgeInsets.all(1),
-                                decoration: BoxDecoration(
-                                  color: isToday
-                                      ? Theme.of(context)
-                                          .colorScheme
-                                          .primaryContainer
-                                          .withAlpha(100)
+                      return Expanded(
+                        child: GestureDetector(
+                          onTap: () {
+                            setState(() => _selectedDay = day);
+                          },
+                          onDoubleTap: () {
+                            context.push('/daily?date=${day.toIso8601String()}');
+                          },
+                          child: Container(
+                            height: 48,
+                            margin: const EdgeInsets.all(1),
+                            decoration: BoxDecoration(
+                              color: isSelected
+                                  ? Theme.of(context).colorScheme.primaryContainer.withAlpha(80)
+                                  : null,
+                              borderRadius: BorderRadius.circular(6),
+                              border: isToday
+                                  ? Border.all(color: Theme.of(context).colorScheme.primary, width: 1.5)
+                                  : null,
+                            ),
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                  decoration: isToday
+                                      ? BoxDecoration(
+                                          color: Theme.of(context).colorScheme.primary,
+                                          shape: BoxShape.circle,
+                                        )
                                       : null,
-                                  borderRadius: BorderRadius.circular(4),
-                                  border: Border.all(
-                                    color: isToday
-                                        ? Theme.of(context).colorScheme.primary
-                                        : Colors.grey.withAlpha(30),
-                                    width: isToday ? 1.5 : 0.5,
+                                  child: Text(
+                                    '$dayNum',
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: isToday ? FontWeight.bold : FontWeight.normal,
+                                      color: isToday
+                                          ? Colors.white
+                                          : col == 0
+                                              ? Colors.red[400]
+                                              : col == 6
+                                                  ? Colors.blue[400]
+                                                  : null,
+                                    ),
                                   ),
                                 ),
-                                child: Padding(
-                                  padding: const EdgeInsets.all(2),
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Center(
-                                        child: Container(
-                                          padding: const EdgeInsets.symmetric(
-                                            horizontal: 6,
-                                            vertical: 2,
-                                          ),
-                                          decoration: isToday
-                                              ? BoxDecoration(
-                                                  color: Theme.of(context)
-                                                      .colorScheme
-                                                      .primary,
-                                                  shape: BoxShape.circle,
-                                                )
-                                              : null,
-                                          child: Text(
-                                            '$dayNum',
-                                            style: TextStyle(
-                                              fontSize: 12,
-                                              fontWeight: isToday
-                                                  ? FontWeight.bold
-                                                  : FontWeight.normal,
-                                              color: isToday
-                                                  ? Colors.white
-                                                  : col == 0
-                                                      ? Colors.red[400]
-                                                      : col == 6
-                                                          ? Colors.blue[400]
-                                                          : null,
-                                            ),
-                                          ),
+                                const SizedBox(height: 2),
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    if (hasEvents)
+                                      Container(
+                                        width: 5,
+                                        height: 5,
+                                        margin: const EdgeInsets.symmetric(horizontal: 1),
+                                        decoration: BoxDecoration(
+                                          color: isToday ? Colors.white : const Color(0xFF5B8DEF),
+                                          shape: BoxShape.circle,
                                         ),
                                       ),
-                                      // Event indicators
-                                      ...dayEvents.take(3).map(
-                                            (e) => Container(
-                                              margin: const EdgeInsets.only(
-                                                top: 1,
-                                              ),
-                                              padding: const EdgeInsets.symmetric(
-                                                horizontal: 2,
-                                              ),
-                                              decoration: BoxDecoration(
-                                                color: _parseColor(e.calendarColor)
-                                                    .withAlpha(180),
-                                                borderRadius:
-                                                    BorderRadius.circular(2),
-                                              ),
-                                              child: Text(
-                                                e.title,
-                                                maxLines: 1,
-                                                overflow: TextOverflow.ellipsis,
-                                                style: const TextStyle(
-                                                  fontSize: 9,
-                                                  color: Colors.white,
-                                                ),
-                                              ),
-                                            ),
-                                          ),
-                                      if (dayEvents.length > 3)
-                                        Padding(
-                                          padding: const EdgeInsets.only(top: 1),
-                                          child: Text(
-                                            '+${dayEvents.length - 3}',
-                                            style: TextStyle(
-                                              fontSize: 9,
-                                              color: Colors.grey[500],
-                                            ),
-                                          ),
+                                    if (hasTasks)
+                                      Container(
+                                        width: 5,
+                                        height: 5,
+                                        margin: const EdgeInsets.symmetric(horizontal: 1),
+                                        decoration: BoxDecoration(
+                                          color: isToday ? Colors.white70 : const Color(0xFFF0A050),
+                                          shape: BoxShape.circle,
                                         ),
-                                    ],
-                                  ),
+                                      ),
+                                  ],
                                 ),
-                              ),
+                              ],
                             ),
-                          );
-                        }),
-                      ),
-                    );
-                  }),
-                ),
+                          ),
+                        ),
+                      );
+                    }),
+                  );
+                }),
               ),
             ),
+            const SizedBox(height: 4),
+            // Selected day detail panel
+            if (_selectedDay != null)
+              Expanded(child: _buildDayDetailPanel(calProvider, allEvents, allTasks)),
+            if (_selectedDay == null)
+              const Expanded(child: SizedBox()),
+          ],
         ],
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: () => context.push('/event/new?date=${DateTime.now().toIso8601String()}'),
+        onPressed: () {
+          final date = _selectedDay ?? DateTime.now();
+          showModalBottomSheet(
+            context: context,
+            builder: (ctx) => SafeArea(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  ListTile(
+                    leading: const Icon(Icons.event, color: Color(0xFF5B8DEF)),
+                    title: const Text('새 Event'),
+                    subtitle: const Text('일정, 약속, 기념일'),
+                    onTap: () {
+                      Navigator.pop(ctx);
+                      context.push('/event/new?date=${date.toIso8601String()}');
+                    },
+                  ),
+                  ListTile(
+                    leading: const Icon(Icons.check_box_outlined, color: Color(0xFFF0A050)),
+                    title: const Text('새 Task'),
+                    subtitle: const Text('할 일, 체크리스트'),
+                    onTap: () {
+                      Navigator.pop(ctx);
+                      context.push('/task/new?date=${date.toIso8601String()}');
+                    },
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
         child: const Icon(Icons.add),
       ),
       bottomNavigationBar: NavigationBar(
@@ -389,6 +528,111 @@ class _MonthlyViewScreenState extends State<MonthlyViewScreen> {
           NavigationDestination(icon: Icon(Icons.calendar_today), label: '연별'),
           NavigationDestination(icon: Icon(Icons.family_restroom), label: '가족'),
           NavigationDestination(icon: Icon(Icons.settings), label: '설정'),
+        ],
+      ),
+    );
+  }
+}
+
+class _EventCardWithTasks extends StatelessWidget {
+  final EventModel event;
+  final List<TaskModel> tasks;
+  final VoidCallback? onEventTap;
+  final Function(String taskId) onTaskToggle;
+  final Color Function(String?) parseColor;
+
+  const _EventCardWithTasks({
+    required this.event,
+    required this.tasks,
+    this.onEventTap,
+    required this.onTaskToggle,
+    required this.parseColor,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final timeFormat = DateFormat('HH:mm');
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 8),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        children: [
+          InkWell(
+            onTap: onEventTap,
+            child: Container(
+              decoration: BoxDecoration(
+                border: Border(left: BorderSide(color: const Color(0xFF5B8DEF), width: 3)),
+              ),
+              padding: const EdgeInsets.all(12),
+              child: Row(
+                children: [
+                  Container(
+                    width: 8,
+                    height: 8,
+                    decoration: const BoxDecoration(
+                      color: Color(0xFF5B8DEF),
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          event.title,
+                          style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          event.isAllDay
+                              ? '종일'
+                              : '${timeFormat.format(event.startTime)} – ${timeFormat.format(event.endTime)}',
+                          style: TextStyle(fontSize: 12, color: Colors.grey[500]),
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (tasks.isNotEmpty)
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFA78BFA).withAlpha(25),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        'Task ${tasks.where((t) => t.isDone).length}/${tasks.length}',
+                        style: const TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFFA78BFA),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ),
+          if (tasks.isNotEmpty)
+            Container(
+              width: double.infinity,
+              decoration: BoxDecoration(
+                border: Border(
+                  left: const BorderSide(color: Color(0xFF5B8DEF), width: 3),
+                  top: BorderSide(color: Theme.of(context).dividerColor),
+                ),
+              ),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+              child: Column(
+                children: tasks
+                    .map((task) => NestedTaskItem(
+                          task: task,
+                          onToggleComplete: () => onTaskToggle(task.baseId),
+                        ))
+                    .toList(),
+              ),
+            ),
         ],
       ),
     );

@@ -75,6 +75,11 @@ class _FakeApiService implements ApiService {
   Future<http.Response> delete(String path) async {
     throw UnimplementedError('delete not needed in tryRestore tests');
   }
+
+  @override
+  Future<http.Response> patch(String path, [Map<String, dynamic>? body]) async {
+    throw UnimplementedError('patch not needed in tryRestore tests');
+  }
 }
 
 /// 마이크로태스크 큐를 비워서 백그라운드 hydrate가 완료되도록 기다린다.
