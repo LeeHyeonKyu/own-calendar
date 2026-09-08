@@ -88,11 +88,11 @@ export const eventService = {
       where: {
         ...where,
         OR: [
-          // Non-recurring: normal time range filter
+          // Non-recurring: overlap check (event touches the query window)
           {
             recurrenceType: 'NONE',
-            ...(query.start ? { startTime: { gte: queryStart } } : {}),
-            ...(query.end ? { endTime: { lte: queryEnd } } : {}),
+            ...(query.end ? { startTime: { lt: queryEnd } } : {}),
+            ...(query.start ? { endTime: { gt: queryStart } } : {}),
           },
           // Recurring: original start before query end, and (no recurrenceEnd OR recurrenceEnd after query start)
           {

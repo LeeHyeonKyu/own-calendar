@@ -231,8 +231,16 @@ class _DailyViewScreenState extends State<DailyViewScreen> {
   // ─── TIMELINE TAB ───
 
   Widget _buildTimeline(CalendarProvider calProvider) {
-    final allEvents = calProvider.allVisibleEvents;
-    final allTasks = calProvider.tasks;
+    final dayStart = DateTime(_selectedDate.year, _selectedDate.month, _selectedDate.day);
+    final dayEnd = dayStart.add(const Duration(days: 1));
+    final allEvents = calProvider.allVisibleEvents
+        .where((e) => e.startTime.isBefore(dayEnd) && e.endTime.isAfter(dayStart))
+        .toList();
+    final allTasks = calProvider.tasks.where((t) {
+      final date = t.scheduledDate ?? t.dueDate;
+      if (date == null) return t.isTodo;
+      return !date.isBefore(dayStart) && date.isBefore(dayEnd);
+    }).toList();
     final unscheduled = allTasks.where((t) =>
         t.scheduledTime == null && t.dueDate == null && t.scheduledDate == null && t.isTodo).toList();
 
@@ -502,7 +510,13 @@ class _DailyViewScreenState extends State<DailyViewScreen> {
   // ─── TASK TAB ───
 
   Widget _buildTaskList(CalendarProvider calProvider) {
-    final allTasks = calProvider.tasks;
+    final dayStart = DateTime(_selectedDate.year, _selectedDate.month, _selectedDate.day);
+    final dayEnd = dayStart.add(const Duration(days: 1));
+    final allTasks = calProvider.tasks.where((t) {
+      final date = t.scheduledDate ?? t.dueDate;
+      if (date == null) return t.isTodo;
+      return !date.isBefore(dayStart) && date.isBefore(dayEnd);
+    }).toList();
     final overdue = allTasks.where((t) => t.isOverdue).toList();
     final eventLinked = allTasks.where((t) => t.hasEvent && !t.isDone && !t.isOverdue).toList();
     final standalone = allTasks.where((t) => !t.hasEvent && t.hasTime && !t.isDone && !t.isOverdue).toList();

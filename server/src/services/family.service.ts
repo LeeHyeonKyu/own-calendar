@@ -186,11 +186,11 @@ export const familyService = {
     });
 
     const eventWhere: any = {};
-    if (query?.start) {
-      eventWhere.startTime = { gte: new Date(query.start) };
-    }
     if (query?.end) {
-      eventWhere.endTime = { ...(eventWhere.endTime || {}), lte: new Date(query.end) };
+      eventWhere.startTime = { lt: new Date(query.end) };
+    }
+    if (query?.start) {
+      eventWhere.endTime = { gt: new Date(query.start) };
     }
 
     const result = [];
