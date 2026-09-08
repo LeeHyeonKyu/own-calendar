@@ -14,7 +14,9 @@ const bool kTestMode = bool.fromEnvironment('TEST_MODE', defaultValue: false);
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await initializeDateFormatting('ko');
-  await HomeWidget.setAppGroupId('group.com.owncalendar.ownCalendar');
+  try {
+    await HomeWidget.setAppGroupId('group.com.owncalendar.ownCalendar');
+  } catch (_) {}
 
   final authProvider = AuthProvider();
 
@@ -49,11 +51,10 @@ class _OwnCalendarAppState extends State<OwnCalendarApp> {
     // 여기서 Consumer로 감싸 재생성할 필요가 없다.
     _router = createRouter(widget.authProvider);
 
-    // Handle deep links from widget clicks (runtime)
-    _widgetClickSub = HomeWidget.widgetClicked.listen(_handleWidgetUri);
-
-    // Handle deep link if app was launched from widget (cold start)
-    HomeWidget.initiallyLaunchedFromHomeWidget().then(_handleWidgetUri);
+    try {
+      _widgetClickSub = HomeWidget.widgetClicked.listen(_handleWidgetUri);
+      HomeWidget.initiallyLaunchedFromHomeWidget().then(_handleWidgetUri);
+    } catch (_) {}
   }
 
   @override
