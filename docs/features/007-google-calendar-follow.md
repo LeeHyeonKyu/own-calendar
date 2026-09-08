@@ -1,0 +1,148 @@
+---
+id: 7
+title: Google Calendar Follow (단방향 동기화)
+status: complete
+priority: P0
+class: Architectural
+depends_on: [1, 6]
+persona: 현규
+gate:
+  worktree: null
+  architect: pending
+  designer: pending
+  qa: pending
+assumptions:
+  - "Google Calendar API 무료 쿼터가 가족 규모 트래픽에 충분할 것"
+  - "OAuth redirect URI 방식이 iOS/Android 모두에서 안정적으로 동작할 것"
+date: 2026-09-08
+generatedBy: know-thy-build-feature
+---
+
+# Google Calendar Follow (단방향 동기화)
+
+Google Calendar의 일정을 Own Calendar에서 자동으로 follow하여 통합 뷰에 표시한다.
+
+## Problem
+
+회사/외부 미팅은 Gmail 기반 초대로 Google Calendar에 먼저 등록된다. 이 일정을 보려면 GC 앱을 따로 열어야 하고, Own Calendar의 통합 뷰에는 반영되지 않는다. 매번 수동으로 확인하거나 옮겨야 하는 마찰이 존재한다.
+
+## Value
+
+앱을 열면 GC 일정이 이미 통합되어 보인다. "여기만 보면 된다"는 PROJECT.md의 핵심 가치(일정 통합 허브)를 실현하는 필수 기능. 특히 남이 초대하는 일정이 자동으로 따라오는 것이 핵심이다.
+
+## Solution
+
+GC를 **follow** 하는 단방향 구조. GC가 source of truth이고, Own Calendar은 읽기 + 로컬 보강(task 연결 등)만 한다.
+
+- **OAuth 인증**: 인앱 웹뷰 대신 외부 브라우저를 열어 인증. 완료 후 redirect URI로 앱 복귀.
+- **Pull 동기화**: 앱 열 때(foreground 진입) 자동 pull. Google의 `syncToken` 기반 증분 동기화.
+- **머지 전략**: GC 소유 필드(제목, 설명, 시간, 장소, 참여자 등)는 GC 기준 overwrite. 로컬 소유 필드(related task 등)는 보존.
+- **삭제 처리**: GC에서 일정 삭제 시 로컬 event 삭제, related task는 orphan으로 보존.
+- **계정 수**: 1개. DB 구조(`ExternalCalendarConnection`)는 이미 N개 지원하므로 추후 확장 가능.
+
+## Scope
+
+**Includes:**
+- 외부 브라우저 OAuth 인증 플로우 (기존 인앱 방식 교체)
+- GC → Own Calendar 단방향 pull (앱 열 때 자동)
+- GC 소유 필드 overwrite / 로컬 소유 필드 보존 머지 전략
+- GC 일정 삭제 시 event 삭제 + related task orphan 보존
+- 1개 Google 계정 연결
+- GC 일정에 related task 연결
+
+**Excludes:**
+- Own Calendar → GC 역방향 push
+- Webhook (실시간 변경 감지) — 이후 별도 feature
+- 다중 Google 계정 UI
+- GC 일정의 GC 소유 필드 로컬 편집 (제목/시간 등)
+
+## User Stories & Acceptance Criteria
+
+### Story 1: Google 계정 연결
+
+**As a** 현규, **I want** 외부 브라우저에서 Google OAuth 인증을 완료하고 앱으로 돌아오는 것 **so that** GC 일정을 Own Calendar에서 볼 수 있다.
+
+**Scenario:**
+- Given: Google 계정이 연결되지 않은 상태
+- When: 설정에서 "Google Calendar 연결"을 탭
+- Then: 외부 브라우저가 열리고, 인증 완료 후 앱으로 복귀하며, 연결 상태가 표시된다
+
+**Acceptance Criteria:**
+- [ ] 외부 브라우저에서 Google 로그인 + 권한 동의 완료 시 앱으로 redirect — verify: 수동 테스트
+- [ ] 연결 성공 후 ExternalCalendarConnection 레코드 생성 — verify: DB 확인
+- [ ] 연결 성공 시 즉시 첫 pull 실행 — verify: 이벤트 목록 확인
+
+**Edge Cases & Errors:**
+- [ ] 사용자가 OAuth 도중 취소 — verify: 앱 상태 변화 없음, 에러 없음
+- [ ] 이미 연결된 상태에서 재연결 시도 — verify: 기존 연결 갱신 또는 안내 메시지
+- [ ] 네트워크 끊김 상태에서 연결 시도 — verify: 에러 메시지 표시
+
+### Story 2: GC 일정 자동 동기화
+
+**As a** 현규, **I want** 앱을 열 때 GC 일정이 자동으로 가져와지는 것 **so that** 별도 조작 없이 항상 최신 일정을 본다.
+
+**Scenario:**
+- Given: Google 계정이 연결된 상태
+- When: 앱을 열거나 foreground로 진입
+- Then: GC 일정이 pull되어 캘린더에 최신 상태로 표시된다
+
+**Acceptance Criteria:**
+- [ ] 앱 진입 시 자동 pull, 새 일정 표시 — verify: GC에 일정 추가 후 앱 재진입
+- [ ] GC에서 제목/시간 변경 시 로컬 GC 소유 필드 overwrite — verify: GC에서 수정 후 sync
+- [ ] GC에서 일정 삭제 시 로컬 event 삭제, related task는 orphan 보존 — verify: task 잔존 확인
+- [ ] 로컬 소유 필드(related task 등) sync 시 보존 — verify: task 연결 후 sync 재실행
+
+**Edge Cases & Errors:**
+- [ ] 첫 sync (syncToken 없음) — verify: 최근 3개월 일정 가져오기
+- [ ] GC에 일정 0건 — verify: 빈 상태 정상 처리
+- [ ] sync 중 네트워크 오류 — verify: 기존 데이터 유지, 에러 표시
+
+### Story 3: GC 일정에 task 연결
+
+**As a** 현규, **I want** GC에서 가져온 일정에 related task를 달 수 있는 것 **so that** 회의 관련 할 일을 일정과 함께 관리한다.
+
+**Scenario:**
+- Given: GC에서 가져온 일정이 존재
+- When: 해당 일정 상세에서 task 추가
+- Then: task가 event에 연결되어 표시된다
+
+**Acceptance Criteria:**
+- [ ] GC 일정 상세에서 related task 추가 가능 — verify: UI 확인
+- [ ] 연결된 task가 일정 상세에서 보임 — verify: 일정 상세 화면
+- [ ] GC 일정 삭제 후에도 orphan task 독립 존재 — verify: task 목록에서 확인
+
+**Edge Cases & Errors:**
+- [ ] 동일 GC 일정에 여러 task 연결 — verify: 모두 표시
+- [ ] orphan task에서 원본 GC 일정 정보가 사라진 상태 — verify: task 단독 표시 정상
+
+## Design Intent
+
+| Step | User Action | Ideal Outcome | Design Decision | QA Verification |
+|------|-------------|---------------|-----------------|-----------------|
+| 1 | 설정에서 "Google Calendar 연결" 탭 | 외부 브라우저 열기 확인 다이얼로그 | 인앱 웹뷰 대신 외부 브라우저 — 복붙 가능, 기존 로그인 세션 활용 | 외부 브라우저가 열리는지 확인 |
+| 2 | Google 로그인 + 권한 동의 | 앱으로 자동 복귀 + "연결 완료" 표시 | redirect URI로 앱 복귀 — 수동 전환 불필요 | 인증 후 앱 자동 전환 확인 |
+| 3 | 앱 열기 (일상) | GC 일정이 통합 뷰에 이미 표시 | foreground 진입 시 자동 pull — 별도 버튼 불필요 | GC 일정 추가 → 앱 재진입 → 표시 확인 |
+| 4 | GC 일정 탭 → task 추가 | task가 일정에 연결 | GC 일정도 일반 일정과 동일한 task 연결 UI | task 추가/표시 확인 |
+
+**Key States:**
+
+| State | Trigger | User Sees |
+|-------|---------|-----------|
+| Empty | GC 미연결 | 설정에서 "Google Calendar 연결" 버튼. 캘린더에 GC 일정 없음 |
+| Error | OAuth 실패 / 네트워크 오류 | 에러 메시지 + 재시도 안내. 기존 데이터 유지 |
+
+## Approach
+
+- 기존 `google-sync.service.ts`의 `pullEvents()`를 머지 전략에 맞게 수정 (GC 소유 필드만 overwrite)
+- 기존 `pushEvent()`, `deleteExternalEvent()`는 이 feature에서 사용하지 않음 (코드 제거는 아님, 단순 미사용)
+- Flutter 쪽 OAuth: `url_launcher`로 외부 브라우저 열기 + deep link / custom scheme으로 앱 복귀
+- 삭제 처리: event 삭제 시 관련 task의 `eventId`를 null로 설정 (orphan)
+
+## Assumptions
+
+- Google Calendar API 무료 쿼터가 가족 규모 트래픽에 충분할 것 — if wrong: sync 주기를 늘리거나 Webhook으로 전환
+- OAuth redirect URI 방식이 iOS/Android 모두에서 안정적으로 동작할 것 — if wrong: platform별 분기 필요
+
+---
+
+*Generated by know-thy-build-feature | 2026-09-08*

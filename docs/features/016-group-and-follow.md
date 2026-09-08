@@ -1,0 +1,185 @@
+---
+id: 16
+title: 그룹 및 Follow/Invite 시스템
+status: complete
+priority: P1
+class: Architectural
+depends_on: [1]
+persona: 현규
+gate:
+  worktree: null
+  architect: pending
+  designer: pending
+  qa: pending
+assumptions:
+  - "사용자 수가 가족/지인 규모(수십 명)에서 유지될 것"
+  - "기존 가족 그룹 데이터가 없거나 적어서 마이그레이션 비용이 낮을 것"
+date: 2026-09-08
+generatedBy: know-thy-build-feature
+---
+
+# 그룹 및 Follow/Invite 시스템
+
+"가족"을 범용 "그룹"으로 일반화하고, 사용자 간 follow(단방향 열람) 및 event invite(참여자 초대) 관계를 도입한다.
+
+## Problem
+
+현재 "가족 그룹"이라는 고정된 관계만 존재한다. 친구, 동호회, 팀 등 다른 관계를 표현할 수 없다. 또한 Google Calendar처럼 누군가의 일정을 follow해서 열람하거나, 특정 일정에 사람을 초대하는 구조가 없어서 일정 공유가 그룹 단위로만 가능하다.
+
+## Value
+
+관계를 일반화하면 하나의 시스템으로 다양한 사용 패턴을 커버한다:
+- 가족 = 그룹 (기존과 동일한 경험)
+- 친구 = follow (서로 일정 열람)
+- 회의 = invite (특정 일정에 참여자 추가)
+
+Google Calendar의 익숙한 패턴(follow, invite)을 Own Calendar에서도 재현. PROJECT.md의 "기존 캘린더를 통합하는 허브" 비전에 부합.
+
+## Solution
+
+### 세 가지 관계 모델
+
+| 관계 | 방향 | 범위 | 예시 |
+|------|------|------|------|
+| **그룹** | 양방향 | 그룹 전체 일정 공유 | 가족, 동호회 |
+| **Follow** | 단방향 | 상대의 공개 일정 열람 | 친구, 동료 |
+| **Invite** | 일정 단위 | 특정 event에 참여자 추가 | 회의, 모임 |
+
+### 그룹
+
+- 기존 "가족 그룹"을 범용 "그룹"으로 확장
+- 그룹 코드로 합류 (기존 가족 코드와 동일 패턴)
+- 그룹 캘린더: 그룹 전용 공유 일정
+- 그룹 타입 라벨 (가족, 친구, 팀 등) — 기능 차이 없이 표시용
+
+### Follow
+
+- A가 B를 follow → A의 캘린더에 B의 공개 일정이 보임
+- follow 요청 → 상대 승인 → follow 성립 (스팸 방지)
+- follow한 상대의 일정은 읽기 전용
+- 맞팔로우는 강제 아님 — 각자 독립적으로 follow
+
+### Invite
+
+- event 생성/편집 시 참여자 추가 (Own Calendar 사용자)
+- 초대받은 사람의 캘린더에 해당 event 표시
+- 수락/거절 가능
+- GC에서 가져온 event의 참여자 정보와 연결 가능 (018 메타데이터와 연계)
+
+## Scope
+
+**Includes:**
+- 가족 그룹 → 범용 그룹 마이그레이션 (Family → Group)
+- 그룹 CRUD (생성, 코드 합류, 탈퇴, 삭제)
+- 그룹 캘린더 (그룹 전용 공유 일정)
+- Follow 요청/승인/해제
+- Follow한 사용자의 공개 일정 열람
+- Event invite (참여자 추가/제거, 수락/거절)
+- 기존 002 가족 데이터 마이그레이션
+
+**Excludes:**
+- 그룹 내 역할/권한 (관리자, 멤버 등) — 가족 규모에서 불필요
+- 그룹 간 일정 공유 (그룹 A ↔ 그룹 B)
+- 비공개 일정의 follow 열람 (공개 일정만)
+- Own Calendar 미사용자 초대 (앱 사용자만)
+- 채팅/댓글 (일정에 대한 커뮤니케이션)
+
+## User Stories & Acceptance Criteria
+
+### Story 1: 그룹 생성 및 합류
+
+**As a** 현규, **I want** "가족" 그룹을 만들고 가족을 초대하는 것 **so that** 가족 일정을 함께 관리한다.
+
+**Scenario:**
+- Given: 그룹이 없는 상태
+- When: 그룹 생성 후 코드를 가족에게 공유
+- Then: 가족이 코드로 합류하고 그룹 캘린더에 접근 가능
+
+**Acceptance Criteria:**
+- [ ] 그룹 생성 (이름, 타입 라벨) — verify: UI 확인
+- [ ] 그룹 코드 생성 및 공유 — verify: 코드 복사/공유 확인
+- [ ] 코드로 그룹 합류 — verify: 합류 후 그룹 캘린더 접근 확인
+- [ ] 그룹 캘린더에 일정 등록 시 멤버 전원에게 표시 — verify: 다른 멤버 캘린더에서 확인
+- [ ] 그룹 탈퇴/삭제 — verify: 탈퇴 후 접근 불가 확인
+
+**Edge Cases & Errors:**
+- [ ] 잘못된 그룹 코드 입력 — verify: 에러 메시지
+- [ ] 이미 가입된 그룹에 재합류 시도 — verify: 안내 메시지
+- [ ] 마지막 멤버가 탈퇴 — verify: 그룹 자동 삭제 또는 유지 정책
+
+### Story 2: Follow
+
+**As a** 현규, **I want** 친구를 follow해서 일정을 확인하는 것 **so that** 직접 물어보지 않아도 상대 일정을 알 수 있다.
+
+**Scenario:**
+- Given: 친구가 Own Calendar 사용자
+- When: 친구에게 follow 요청 → 친구가 승인
+- Then: 내 캘린더에 친구의 공개 일정이 보인다
+
+**Acceptance Criteria:**
+- [ ] 사용자 검색 및 follow 요청 — verify: 검색 + 요청 전송 확인
+- [ ] follow 요청 수신 → 승인/거절 — verify: 알림 + 승인 UI 확인
+- [ ] 승인 후 상대의 공개 일정 표시 — verify: 캘린더에 상대 일정 표시
+- [ ] follow 해제 — verify: 해제 후 상대 일정 미표시
+- [ ] 상대의 비공개 일정은 미표시 — verify: 비공개 일정 노출 안 됨
+
+**Edge Cases & Errors:**
+- [ ] 이미 follow 중인 사용자에게 재요청 — verify: 안내 메시지
+- [ ] 상대가 계정 삭제 시 — verify: follow 자동 해제, 일정 제거
+- [ ] 사용자 검색 결과 0건 — verify: "사용자를 찾을 수 없습니다" 안내
+
+### Story 3: Event Invite
+
+**As a** 현규, **I want** 일정에 친구를 초대하는 것 **so that** 같은 일정을 공유한다.
+
+**Scenario:**
+- Given: event가 존재하는 상태
+- When: event 편집에서 참여자 추가
+- Then: 초대받은 사람의 캘린더에 해당 event 표시
+
+**Acceptance Criteria:**
+- [ ] event 생성/편집 시 참여자 추가 가능 — verify: 참여자 검색 + 추가 UI
+- [ ] 초대받은 사용자에게 알림 — verify: 알림 수신 확인
+- [ ] 초대 수락 시 캘린더에 event 표시 — verify: 수락 후 표시 확인
+- [ ] 초대 거절 가능 — verify: 거절 후 미표시
+- [ ] 참여자 제거 가능 — verify: 제거 후 상대 캘린더에서 사라짐
+
+**Edge Cases & Errors:**
+- [ ] event 삭제 시 초대받은 사람 캘린더에서도 제거 — verify: 삭제 후 확인
+- [ ] event 시간 변경 시 참여자에게 반영 — verify: 변경 후 참여자 캘린더 확인
+- [ ] 동일인 중복 초대 — verify: 중복 방지
+
+## Design Intent
+
+| Step | User Action | Ideal Outcome | Design Decision | QA Verification |
+|------|-------------|---------------|-----------------|-----------------|
+| 1 | 그룹 탭 진입 | 소속 그룹 목록 + follow 목록 | 그룹과 follow를 한 화면에서 관리 | 목록 표시 확인 |
+| 2 | follow 요청 | 상대에게 알림 발송 | 사용자 검색 → 요청 — 2단계로 간결 | 요청 + 알림 확인 |
+| 3 | event에서 참여자 추가 | 사용자 검색 → 추가 | 기존 event 편집 폼에 참여자 필드 추가 | 참여자 추가 UI 확인 |
+| 4 | 캘린더에서 follow 일정 확인 | 내 일정과 구분되어 표시 | 색상 또는 라벨로 출처 구분 | 시각적 구분 확인 |
+
+**Key States:**
+
+| State | Trigger | User Sees |
+|-------|---------|-----------|
+| Empty | 그룹 0개, follow 0명 | "그룹을 만들거나 친구를 follow 해보세요" 안내 |
+| Error | follow 요청 실패 / 네트워크 오류 | 에러 메시지 + 재시도 |
+
+## Approach
+
+- DB 마이그레이션: `FamilyGroup` → `Group` (type 라벨 추가), `FamilyMembership` → `GroupMembership`
+- 새 모델: `Follow` (followerId, followeeId, status: pending/accepted/rejected)
+- 새 모델: `EventInvite` (eventId, inviteeId, status: pending/accepted/declined)
+- Event 모델에 `invites` relation 추가
+- 사용자 검색: email 또는 username 기반
+- follow 일정 조회: 캘린더 데이터 fetch 시 follow 대상의 공개 일정도 함께 반환
+- 002의 가족 코드 합류 로직을 그룹 코드로 일반화
+
+## Assumptions
+
+- 사용자 수가 가족/지인 규모(수십 명)에서 유지될 것 — if wrong: follow 일정 조회 최적화 필요
+- 기존 가족 그룹 데이터가 없거나 적어서 마이그레이션 비용이 낮을 것 — if wrong: 데이터 마이그레이션 스크립트 별도 작성
+
+---
+
+*Generated by know-thy-build-feature | 2026-09-08*
