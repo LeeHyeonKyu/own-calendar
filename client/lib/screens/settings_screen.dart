@@ -118,6 +118,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
           const Divider(),
           ListTile(
+            leading: const Icon(Icons.palette_outlined),
+            title: const Text('테마'),
+            subtitle: const Text('컬러 테마 및 다크모드 설정'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => context.push('/settings/theme'),
+          ),
+          const Divider(),
+          ListTile(
             leading: const Icon(Icons.tab),
             title: const Text('탭 편집'),
             subtitle: const Text('하단 네비게이션 탭 순서 및 표시 설정'),

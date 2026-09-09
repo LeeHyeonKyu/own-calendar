@@ -11,6 +11,7 @@ import 'screens/task_form_screen.dart';
 import 'screens/search_screen.dart';
 import 'screens/settings_screen.dart';
 import 'screens/tab_settings_screen.dart';
+import 'screens/theme_settings_screen.dart';
 import 'widgets/navigation_shell.dart';
 
 GoRouter createRouter(AuthProvider authProvider) {
@@ -113,6 +114,10 @@ GoRouter createRouter(AuthProvider authProvider) {
       GoRoute(
         path: '/settings/tabs',
         builder: (context, state) => const TabSettingsScreen(),
+      ),
+      GoRoute(
+        path: '/settings/theme',
+        builder: (context, state) => const ThemeSettingsScreen(),
       ),
 
       // Deep link routes for widget interactions

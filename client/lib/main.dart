@@ -6,6 +6,7 @@ import 'package:intl/date_symbol_data_local.dart';
 import 'package:home_widget/home_widget.dart';
 import 'providers/auth_provider.dart';
 import 'providers/calendar_provider.dart';
+import 'providers/theme_provider.dart';
 import 'router.dart';
 import 'services/fcm_service.dart';
 
@@ -20,6 +21,8 @@ void main() async {
   } catch (_) {}
 
   final authProvider = AuthProvider();
+  final themeProvider = ThemeProvider();
+  await themeProvider.loadPreferences();
 
   if (kTestMode) {
     await authProvider.login('hk@test.com', 'test1234');
@@ -32,13 +35,21 @@ void main() async {
   // Initialize FCM for push notifications (no-op until Firebase is configured)
   unawaited(FcmService().initialize());
 
-  runApp(OwnCalendarApp(authProvider: authProvider));
+  runApp(OwnCalendarApp(
+    authProvider: authProvider,
+    themeProvider: themeProvider,
+  ));
 }
 
 class OwnCalendarApp extends StatefulWidget {
   final AuthProvider authProvider;
+  final ThemeProvider themeProvider;
 
-  const OwnCalendarApp({super.key, required this.authProvider});
+  const OwnCalendarApp({
+    super.key,
+    required this.authProvider,
+    required this.themeProvider,
+  });
 
   @override
   State<OwnCalendarApp> createState() => _OwnCalendarAppState();
@@ -96,22 +107,20 @@ class _OwnCalendarAppState extends State<OwnCalendarApp> {
     return MultiProvider(
       providers: [
         ChangeNotifierProvider.value(value: widget.authProvider),
+        ChangeNotifierProvider.value(value: widget.themeProvider),
         ChangeNotifierProvider(create: (_) => CalendarProvider()),
       ],
-      child: MaterialApp.router(
-        title: 'Own Calendar',
-        debugShowCheckedModeBanner: false,
-        theme: ThemeData(
-          colorSchemeSeed: Colors.teal,
-          useMaterial3: true,
-          brightness: Brightness.light,
-        ),
-        darkTheme: ThemeData(
-          colorSchemeSeed: Colors.teal,
-          useMaterial3: true,
-          brightness: Brightness.dark,
-        ),
-        routerConfig: _router,
+      child: Consumer<ThemeProvider>(
+        builder: (context, themeProvider, _) {
+          return MaterialApp.router(
+            title: 'Own Calendar',
+            debugShowCheckedModeBanner: false,
+            theme: themeProvider.lightTheme,
+            darkTheme: themeProvider.darkTheme,
+            themeMode: themeProvider.themeMode,
+            routerConfig: _router,
+          );
+        },
       ),
     );
   }
