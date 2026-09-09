@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../providers/auth_provider.dart';
 import '../services/api_service.dart';
 
@@ -12,7 +13,7 @@ class SettingsScreen extends StatefulWidget {
   State<SettingsScreen> createState() => _SettingsScreenState();
 }
 
-class _SettingsScreenState extends State<SettingsScreen> {
+class _SettingsScreenState extends State<SettingsScreen> with WidgetsBindingObserver {
   final ApiService _api = ApiService();
   List<dynamic> _connections = [];
   bool _isLoading = true;
@@ -20,7 +21,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _loadConnections();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _loadConnections();
+    }
   }
 
   Future<void> _loadConnections() async {
@@ -35,19 +50,71 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<void> _connectGoogle() async {
-    final res = await _api.get('/google/auth');
-    if (res.statusCode == 200) {
-      final data = jsonDecode(res.body);
-      final url = data['url'];
+    try {
+      final res = await _api.get('/google/auth');
+      if (res.statusCode == 200) {
+        final data = jsonDecode(res.body);
+        final url = data['url'] as String?;
+        if (url == null) return;
+
+        final uri = Uri.parse(url);
+        if (await canLaunchUrl(uri)) {
+          await launchUrl(uri, mode: LaunchMode.externalApplication);
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Google 인증 완료 후 앱으로 돌아와주세요')),
+            );
+          }
+        } else {
+          if (mounted) {
+            _showOAuthFallbackDialog(url);
+          }
+        }
+      }
+    } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('브라우저에서 인증해주세요: $url'),
-            duration: const Duration(seconds: 10),
-          ),
+          SnackBar(content: Text('연결 실패: $e')),
         );
       }
     }
+  }
+
+  void _showOAuthFallbackDialog(String url) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Google Calendar 연결'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('아래 링크를 브라우저에서 열어 인증을 완료해주세요:'),
+            const SizedBox(height: 12),
+            SelectableText(
+              url,
+              style: TextStyle(
+                fontSize: 12,
+                color: Theme.of(context).colorScheme.primary,
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('닫기'),
+          ),
+          FilledButton(
+            onPressed: () async {
+              Navigator.pop(ctx);
+              await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+            },
+            child: const Text('브라우저에서 열기'),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _syncGoogle(String connectionId) async {
