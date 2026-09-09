@@ -16,6 +16,10 @@
   <title>Own Calendar</title>
   <link rel="manifest" href="manifest.json">
 
+  <!-- Preload critical assets for faster Flutter startup -->
+  <link rel="preload" href="flutter_bootstrap.js" as="script">
+  <link rel="preload" href="main.dart.js" as="script">
+
   <style>
     body { margin: 0; background: #121212; }
     #loading {

@@ -64,18 +64,18 @@ class TaskModel {
       description: json['description'],
       status: json['status'] ?? 'TODO',
       priority: json['priority'] ?? 'NONE',
-      dueDate: json['dueDate'] != null ? DateTime.parse(json['dueDate']) : null,
+      dueDate: json['dueDate'] != null ? DateTime.parse(json['dueDate']).toLocal() : null,
       scheduledDate: json['scheduledDate'] != null
-          ? DateTime.parse(json['scheduledDate'])
+          ? DateTime.parse(json['scheduledDate']).toLocal()
           : null,
       scheduledTime: json['scheduledTime'],
       recurrenceType: json['recurrenceType'] ?? 'NONE',
       recurrenceEnd: json['recurrenceEnd'] != null
-          ? DateTime.parse(json['recurrenceEnd'])
+          ? DateTime.parse(json['recurrenceEnd']).toLocal()
           : null,
       rrule: json['rrule'],
       completedAt: json['completedAt'] != null
-          ? DateTime.parse(json['completedAt'])
+          ? DateTime.parse(json['completedAt']).toLocal()
           : null,
       eventId: json['eventId'],
       calendarId: json['calendarId'],

@@ -56,15 +56,15 @@ class EventModel {
       id: json['id'],
       title: json['title'],
       description: json['description'],
-      startTime: DateTime.parse(json['startTime']),
-      endTime: DateTime.parse(json['endTime']),
+      startTime: DateTime.parse(json['startTime']).toLocal(),
+      endTime: DateTime.parse(json['endTime']).toLocal(),
       isAllDay: json['isAllDay'] ?? false,
       isPrivate: json['isPrivate'] ?? false,
       category: json['category'] ?? 'PERSONAL',
       tags: (json['tags'] as List<dynamic>?)?.cast<String>() ?? [],
       recurrenceType: json['recurrenceType'] ?? 'NONE',
       recurrenceEnd: json['recurrenceEnd'] != null
-          ? DateTime.parse(json['recurrenceEnd'])
+          ? DateTime.parse(json['recurrenceEnd']).toLocal()
           : null,
       rrule: json['rrule'],
       calendarId: json['calendarId'],
