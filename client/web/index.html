@@ -48,6 +48,12 @@
     <div class="label">Own Calendar</div>
   </div>
   <script>
+    // Unregister any stale service workers on load
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.getRegistrations().then(function(registrations) {
+        for (var reg of registrations) { reg.unregister(); }
+      });
+    }
     window.addEventListener('flutter-first-frame', function () {
       var el = document.getElementById('loading');
       if (el) el.remove();
