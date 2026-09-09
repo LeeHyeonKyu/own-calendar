@@ -2,10 +2,18 @@ import { Router, Response } from 'express';
 import { googleSyncService } from '../services/google-sync.service';
 import { authenticate } from '../middleware/auth';
 import { AuthRequest } from '../types';
+import { config } from '../config';
 
 const router = Router();
 
 router.get('/auth', authenticate, async (req: AuthRequest, res: Response) => {
+  if (!config.google.clientId || !config.google.clientSecret) {
+    res.status(503).json({
+      error: 'Google Calendar 연동이 아직 설정되지 않았습니다. 관리자에게 문의해주세요.',
+      code: 'GOOGLE_NOT_CONFIGURED',
+    });
+    return;
+  }
   const url = googleSyncService.getAuthUrl(req.userId!);
   res.json({ url });
 });

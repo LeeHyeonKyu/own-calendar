@@ -76,6 +76,17 @@ class _SettingsScreenState extends State<SettingsScreen> with WidgetsBindingObse
   Future<void> _connectGoogle() async {
     try {
       final res = await _api.get('/google/auth');
+      if (res.statusCode == 503) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Google Calendar 연동이 아직 설정되지 않았습니다. 관리자에게 문의해주세요.'),
+              duration: Duration(seconds: 5),
+            ),
+          );
+        }
+        return;
+      }
       if (res.statusCode == 200) {
         final data = jsonDecode(res.body);
         final url = data['url'] as String?;
