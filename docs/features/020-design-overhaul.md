@@ -1,0 +1,183 @@
+---
+id: 20
+title: 디자인 대개편 (상용 캘린더 리서치 기반)
+status: complete
+priority: P0
+class: Architectural
+depends_on: [1, 15, 17]
+persona: 현규
+gate:
+  worktree: null
+  architect: pending
+  designer: pending
+  qa: pending
+assumptions:
+  - "상용 캘린더의 디자인 패턴 정보가 웹 검색으로 충분히 수집 가능할 것"
+  - "Flutter의 ThemeData 시스템으로 테마 전환이 구현 가능할 것"
+date: 2026-09-09
+generatedBy: know-thy-build-feature
+---
+
+# 디자인 대개편 (상용 캘린더 리서치 기반)
+
+상용 캘린더 앱의 디자인을 체계적으로 리서치하여, 공통 UX 패턴은 즉시 도입하고, 취향 영역은 테마 시스템으로 사용자 선택형 제공한다.
+
+## Problem
+
+현재 UI가 AI slop이 심하다. 기능은 동작하지만 디자인이 정돈되지 않아 사용에 불편감이 크다. 구체적으로:
+- 시각적 계층 구조 없음 — 중요한 정보와 덜 중요한 정보가 같은 무게로 표시
+- 일관된 디자인 언어 없음 — 화면마다 여백, 크기, 색상 사용이 다름
+- Phone에서의 사용성 검증 없음 — 터치 타겟, 스크롤 동작, 공간 활용
+- Web view에서의 넓은 화면 활용 미흡
+- Widget 디자인이 네이티브 앱 수준에 미달
+- 색상, 폰트 등 디자인 기본 요소에 대한 체계 없음
+
+## Value
+
+"매일 아침 이 앱을 첫 번째로 여는" Leading Indicator 달성에 핵심. 기능이 다 있어도 디자인이 불편하면 사용자는 다른 앱으로 돌아간다. 특히 비개발자 가족(secondary persona)의 채택에 디자인 품질이 결정적이다.
+
+## Solution
+
+### Phase 1: 디자인 리서치
+
+**리서쳐 agent** 실행:
+1. 유명 캘린더 앱 목록 수집 (최소 8개)
+   - 대중적: Google Calendar, Apple Calendar, Outlook
+   - 디자인 호평: Fantastical, Calendars by Readdle, Vantage Calendar
+   - 특화: TimeTree(가족), TickTick(할 일), Notion Calendar
+2. 각 캘린더별 **디자인 분석가 agent** 병렬 파견
+3. 분석 프레임 (모든 캘린더에 동일 적용):
+
+**뷰별 분석:**
+- Monthly view: 날짜 셀 구조, 이벤트 표시 방식, 오늘 강조, 빈 날 처리
+- Weekly view: 시간 그리드 스타일, 이벤트 블록 디자인, 종일 이벤트
+- Daily view: 타임라인 레이아웃, 이벤트 카드, Task 통합
+- Event 생성/편집: 폼 구조, 필드 배치, 빠른 입력 UX
+- 설정 화면: 접근 방식(탭/메뉴/프로필), 섹션 구분, 토글 스타일
+
+**플랫폼별 분석:**
+- Phone (모바일): 터치 타겟 크기, 스와이프 제스처, 하단 시트 vs 전체 화면
+- Web/Tablet: 넓은 화면 활용, 사이드바, 다중 패널
+- Widget: 정보 밀도, 컬러 활용, 홈화면 매칭
+
+**디자인 요소 분석:**
+- 색상 체계: primary/secondary/accent, light/dark 모드
+- 타이포그래피: 폰트 패밀리, 크기 계층 (제목/본문/캡션)
+- 아이콘: 스타일(outlined/filled/rounded), 크기 규칙
+- 여백/간격: 카드 패딩, 섹션 간 gap, 전체 밀도
+- 둥글기: 카드 radius, 버튼 radius, 칩 radius
+- 그림자/깊이: elevation 사용 패턴
+- 애니메이션: 화면 전환, 리스트 아이템, 마이크로 인터랙션
+- 정보 계층: 어떤 정보가 시각적으로 도드라지는지, 어떤 정보가 suppressed 되는지
+- 네비게이션 패턴: 탭 바, 햄버거, 프로필 아이콘, 날짜 이동
+
+### Phase 2: 공통 프레임 도입
+
+리서치에서 80%+ 캘린더가 공유하는 패턴 = "공통 프레임"으로 정의하여 즉시 적용:
+- 예: "이벤트 블록은 좌측 컬러 바 + 제목 + 시간 순", "설정은 프로필 아이콘 or 하단 탭"
+
+### Phase 3: 테마 시스템
+
+취향에 따라 달라질 수 있는 영역을 ThemeData로 추상화:
+- 색상 팔레트 프리셋 (예: "Google Blue", "Apple Minimal", "Warm Sunset")
+- 폰트 프리셋 (예: "System Default", "Pretendard", "Noto Sans")
+- 밀도 설정 (Compact / Default / Comfortable)
+- 둥글기 설정 (Sharp / Rounded / Pill)
+- 설정에서 테마 선택 UI 제공
+
+## Scope
+
+**Includes:**
+- 상용 캘린더 8개+ 체계적 디자인 리서치
+- 공통 UX 패턴 즉시 적용 (모든 뷰)
+- 테마 시스템 구축 (색상/폰트/밀도/둥글기 프리셋)
+- 테마 선택 UI (설정 화면)
+- Phone/Web/Widget 각각에 대한 반응형 디자인 적용
+- Light/Dark 모드 체계적 적용
+- 모든 화면의 여백, 타이포그래피, 색상 통일
+
+**Excludes:**
+- 기능 변경 (기존 기능은 그대로, 디자인만 변경)
+- 새로운 뷰 추가
+- 커스텀 테마 생성 (프리셋 중 선택만)
+- 앱 아이콘 / 스플래시 화면 변경
+
+## User Stories & Acceptance Criteria
+
+### Story 1: 통일된 디자인 언어
+
+**As a** 현규, **I want** 모든 화면이 일관된 디자인으로 보이는 것 **so that** 앱이 완성된 제품처럼 느껴진다.
+
+**Scenario:**
+- Given: 디자인 개편 후 앱 실행
+- When: 월별 → 일별 → 주별 → 설정 등 화면 이동
+- Then: 색상, 여백, 폰트, 카드 스타일이 일관된다
+
+**Acceptance Criteria:**
+- [ ] 모든 화면에서 동일한 색상 팔레트 사용 — verify: 화면별 스크린샷 비교
+- [ ] 타이포그래피 계층 통일 (제목/본문/캡션 3단계) — verify: 폰트 크기 일관성 확인
+- [ ] 여백/간격 시스템 통일 (8px 그리드) — verify: 각 화면 패딩 확인
+- [ ] AI slop 제거 — 불필요한 그라데이션, 과한 그림자, 의미 없는 아이콘 없음 — verify: 시각 검수
+
+**Edge Cases & Errors:**
+- [ ] Dark 모드에서도 일관성 유지 — verify: Dark 모드 전체 화면 검수
+- [ ] 초소형 화면 (iPhone SE) — verify: 320px 너비에서 레이아웃 깨지지 않음
+
+### Story 2: 테마 선택
+
+**As a** 현규, **I want** 여러 테마 중 취향에 맞는 걸 선택하는 것 **so that** 내 스타일에 맞는 앱을 쓴다.
+
+**Scenario:**
+- Given: 설정 > 테마
+- When: "Warm" 테마 선택
+- Then: 즉시 앱 전체에 따뜻한 색상 팔레트 적용
+
+**Acceptance Criteria:**
+- [ ] 3개+ 테마 프리셋 제공 — verify: 테마 목록 확인
+- [ ] 테마 변경 즉시 반영 (앱 재시작 불필요) — verify: 변경 후 즉시 색상 변화
+- [ ] 테마 설정 앱 재시작 후에도 유지 — verify: 재시작 후 테마 유지
+- [ ] 각 테마의 Light/Dark 모드 모두 지원 — verify: 테마별 Light/Dark 전환
+
+**Edge Cases & Errors:**
+- [ ] 시스템 테마 자동 감지 (Light/Dark) — verify: OS 설정 변경 시 자동 전환
+
+### Story 3: Phone/Web 반응형
+
+**As a** 가족, **I want** 핸드폰에서 편하게 쓸 수 있는 것 **so that** 복잡한 설정 없이 일정을 확인한다.
+
+**Scenario:**
+- Given: iPhone에서 앱 실행
+- When: 캘린더 탐색 및 일정 확인
+- Then: 터치 타겟이 충분하고, 스크롤이 자연스럽고, 한 손 사용이 가능하다
+
+**Acceptance Criteria:**
+- [ ] 모든 터치 타겟 최소 44x44px — verify: 버튼/탭 크기 측정
+- [ ] Phone에서 핵심 정보가 스크롤 없이 보임 — verify: 첫 화면 정보 확인
+- [ ] Web에서 넓은 화면 활용 (사이드바 or 멀티패널) — verify: 1024px+ 화면 확인
+- [ ] Widget이 홈화면에서 가독성 있게 표시 — verify: 위젯 스크린샷
+
+## Design Intent
+
+리서치 결과에 따라 구체화. 리서치 agent의 산출물이 이 섹션을 채운다.
+
+## Approach
+
+1. **리서치 agent 구조:**
+   - 메인 리서쳐 agent: 캘린더 목록 수집 + 공통 분석 프레임 정의
+   - 캘린더별 분석가 agent (8개+ 병렬): 개별 앱 심층 분석
+   - 리서쳐가 결과 종합 → `docs/research/calendar-design-research.md`에 저장
+
+2. **구현:**
+   - 테마 시스템: Flutter `ThemeData` + `ThemeExtension`으로 커스텀 토큰 관리
+   - 테마 프리셋: `lib/themes/` 디렉토리에 프리셋별 파일
+   - 반응형: `LayoutBuilder` / `MediaQuery` 기반 Phone/Web 분기
+   - 모든 위젯에서 하드코딩 색상 제거 → ThemeData 토큰으로 교체
+
+## Assumptions
+
+- 상용 캘린더의 디자인 패턴 정보가 웹 검색으로 충분히 수집 가능할 것 — if wrong: 직접 스크린샷 캡처로 보완
+- Flutter의 ThemeData 시스템으로 테마 전환이 구현 가능할 것 — if wrong: 커스텀 InheritedWidget 사용
+
+---
+
+*Generated by know-thy-build-feature | 2026-09-09*

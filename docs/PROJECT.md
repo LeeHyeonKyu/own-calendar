@@ -187,6 +187,7 @@ lastEvolve: 2026-08-31
 | 017 | [Custom Category (색상/이모지)](features/017-custom-category.md) | P2 | 001, 006 | complete |
 | 018 | [Event/Task 메타데이터 (참여자, 장소, 메모)](features/018-event-task-metadata.md) | P0 | 001, 006 | complete |
 | 019 | [네이티브 앱 패키징 (iOS/macOS + CI/CD)](features/019-native-app-packaging.md) | P0 | 001 | complete |
+| 020 | [디자인 대개편 (상용 캘린더 리서치 기반)](features/020-design-overhaul.md) | P0 | 001, 015, 017 | in-progress |
 
 **Technical Foundation:** [TECHNICAL.md](TECHNICAL.md)
 
