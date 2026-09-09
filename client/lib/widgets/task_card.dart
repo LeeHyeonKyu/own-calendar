@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../models/task.dart';
+import '../themes/spacing.dart';
 
 class TaskCard extends StatelessWidget {
   final TaskModel task;
@@ -14,29 +15,36 @@ class TaskCard extends StatelessWidget {
     this.onToggleComplete,
   });
 
-  static const _taskColor = Color(0xFFF0A050);
-  static const _doneColor = Color(0xFF4ADE80);
-  static const _overdueColor = Color(0xFFEF6B6B);
+  Color get _statusColor {
+    if (task.isDone) return AppColors.taskDone;
+    if (task.isOverdue) return AppColors.taskOverdue;
+    return AppColors.taskPending;
+  }
 
   Color get _borderColor {
-    if (task.isDone) return _doneColor;
-    if (task.isOverdue) return _overdueColor;
-    return _taskColor;
+    if (task.priority != 'NONE') return Color(task.priorityColorValue);
+    return _statusColor;
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final cs = theme.colorScheme;
 
     return Card(
-      margin: const EdgeInsets.only(bottom: 8),
+      elevation: 0,
+      margin: const EdgeInsets.only(bottom: Spacing.xs),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(AppRadius.sm),
+      ),
+      clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(AppRadius.sm),
         child: Opacity(
           opacity: task.isDone ? 0.55 : 1.0,
           child: Padding(
-            padding: const EdgeInsets.all(12),
+            padding: const EdgeInsets.all(Spacing.md),
             child: Row(
               children: [
                 Container(
@@ -47,26 +55,26 @@ class TaskCard extends StatelessWidget {
                     borderRadius: BorderRadius.circular(2),
                   ),
                 ),
-                const SizedBox(width: 8),
+                const SizedBox(width: Spacing.sm),
                 GestureDetector(
                   onTap: onToggleComplete,
                   child: Container(
-                    width: 22,
-                    height: 22,
+                    width: 20,
+                    height: 20,
                     decoration: BoxDecoration(
                       border: Border.all(
-                        color: _borderColor,
+                        color: _statusColor,
                         width: 2,
                       ),
-                      borderRadius: BorderRadius.circular(5),
-                      color: task.isDone ? _doneColor : null,
+                      borderRadius: BorderRadius.circular(3),
+                      color: task.isDone ? AppColors.taskDone : null,
                     ),
                     child: task.isDone
                         ? const Icon(Icons.check, size: 14, color: Colors.white)
                         : null,
                   ),
                 ),
-                const SizedBox(width: 10),
+                const SizedBox(width: Spacing.sm),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -74,34 +82,34 @@ class TaskCard extends StatelessWidget {
                       Text(
                         task.title,
                         style: TextStyle(
-                          fontSize: 15,
+                          fontSize: AppTypography.body,
                           fontWeight: FontWeight.w500,
                           decoration: task.isDone ? TextDecoration.lineThrough : null,
-                          color: task.isDone ? theme.colorScheme.outline : null,
+                          color: task.isDone ? cs.outline : null,
                         ),
                       ),
-                      const SizedBox(height: 3),
+                      const SizedBox(height: Spacing.xs),
                       Row(
                         children: [
                           if (task.hasTime) ...[
                             Text(
                               task.scheduledTime!,
                               style: TextStyle(
-                                fontSize: 12,
-                                color: _taskColor,
+                                fontSize: AppTypography.bodySmall,
+                                color: AppColors.taskPending,
                                 fontWeight: FontWeight.w500,
                               ),
                             ),
-                            const SizedBox(width: 6),
+                            const SizedBox(width: Spacing.sm),
                           ],
                           if (task.hasDueDate)
                             _DueTag(task: task),
                           if (task.hasEvent) ...[
-                            if (task.hasDueDate) const SizedBox(width: 6),
+                            if (task.hasDueDate) const SizedBox(width: Spacing.sm),
                             _RelatedBadge(eventTitle: task.eventTitle ?? ''),
                           ],
                           if (task.isRecurring) ...[
-                            const SizedBox(width: 6),
+                            const SizedBox(width: Spacing.sm),
                             Flexible(child: _RecurrenceBadge(summary: task.rruleSummary)),
                           ],
                         ],
@@ -137,21 +145,21 @@ class _DueTag extends StatelessWidget {
     final String label;
 
     if (task.isOverdue) {
-      color = const Color(0xFFEF6B6B);
+      color = AppColors.taskOverdue;
       label = '기한 초과';
     } else if (task.isDueToday) {
-      color = const Color(0xFFF0A050);
+      color = AppColors.taskPending;
       label = '오늘 마감';
     } else {
-      color = Colors.grey;
+      color = Theme.of(context).colorScheme.outline;
       label = DateFormat('M/d 마감').format(task.dueDate!);
     }
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+      padding: const EdgeInsets.symmetric(horizontal: Spacing.sm, vertical: 1),
       decoration: BoxDecoration(
         color: color.withAlpha(25),
-        borderRadius: BorderRadius.circular(4),
+        borderRadius: BorderRadius.circular(AppRadius.sm),
       ),
       child: Text(
         label,
@@ -167,6 +175,7 @@ class _RecurrenceBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final outlineColor = Theme.of(context).colorScheme.outline;
     // Keep the inline badge short (e.g. "매주 월, 수요일"); the full
     // summary (with the end condition) is available via the tooltip.
     final shortSummary = summary.split(' · ').first;
@@ -175,12 +184,12 @@ class _RecurrenceBadge extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.repeat, size: 12, color: Colors.grey[500]),
+          Icon(Icons.repeat, size: 12, color: outlineColor),
           const SizedBox(width: 2),
           Flexible(
             child: Text(
               shortSummary,
-              style: TextStyle(fontSize: 10, color: Colors.grey[500]),
+              style: TextStyle(fontSize: 10, color: outlineColor),
               overflow: TextOverflow.ellipsis,
               maxLines: 1,
             ),
@@ -199,21 +208,21 @@ class _RelatedBadge extends StatelessWidget {
   Widget build(BuildContext context) {
     if (eventTitle.isEmpty) return const SizedBox.shrink();
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+      padding: const EdgeInsets.symmetric(horizontal: Spacing.sm, vertical: 1),
       decoration: BoxDecoration(
-        color: const Color(0xFFA78BFA).withAlpha(25),
-        borderRadius: BorderRadius.circular(4),
+        color: AppColors.relatedBadge.withAlpha(25),
+        borderRadius: BorderRadius.circular(AppRadius.sm),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Text('↗ ', style: TextStyle(fontSize: 9, color: Color(0xFFA78BFA))),
+          const Text('↗ ', style: TextStyle(fontSize: 9, color: AppColors.relatedBadge)),
           Text(
             eventTitle,
             style: const TextStyle(
               fontSize: 10,
               fontWeight: FontWeight.w500,
-              color: Color(0xFFA78BFA),
+              color: AppColors.relatedBadge,
             ),
           ),
         ],
@@ -234,8 +243,9 @@ class NestedTaskItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 3, horizontal: 4),
+      padding: const EdgeInsets.symmetric(vertical: 3, horizontal: Spacing.xs),
       child: Row(
         children: [
           GestureDetector(
@@ -245,25 +255,25 @@ class NestedTaskItem extends StatelessWidget {
               height: 16,
               decoration: BoxDecoration(
                 border: Border.all(
-                  color: task.isDone ? const Color(0xFF4ADE80) : const Color(0xFFF0A050),
+                  color: task.isDone ? AppColors.taskDone : AppColors.taskPending,
                   width: 1.5,
                 ),
                 borderRadius: BorderRadius.circular(3),
-                color: task.isDone ? const Color(0xFF4ADE80) : null,
+                color: task.isDone ? AppColors.taskDone : null,
               ),
               child: task.isDone
                   ? const Icon(Icons.check, size: 10, color: Colors.white)
                   : null,
             ),
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: Spacing.sm),
           Expanded(
             child: Text(
               task.title,
               style: TextStyle(
-                fontSize: 13,
+                fontSize: AppTypography.eventTitle,
                 decoration: task.isDone ? TextDecoration.lineThrough : null,
-                color: task.isDone ? Colors.grey : null,
+                color: task.isDone ? cs.outline : null,
               ),
             ),
           ),

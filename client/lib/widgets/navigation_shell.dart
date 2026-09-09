@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../themes/spacing.dart';
 
 /// A single tab entry in the bottom navigation bar.
 class TabItem {
@@ -125,31 +126,37 @@ class _NavigationShellState extends State<NavigationShell> {
     final now = DateTime.now();
     showModalBottomSheet(
       context: context,
-      builder: (ctx) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: const Icon(Icons.event, color: Color(0xFF5B8DEF)),
-              title: const Text('새 Event'),
-              subtitle: const Text('일정, 약속, 기념일'),
-              onTap: () {
-                Navigator.pop(ctx);
-                context.push('/event/new?date=${now.toIso8601String()}');
-              },
+      builder: (ctx) {
+        final cs = Theme.of(ctx).colorScheme;
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: Spacing.sm),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                ListTile(
+                  leading: Icon(Icons.event, color: cs.primary),
+                  title: const Text('새 Event'),
+                  subtitle: const Text('일정, 약속, 기념일'),
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    context.push('/event/new?date=${now.toIso8601String()}');
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(Icons.check_box_outlined, color: AppColors.taskPending),
+                  title: const Text('새 Task'),
+                  subtitle: const Text('할 일, 체크리스트'),
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    context.push('/task/new?date=${now.toIso8601String()}');
+                  },
+                ),
+              ],
             ),
-            ListTile(
-              leading: const Icon(Icons.check_box_outlined, color: Color(0xFFF0A050)),
-              title: const Text('새 Task'),
-              subtitle: const Text('할 일, 체크리스트'),
-              onTap: () {
-                Navigator.pop(ctx);
-                context.push('/task/new?date=${now.toIso8601String()}');
-              },
-            ),
-          ],
-        ),
-      ),
+          ),
+        );
+      },
     );
   }
 

@@ -7,6 +7,7 @@ import '../models/event.dart';
 import '../utils/rrule_utils.dart';
 import '../widgets/recurrence_picker.dart';
 import '../widgets/edit_mode_dialog.dart';
+import '../themes/spacing.dart';
 
 class EventFormScreen extends StatefulWidget {
   final String? eventId;
@@ -229,7 +230,7 @@ class _EventFormScreenState extends State<EventFormScreen> {
             ),
             TextButton(
               onPressed: () => Navigator.pop(ctx, true),
-              child: const Text('삭제', style: TextStyle(color: Colors.red)),
+              child: Text('삭제', style: TextStyle(color: Theme.of(ctx).colorScheme.error)),
             ),
           ],
         ),
@@ -266,7 +267,7 @@ class _EventFormScreenState extends State<EventFormScreen> {
       body: Form(
         key: _formKey,
         child: ListView(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(Spacing.lg),
           children: [
             TextFormField(
               controller: _titleController,
@@ -277,7 +278,7 @@ class _EventFormScreenState extends State<EventFormScreen> {
               validator: (v) =>
                   v == null || v.trim().isEmpty ? '제목을 입력하세요' : null,
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: Spacing.lg),
             DropdownButtonFormField<String>(
               value: _category,
               decoration: const InputDecoration(
@@ -293,7 +294,7 @@ class _EventFormScreenState extends State<EventFormScreen> {
                           Container(
                             width: 12,
                             height: 12,
-                            margin: const EdgeInsets.only(right: 8),
+                            margin: const EdgeInsets.only(right: Spacing.sm),
                             decoration: BoxDecoration(
                               color: Color(EventModel.categoryColors[e.key]!),
                               shape: BoxShape.circle,
@@ -309,7 +310,7 @@ class _EventFormScreenState extends State<EventFormScreen> {
                 if (v != null) setState(() => _category = v);
               },
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: Spacing.lg),
             TextFormField(
               controller: _descController,
               decoration: const InputDecoration(
@@ -318,7 +319,7 @@ class _EventFormScreenState extends State<EventFormScreen> {
               ),
               maxLines: 3,
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: Spacing.lg),
             // Tags
             Row(
               children: [
@@ -333,7 +334,7 @@ class _EventFormScreenState extends State<EventFormScreen> {
                     onSubmitted: (_) => _addTag(),
                   ),
                 ),
-                const SizedBox(width: 8),
+                const SizedBox(width: Spacing.sm),
                 IconButton.filled(
                   onPressed: _addTag,
                   icon: const Icon(Icons.add),
@@ -341,10 +342,10 @@ class _EventFormScreenState extends State<EventFormScreen> {
               ],
             ),
             if (_tags.isNotEmpty) ...[
-              const SizedBox(height: 8),
+              const SizedBox(height: Spacing.sm),
               Wrap(
-                spacing: 6,
-                runSpacing: 4,
+                spacing: Spacing.sm,
+                runSpacing: Spacing.xs,
                 children: _tags
                     .map(
                       (tag) => Chip(
@@ -357,13 +358,13 @@ class _EventFormScreenState extends State<EventFormScreen> {
                     .toList(),
               ),
             ],
-            const SizedBox(height: 16),
+            const SizedBox(height: Spacing.lg),
             SwitchListTile(
               title: const Text('종일'),
               value: _isAllDay,
               onChanged: (v) => setState(() => _isAllDay = v),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: Spacing.sm),
             ListTile(
               title: const Text('시작'),
               subtitle: Text(
@@ -390,16 +391,16 @@ class _EventFormScreenState extends State<EventFormScreen> {
                 if (!_isAllDay && mounted) await _pickTime(false);
               },
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: Spacing.sm),
             SwitchListTile(
               title: const Text('비공개'),
               value: _isPrivate,
               onChanged: (v) => setState(() => _isPrivate = v),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: Spacing.lg),
             ListTile(
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(4),
+                borderRadius: BorderRadius.circular(AppRadius.sm),
                 side: BorderSide(color: Theme.of(context).colorScheme.outline),
               ),
               leading: const Icon(Icons.repeat),
@@ -425,7 +426,7 @@ class _EventFormScreenState extends State<EventFormScreen> {
                 );
               },
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: Spacing.lg),
             DropdownButtonFormField<String>(
               value: _selectedCalendarId,
               decoration: const InputDecoration(
@@ -442,11 +443,11 @@ class _EventFormScreenState extends State<EventFormScreen> {
                   .toList(),
               onChanged: (v) => setState(() => _selectedCalendarId = v),
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: Spacing.xl),
             FilledButton(
               onPressed: _isLoading ? null : _save,
               child: Padding(
-                padding: const EdgeInsets.all(12),
+                padding: const EdgeInsets.all(Spacing.md),
                 child: _isLoading
                     ? const SizedBox(
                         height: 20,

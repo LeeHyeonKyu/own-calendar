@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../models/event.dart';
+import '../themes/spacing.dart';
 
 class EventCard extends StatelessWidget {
   final EventModel event;
@@ -21,67 +22,58 @@ class EventCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final color = _parseColor(event.calendarColor);
-    final categoryColor = Color(event.categoryColorValue);
     final timeFormat = DateFormat('HH:mm');
+    final cs = Theme.of(context).colorScheme;
 
     return Card(
-      margin: const EdgeInsets.only(bottom: 8),
+      elevation: 0,
+      margin: const EdgeInsets.only(bottom: Spacing.xs),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(AppRadius.sm),
+      ),
+      clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
-        child: Padding(
-          padding: const EdgeInsets.all(12),
+        borderRadius: BorderRadius.circular(AppRadius.sm),
+        child: Container(
+          decoration: BoxDecoration(
+            color: color.withAlpha(38),
+            border: Border(left: BorderSide(color: color, width: 3)),
+            borderRadius: BorderRadius.circular(AppRadius.sm),
+          ),
+          padding: const EdgeInsets.all(Spacing.md),
           child: Row(
             children: [
-              Container(
-                width: 4,
-                height: 48,
-                decoration: BoxDecoration(
-                  color: color,
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-              const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(
-                      children: [
-                        Container(
-                          width: 8,
-                          height: 8,
-                          margin: const EdgeInsets.only(right: 6),
-                          decoration: BoxDecoration(
-                            color: categoryColor,
-                            shape: BoxShape.circle,
-                          ),
-                        ),
-                        Expanded(
-                          child: Text(
-                            event.title,
-                            style: const TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                        ),
-                      ],
+                    Text(
+                      event.title,
+                      style: TextStyle(
+                        fontSize: AppTypography.eventTitle,
+                        fontWeight: FontWeight.w500,
+                        color: cs.onSurface,
+                      ),
                     ),
-                    const SizedBox(height: 4),
+                    const SizedBox(height: Spacing.xs),
                     Text(
                       event.isAllDay
                           ? '종일'
                           : '${timeFormat.format(event.startTime)} - ${timeFormat.format(event.endTime)}',
                       style: TextStyle(
-                        fontSize: 13,
-                        color: Colors.grey[600],
+                        fontSize: AppTypography.eventTime,
+                        fontWeight: FontWeight.w400,
+                        color: cs.onSurfaceVariant,
                       ),
                     ),
                     if (event.calendarName != null)
                       Text(
                         event.calendarName!,
-                        style: TextStyle(fontSize: 12, color: Colors.grey[500]),
+                        style: TextStyle(
+                          fontSize: AppTypography.eventTime,
+                          color: cs.outline,
+                        ),
                       ),
                     if (event.isRecurring)
                       Padding(
@@ -89,20 +81,23 @@ class EventCard extends StatelessWidget {
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Icon(Icons.repeat, size: 11, color: Colors.grey[500]),
+                            Icon(Icons.repeat, size: 11, color: cs.outline),
                             const SizedBox(width: 3),
                             Text(
                               event.rruleSummary,
-                              style: TextStyle(fontSize: 11, color: Colors.grey[500]),
+                              style: TextStyle(
+                                fontSize: AppTypography.eventTime,
+                                color: cs.outline,
+                              ),
                             ),
                           ],
                         ),
                       ),
                     if (event.tags.isNotEmpty)
                       Padding(
-                        padding: const EdgeInsets.only(top: 4),
+                        padding: const EdgeInsets.only(top: Spacing.xs),
                         child: Wrap(
-                          spacing: 4,
+                          spacing: Spacing.xs,
                           children: event.tags
                               .map(
                                 (tag) => Container(
@@ -111,14 +106,14 @@ class EventCard extends StatelessWidget {
                                     vertical: 1,
                                   ),
                                   decoration: BoxDecoration(
-                                    color: Colors.grey[200],
-                                    borderRadius: BorderRadius.circular(8),
+                                    color: cs.surfaceContainerHighest,
+                                    borderRadius: BorderRadius.circular(AppRadius.md),
                                   ),
                                   child: Text(
                                     tag,
                                     style: TextStyle(
-                                      fontSize: 10,
-                                      color: Colors.grey[700],
+                                      fontSize: AppTypography.caption,
+                                      color: cs.onSurfaceVariant,
                                     ),
                                   ),
                                 ),
@@ -131,14 +126,14 @@ class EventCard extends StatelessWidget {
               ),
               if (event.isRecurring)
                 Padding(
-                  padding: const EdgeInsets.only(right: 4),
+                  padding: const EdgeInsets.only(right: Spacing.xs),
                   child: Tooltip(
                     message: event.rruleSummary,
-                    child: Icon(Icons.repeat, size: 16, color: Colors.grey[400]),
+                    child: Icon(Icons.repeat, size: 16, color: cs.outline),
                   ),
                 ),
               if (event.isPrivate)
-                Icon(Icons.lock, size: 16, color: Colors.grey[400]),
+                Icon(Icons.lock, size: 16, color: cs.outlineVariant),
             ],
           ),
         ),

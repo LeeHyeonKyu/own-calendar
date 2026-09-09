@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import '../providers/calendar_provider.dart';
 import '../widgets/event_card.dart';
+import '../themes/spacing.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -51,7 +52,7 @@ class _HomeScreenState extends State<HomeScreen> {
       body: RefreshIndicator(
         onRefresh: _loadData,
         child: ListView(
-          padding: const EdgeInsets.all(16),
+          padding: EdgeInsets.all(Spacing.lg),
           children: [
             Text(
               dateStr,
@@ -59,33 +60,33 @@ class _HomeScreenState extends State<HomeScreen> {
                 fontWeight: FontWeight.bold,
               ),
             ),
-            const SizedBox(height: 4),
+            SizedBox(height: Spacing.xs),
             Text(
               '오늘',
               style: Theme.of(context).textTheme.titleMedium?.copyWith(
                 color: Theme.of(context).colorScheme.primary,
               ),
             ),
-            const SizedBox(height: 16),
+            SizedBox(height: Spacing.lg),
             if (calProvider.isLoading)
               const Center(child: CircularProgressIndicator())
             else if (allEvents.isEmpty)
               Center(
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 48),
+                  padding: EdgeInsets.symmetric(vertical: Spacing.xxxl),
                   child: Column(
                     children: [
                       Icon(
                         Icons.event_available,
                         size: 64,
-                        color: Colors.grey[400],
+                        color: Theme.of(context).colorScheme.outlineVariant,
                       ),
-                      const SizedBox(height: 16),
+                      SizedBox(height: Spacing.lg),
                       Text(
                         '오늘 일정이 없습니다',
                         style: TextStyle(
-                          fontSize: 16,
-                          color: Colors.grey[600],
+                          fontSize: AppTypography.h3,
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
                         ),
                       ),
                     ],

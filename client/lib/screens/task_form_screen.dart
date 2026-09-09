@@ -7,6 +7,7 @@ import '../models/task.dart';
 import '../utils/rrule_utils.dart';
 import '../widgets/recurrence_picker.dart';
 import '../widgets/edit_mode_dialog.dart';
+import '../themes/spacing.dart';
 
 class TaskFormScreen extends StatefulWidget {
   final String? taskId;
@@ -205,7 +206,7 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
             ),
             TextButton(
               onPressed: () => Navigator.pop(ctx, true),
-              child: const Text('삭제', style: TextStyle(color: Colors.red)),
+              child: Text('삭제', style: TextStyle(color: Theme.of(ctx).colorScheme.error)),
             ),
           ],
         ),
@@ -238,7 +239,7 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
       body: Form(
         key: _formKey,
         child: ListView(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(Spacing.lg),
           children: [
             TextFormField(
               controller: _titleController,
@@ -248,7 +249,7 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
               ),
               validator: (v) => v == null || v.trim().isEmpty ? '할 일을 입력하세요' : null,
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: Spacing.lg),
             TextFormField(
               controller: _descController,
               decoration: const InputDecoration(
@@ -257,7 +258,7 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
               ),
               maxLines: 3,
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: Spacing.lg),
             DropdownButtonFormField<String>(
               value: _priority,
               decoration: const InputDecoration(
@@ -272,7 +273,7 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
                             Container(
                               width: 10,
                               height: 10,
-                              margin: const EdgeInsets.only(right: 8),
+                              margin: const EdgeInsets.only(right: Spacing.sm),
                               decoration: BoxDecoration(
                                 color: Color(TaskModel.priorityColors[e.key]!),
                                 shape: BoxShape.circle,
@@ -287,7 +288,7 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
                 if (v != null) setState(() => _priority = v);
               },
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: Spacing.lg),
             ListTile(
               title: const Text('마감일'),
               subtitle: Text(_dueDate != null ? dateFormat.format(_dueDate!) : '없음'),
@@ -338,10 +339,10 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
               ),
               onTap: _pickTime,
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: Spacing.sm),
             ListTile(
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(4),
+                borderRadius: BorderRadius.circular(AppRadius.sm),
                 side: BorderSide(color: Theme.of(context).colorScheme.outline),
               ),
               leading: const Icon(Icons.repeat),
@@ -367,7 +368,7 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
                 );
               },
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: Spacing.lg),
             // Event 연결
             DropdownButtonFormField<String?>(
               value: _selectedEventId,
@@ -386,7 +387,7 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
               ],
               onChanged: (v) => setState(() => _selectedEventId = v),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: Spacing.lg),
             DropdownButtonFormField<String>(
               value: _selectedCalendarId,
               decoration: const InputDecoration(
@@ -398,11 +399,11 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
                   .toList(),
               onChanged: (v) => setState(() => _selectedCalendarId = v),
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: Spacing.xl),
             FilledButton(
               onPressed: _isLoading ? null : _save,
               child: Padding(
-                padding: const EdgeInsets.all(12),
+                padding: const EdgeInsets.all(Spacing.md),
                 child: _isLoading
                     ? const SizedBox(
                         height: 20,

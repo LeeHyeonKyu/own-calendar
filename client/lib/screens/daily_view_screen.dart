@@ -7,13 +7,7 @@ import '../providers/calendar_provider.dart';
 import '../models/event.dart';
 import '../models/task.dart';
 import '../widgets/task_card.dart';
-
-const _eventColor = Color(0xFF5B8DEF);
-const _taskColor = Color(0xFFF0A050);
-const _doneColor = Color(0xFF4ADE80);
-const _overdueColor = Color(0xFFEF6B6B);
-const _nowColor = Color(0xFFEF6B6B);
-const _relatedColor = Color(0xFFA78BFA);
+import '../themes/spacing.dart';
 
 class DailyViewScreen extends StatefulWidget {
   final DateTime? initialDate;
@@ -129,11 +123,12 @@ class _DailyViewScreenState extends State<DailyViewScreen> {
 
   Widget _buildWeekStrip() {
     final today = DateTime.now();
+    final primary = Theme.of(context).colorScheme.primary;
     return SizedBox(
       height: 64,
       child: ListView.builder(
         scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 8),
+        padding: const EdgeInsets.symmetric(horizontal: Spacing.sm),
         itemCount: 7,
         itemBuilder: (context, i) {
           final day = _weekDates[i];
@@ -148,12 +143,12 @@ class _DailyViewScreenState extends State<DailyViewScreen> {
               _loadData();
             },
             child: Container(
-              width: 48,
-              margin: const EdgeInsets.symmetric(horizontal: 2, vertical: 8),
+              width: Spacing.xxxl,
+              margin: const EdgeInsets.symmetric(horizontal: 2, vertical: Spacing.sm),
               decoration: BoxDecoration(
-                color: isSelected ? _eventColor.withAlpha(30) : null,
-                border: isToday ? Border.all(color: _eventColor, width: 1.5) : null,
-                borderRadius: BorderRadius.circular(12),
+                color: isSelected ? primary.withAlpha(30) : null,
+                border: isToday ? Border.all(color: primary, width: 1.5) : null,
+                borderRadius: BorderRadius.circular(AppRadius.lg),
               ),
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -161,17 +156,17 @@ class _DailyViewScreenState extends State<DailyViewScreen> {
                   Text(
                     DateFormat('E', 'ko').format(day),
                     style: TextStyle(
-                      fontSize: 11,
-                      color: isSelected ? _eventColor : Colors.grey[500],
+                      fontSize: AppTypography.caption,
+                      color: isSelected ? primary : Theme.of(context).colorScheme.onSurfaceVariant,
                     ),
                   ),
                   const SizedBox(height: 2),
                   Text(
                     '${day.day}',
                     style: TextStyle(
-                      fontSize: 16,
+                      fontSize: AppTypography.h3,
                       fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                      color: isSelected ? _eventColor : null,
+                      color: isSelected ? primary : null,
                     ),
                   ),
                 ],
@@ -184,20 +179,21 @@ class _DailyViewScreenState extends State<DailyViewScreen> {
   }
 
   Widget _buildSubTabs() {
+    final primary = Theme.of(context).colorScheme.primary;
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: Spacing.lg, vertical: Spacing.xs),
       child: SegmentedButton<int>(
         segments: const [
-          ButtonSegment(value: 0, label: Text('Timeline'), icon: Icon(Icons.schedule, size: 16)),
-          ButtonSegment(value: 1, label: Text('Task'), icon: Icon(Icons.checklist, size: 16)),
+          ButtonSegment(value: 0, label: Text('Timeline'), icon: Icon(Icons.schedule, size: Spacing.lg)),
+          ButtonSegment(value: 1, label: Text('Task'), icon: Icon(Icons.checklist, size: Spacing.lg)),
         ],
         selected: {_subTab},
         onSelectionChanged: (v) => setState(() => _subTab = v.first),
         style: SegmentedButton.styleFrom(
           selectedBackgroundColor: _subTab == 0
-              ? _eventColor.withAlpha(25)
-              : _taskColor.withAlpha(25),
-          selectedForegroundColor: _subTab == 0 ? _eventColor : _taskColor,
+              ? primary.withAlpha(25)
+              : AppColors.taskPending.withAlpha(25),
+          selectedForegroundColor: _subTab == 0 ? primary : AppColors.taskPending,
         ),
       ),
     );
@@ -230,33 +226,38 @@ class _DailyViewScreenState extends State<DailyViewScreen> {
 
   Widget _buildUnscheduledZone(List<TaskModel> tasks, CalendarProvider calProvider) {
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+      margin: const EdgeInsets.symmetric(horizontal: Spacing.md, vertical: Spacing.xs),
       decoration: BoxDecoration(
         border: Border.all(color: Theme.of(context).dividerColor),
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(AppRadius.md),
       ),
       child: Column(
         children: [
           InkWell(
             onTap: () => setState(() => _unschedExpanded = !_unschedExpanded),
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              padding: const EdgeInsets.symmetric(horizontal: Spacing.md, vertical: Spacing.sm),
               child: Row(
                 children: [
                   Icon(
                     _unschedExpanded ? Icons.expand_less : Icons.expand_more,
-                    size: 18, color: Colors.grey[500],
+                    size: 18, color: Theme.of(context).colorScheme.onSurfaceVariant,
                   ),
-                  const SizedBox(width: 4),
-                  Text('시간 미정', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.grey[500])),
+                  const SizedBox(width: Spacing.xs),
+                  Text('시간 미정', style: TextStyle(
+                    fontSize: AppTypography.bodySmall,
+                    fontWeight: FontWeight.w600,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  )),
                   const Spacer(),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                    padding: const EdgeInsets.symmetric(horizontal: Spacing.sm, vertical: 1),
                     decoration: BoxDecoration(
-                      color: _taskColor.withAlpha(25),
-                      borderRadius: BorderRadius.circular(8),
+                      color: AppColors.taskPending.withAlpha(25),
+                      borderRadius: BorderRadius.circular(AppRadius.md),
                     ),
-                    child: Text('${tasks.length}', style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: _taskColor)),
+                    child: Text('${tasks.length}', style: const TextStyle(
+                        fontSize: 10, fontWeight: FontWeight.w600, color: AppColors.taskPending)),
                   ),
                 ],
               ),
@@ -264,7 +265,7 @@ class _DailyViewScreenState extends State<DailyViewScreen> {
           ),
           if (_unschedExpanded)
             ...tasks.map((t) => Padding(
-              padding: const EdgeInsets.fromLTRB(12, 0, 12, 6),
+              padding: const EdgeInsets.fromLTRB(Spacing.md, 0, Spacing.md, Spacing.sm),
               child: _buildStandaloneTask(t, calProvider, dashed: true),
             )),
         ],
@@ -327,9 +328,9 @@ class _DailyViewScreenState extends State<DailyViewScreen> {
             children: [
               _buildHourRow(h, items),
               Positioned(
-                top: 28 + (minuteFraction * 64),
+                top: AppColors.todayCircleSize + (minuteFraction * 64),
                 left: 0, right: 0,
-                child: _buildNowLine(now),
+                child: _buildNowLine(),
               ),
             ],
           ),
@@ -347,16 +348,16 @@ class _DailyViewScreenState extends State<DailyViewScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         SizedBox(
-          width: 46,
+          width: Spacing.xxxl,
           child: Padding(
-            padding: const EdgeInsets.only(top: 2, right: 8),
+            padding: const EdgeInsets.only(top: 2, right: Spacing.sm),
             child: Text(
               hour.toString().padLeft(2, '0'),
               textAlign: TextAlign.right,
               style: TextStyle(
-                fontSize: 11,
+                fontSize: AppTypography.caption,
                 fontWeight: FontWeight.w500,
-                color: Colors.grey[500],
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
                 fontFeatures: const [FontFeature.tabularFigures()],
               ),
             ),
@@ -371,7 +372,7 @@ class _DailyViewScreenState extends State<DailyViewScreen> {
                 left: BorderSide(color: Theme.of(context).dividerColor),
               ),
             ),
-            padding: const EdgeInsets.fromLTRB(8, 4, 12, 4),
+            padding: const EdgeInsets.fromLTRB(Spacing.sm, Spacing.xs, Spacing.md, Spacing.xs),
             child: items.isEmpty
                 ? const SizedBox()
                 : Column(
@@ -384,68 +385,67 @@ class _DailyViewScreenState extends State<DailyViewScreen> {
     );
   }
 
-  Widget _buildNowLine(DateTime now) {
+  Widget _buildNowLine() {
     return Row(
       children: [
         const SizedBox(width: 42),
         Container(
-          width: 8, height: 8,
-          decoration: const BoxDecoration(color: _nowColor, shape: BoxShape.circle),
+          width: 6, height: 6,
+          decoration: const BoxDecoration(color: AppColors.nowLine, shape: BoxShape.circle),
         ),
-        Expanded(child: Container(height: 2, color: _nowColor)),
-        Padding(
-          padding: const EdgeInsets.only(left: 4, right: 8),
-          child: Text(
-            DateFormat('HH:mm').format(now),
-            style: const TextStyle(fontSize: 9, fontWeight: FontWeight.w600, color: _nowColor),
-          ),
-        ),
+        Expanded(child: Container(height: 2, color: AppColors.nowLine)),
       ],
     );
   }
 
   Widget _buildEventCard(EventModel event, List<TaskModel> nestedTasks, CalendarProvider calProvider) {
     final timeFormat = DateFormat('HH:mm');
+    final primary = Theme.of(context).colorScheme.primary;
     return Card(
-      margin: const EdgeInsets.only(bottom: 4),
+      margin: const EdgeInsets.only(bottom: Spacing.xs),
       clipBehavior: Clip.antiAlias,
+      elevation: 0,
       child: Column(
         children: [
           InkWell(
             onTap: () => context.push('/event/${event.id}/edit'),
             child: Container(
-              decoration: const BoxDecoration(
-                border: Border(left: BorderSide(color: _eventColor, width: 3)),
+              decoration: BoxDecoration(
+                color: primary.withAlpha(38),
+                border: Border(left: BorderSide(color: primary, width: 3)),
               ),
-              padding: const EdgeInsets.all(10),
+              padding: const EdgeInsets.all(Spacing.md),
               child: Row(
                 children: [
-                  const _Dot(color: _eventColor),
-                  const SizedBox(width: 8),
+                  _Dot(color: primary),
+                  const SizedBox(width: Spacing.sm),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(event.title, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+                        Text(event.title, style: const TextStyle(fontSize: AppTypography.body, fontWeight: FontWeight.w600)),
                         Text(
                           event.isAllDay
                               ? '종일'
                               : '${timeFormat.format(event.startTime)} – ${timeFormat.format(event.endTime)}',
-                          style: TextStyle(fontSize: 11, color: Colors.grey[500]),
+                          style: TextStyle(
+                            fontSize: AppTypography.eventTime,
+                            color: Theme.of(context).colorScheme.onSurfaceVariant,
+                          ),
                         ),
                       ],
                     ),
                   ),
                   if (nestedTasks.isNotEmpty)
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      padding: const EdgeInsets.symmetric(horizontal: Spacing.sm, vertical: 2),
                       decoration: BoxDecoration(
-                        color: _relatedColor.withAlpha(25),
-                        borderRadius: BorderRadius.circular(8),
+                        color: AppColors.relatedBadge.withAlpha(25),
+                        borderRadius: BorderRadius.circular(AppRadius.md),
                       ),
                       child: Text(
                         '${nestedTasks.where((t) => t.isDone).length}/${nestedTasks.length}',
-                        style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: _relatedColor),
+                        style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: AppColors.relatedBadge),
                       ),
                     ),
                 ],
@@ -457,11 +457,11 @@ class _DailyViewScreenState extends State<DailyViewScreen> {
               width: double.infinity,
               decoration: BoxDecoration(
                 border: Border(
-                  left: const BorderSide(color: _eventColor, width: 3),
+                  left: BorderSide(color: primary, width: 3),
                   top: BorderSide(color: Theme.of(context).dividerColor),
                 ),
               ),
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+              padding: const EdgeInsets.symmetric(horizontal: Spacing.lg, vertical: Spacing.xs),
               child: Column(
                 children: nestedTasks.map((t) => NestedTaskItem(
                   task: t,
@@ -508,30 +508,33 @@ class _DailyViewScreenState extends State<DailyViewScreen> {
     final events = calProvider.allVisibleEvents;
 
     return ListView(
-      padding: const EdgeInsets.symmetric(horizontal: 12),
+      padding: const EdgeInsets.symmetric(horizontal: Spacing.md),
       children: [
         // Progress bar
         if (totalTasks > 0)
           Padding(
-            padding: const EdgeInsets.symmetric(vertical: 12),
+            padding: const EdgeInsets.symmetric(vertical: Spacing.md),
             child: Column(
               children: [
                 Row(
                   children: [
                     Text('$doneTasks / $totalTasks 완료',
-                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                        style: const TextStyle(fontSize: AppTypography.bodySmall, fontWeight: FontWeight.w600)),
                     const Spacer(),
                     Text('${totalTasks > 0 ? (doneTasks * 100 ~/ totalTasks) : 0}%',
-                        style: TextStyle(fontSize: 12, color: Colors.grey[500])),
+                        style: TextStyle(
+                          fontSize: AppTypography.bodySmall,
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        )),
                   ],
                 ),
-                const SizedBox(height: 6),
+                const SizedBox(height: Spacing.sm),
                 ClipRRect(
-                  borderRadius: BorderRadius.circular(4),
+                  borderRadius: BorderRadius.circular(AppRadius.sm),
                   child: LinearProgressIndicator(
                     value: totalTasks > 0 ? doneTasks / totalTasks : 0,
                     backgroundColor: Theme.of(context).dividerColor,
-                    color: _doneColor,
+                    color: AppColors.taskDone,
                     minHeight: 6,
                   ),
                 ),
@@ -541,7 +544,7 @@ class _DailyViewScreenState extends State<DailyViewScreen> {
 
         // Overdue
         if (overdue.isNotEmpty) ...[
-          _sectionHeader('기한 초과', overdue.length, _overdueColor),
+          _sectionHeader('기한 초과', overdue.length, AppColors.taskOverdue),
           ...overdue.map((t) => TaskCard(
             task: t,
             onTap: () => context.push('/task/${t.baseId}/edit'),
@@ -551,7 +554,7 @@ class _DailyViewScreenState extends State<DailyViewScreen> {
 
         // Event-linked
         if (eventTaskMap.isNotEmpty) ...[
-          _sectionHeader('Event 연결', eventLinked.length, _relatedColor),
+          _sectionHeader('Event 연결', eventLinked.length, AppColors.relatedBadge),
           ...eventTaskMap.entries.map((entry) {
             final event = events.where((e) => e.id == entry.key).firstOrNull;
             if (event == null) return const SizedBox();
@@ -561,7 +564,7 @@ class _DailyViewScreenState extends State<DailyViewScreen> {
 
         // Standalone timed
         if (standalone.isNotEmpty) ...[
-          _sectionHeader('독립 Task', standalone.length, _taskColor),
+          _sectionHeader('독립 Task', standalone.length, AppColors.taskPending),
           ...standalone.map((t) => TaskCard(
             task: t,
             onTap: () => context.push('/task/${t.baseId}/edit'),
@@ -571,7 +574,7 @@ class _DailyViewScreenState extends State<DailyViewScreen> {
 
         // Unscheduled
         if (unscheduled.isNotEmpty) ...[
-          _sectionHeader('시간 미정', unscheduled.length, Colors.grey),
+          _sectionHeader('시간 미정', unscheduled.length, Theme.of(context).colorScheme.onSurfaceVariant),
           ...unscheduled.map((t) => TaskCard(
             task: t,
             onTap: () => context.push('/task/${t.baseId}/edit'),
@@ -584,15 +587,20 @@ class _DailyViewScreenState extends State<DailyViewScreen> {
           InkWell(
             onTap: () => setState(() => _completedExpanded = !_completedExpanded),
             child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 8),
+              padding: const EdgeInsets.symmetric(vertical: Spacing.sm),
               child: Row(
                 children: [
                   Icon(_completedExpanded ? Icons.expand_less : Icons.expand_more,
-                      size: 18, color: Colors.grey[500]),
-                  const SizedBox(width: 4),
-                  Text('완료됨', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.grey[500])),
-                  const SizedBox(width: 6),
-                  Text('(${completed.length})', style: TextStyle(fontSize: 11, color: _doneColor)),
+                      size: 18, color: Theme.of(context).colorScheme.onSurfaceVariant),
+                  const SizedBox(width: Spacing.xs),
+                  Text('완료됨', style: TextStyle(
+                    fontSize: AppTypography.bodySmall,
+                    fontWeight: FontWeight.w600,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  )),
+                  const SizedBox(width: Spacing.sm),
+                  Text('(${completed.length})', style: const TextStyle(
+                      fontSize: AppTypography.caption, color: AppColors.taskDone)),
                 ],
               ),
             ),
@@ -611,14 +619,18 @@ class _DailyViewScreenState extends State<DailyViewScreen> {
 
   Widget _sectionHeader(String label, int count, Color color) {
     return Padding(
-      padding: const EdgeInsets.only(top: 8, bottom: 4),
+      padding: const EdgeInsets.only(top: Spacing.sm, bottom: Spacing.xs),
       child: Row(
         children: [
           Container(width: 3, height: 14, decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(2))),
-          const SizedBox(width: 8),
-          Text(label, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.grey[600])),
-          const SizedBox(width: 6),
-          Text('$count', style: TextStyle(fontSize: 11, color: color, fontWeight: FontWeight.w600)),
+          const SizedBox(width: Spacing.sm),
+          Text(label, style: TextStyle(
+            fontSize: AppTypography.bodySmall,
+            fontWeight: FontWeight.w600,
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          )),
+          const SizedBox(width: Spacing.sm),
+          Text('$count', style: TextStyle(fontSize: AppTypography.caption, color: color, fontWeight: FontWeight.w600)),
         ],
       ),
     );

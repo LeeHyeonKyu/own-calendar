@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import '../providers/calendar_provider.dart';
 import '../models/event.dart';
+import '../themes/spacing.dart';
 
 class YearlyViewScreen extends StatefulWidget {
   const YearlyViewScreen({super.key});
@@ -49,7 +50,7 @@ class _YearlyViewScreenState extends State<YearlyViewScreen> {
         children: [
           // Year navigation
           Padding(
-            padding: const EdgeInsets.symmetric(vertical: 8),
+            padding: EdgeInsets.symmetric(vertical: Spacing.sm),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
@@ -88,12 +89,12 @@ class _YearlyViewScreenState extends State<YearlyViewScreen> {
           else
             Expanded(
               child: GridView.builder(
-                padding: const EdgeInsets.all(8),
+                padding: EdgeInsets.all(Spacing.sm),
                 gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                   crossAxisCount: 3,
                   childAspectRatio: 0.85,
-                  crossAxisSpacing: 8,
-                  mainAxisSpacing: 8,
+                  crossAxisSpacing: Spacing.sm,
+                  mainAxisSpacing: Spacing.sm,
                 ),
                 itemCount: 12,
                 itemBuilder: (context, monthIndex) {
@@ -114,10 +115,10 @@ class _YearlyViewScreenState extends State<YearlyViewScreen> {
                         border: Border.all(
                           color: isCurrentMonth
                               ? Theme.of(context).colorScheme.primary
-                              : Colors.grey.withAlpha(50),
+                              : Theme.of(context).colorScheme.outlineVariant,
                           width: isCurrentMonth ? 2 : 1,
                         ),
-                        borderRadius: BorderRadius.circular(8),
+                        borderRadius: BorderRadius.circular(AppRadius.md),
                       ),
                       child: Column(
                         children: [
@@ -130,7 +131,7 @@ class _YearlyViewScreenState extends State<YearlyViewScreen> {
                                   ? Theme.of(context)
                                       .colorScheme
                                       .primaryContainer
-                                  : Colors.grey[100],
+                                  : Theme.of(context).colorScheme.surfaceContainerLow,
                               borderRadius: const BorderRadius.vertical(
                                 top: Radius.circular(7),
                               ),
@@ -160,10 +161,10 @@ class _YearlyViewScreenState extends State<YearlyViewScreen> {
                                             style: TextStyle(
                                               fontSize: 7,
                                               color: d == '일'
-                                                  ? Colors.red[300]
+                                                  ? AppColors.sundayText
                                                   : d == '토'
-                                                      ? Colors.blue[300]
-                                                      : Colors.grey[500],
+                                                      ? AppColors.saturdayText
+                                                      : Theme.of(context).colorScheme.outline,
                                             ),
                                           ),
                                         ),
