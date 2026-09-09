@@ -210,14 +210,14 @@ class _EventFormScreenState extends State<EventFormScreen> {
     final data = {
       'title': _titleController.text.trim(),
       'description': _descController.text.trim(),
-      'startTime': startDt.toIso8601String(),
-      'endTime': endDt.toIso8601String(),
+      'startTime': startDt.toUtc().toIso8601String(),
+      'endTime': endDt.toUtc().toIso8601String(),
       'isAllDay': _isAllDay,
       'isPrivate': _isPrivate,
       'category': _category,
       'tags': _tags,
       'recurrenceType': _recurrenceType,
-      'recurrenceEnd': _recurrenceEnd?.toIso8601String(),
+      'recurrenceEnd': _recurrenceEnd?.toUtc().toIso8601String(),
       'rrule': _rrule,
       'calendarId': _selectedCalendarId,
       'location': _locationController.text.trim().isEmpty

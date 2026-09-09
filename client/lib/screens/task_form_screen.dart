@@ -170,7 +170,7 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
       'description': _descController.text.trim().isEmpty ? null : _descController.text.trim(),
       'priority': _priority,
       'recurrenceType': _recurrenceType,
-      'recurrenceEnd': _recurrenceEnd?.toIso8601String(),
+      'recurrenceEnd': _recurrenceEnd?.toUtc().toIso8601String(),
       'rrule': _rrule,
       'calendarId': _selectedCalendarId,
       'eventId': _selectedEventId,
@@ -184,10 +184,10 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
     };
 
     if (_dueDate != null) {
-      data['dueDate'] = _dueDate!.toIso8601String();
+      data['dueDate'] = _dueDate!.toUtc().toIso8601String();
     }
     if (_scheduledDate != null) {
-      data['scheduledDate'] = _scheduledDate!.toIso8601String();
+      data['scheduledDate'] = _scheduledDate!.toUtc().toIso8601String();
     }
     if (_scheduledTime != null) {
       data['scheduledTime'] =
