@@ -21,9 +21,9 @@
       "tintColor": "4A90D9",
       "category": "utilities",
       "screenshots": [],
-      "version": "v2026.09.09.1",
-      "versionDate": "2026-09-09T03:40:30Z",
-      "downloadURL": "https://github.com/LeeHyeonKyu/own-calendar/releases/download/v2026.09.09.1/OwnCalendar.ipa",
+      "version": "v2026.09.09.2",
+      "versionDate": "2026-09-09T04:27:07Z",
+      "downloadURL": "https://github.com/LeeHyeonKyu/own-calendar/releases/download/v2026.09.09.2/OwnCalendar.ipa",
       "size": 0,
       "minOSVersion": "16.0",
       "permissions": [
@@ -45,6 +45,13 @@
         "privacy": []
       },
       "versions": [
+        {
+          "version": "v2026.09.09.2",
+          "date": "2026-09-09T04:27:07Z",
+          "localizedDescription": "Own Calendar v2026.09.09.2",
+          "downloadURL": "https://github.com/LeeHyeonKyu/own-calendar/releases/download/v2026.09.09.2/OwnCalendar.ipa",
+          "size": 0
+        },
         {
           "version": "v2026.09.09.1",
           "date": "2026-09-09T03:40:30Z",
