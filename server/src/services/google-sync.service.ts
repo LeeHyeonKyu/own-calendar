@@ -128,6 +128,10 @@ export const googleSyncService = {
     for (const gEvent of allEvents) {
       if (!gEvent.id) continue;
 
+      // Skip non-event types (working location, focus time, out of office)
+      const eventType = gEvent.eventType || 'default';
+      if (eventType !== 'default' && eventType !== 'birthday') continue;
+
       if (gEvent.status === 'cancelled') {
         const result = await prisma.event.deleteMany({
           where: { externalId: gEvent.id, calendarId: connection.calendarId },
