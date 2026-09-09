@@ -39,7 +39,7 @@ router.get('/connections', async (req: AuthRequest, res: Response) => {
 
 router.post('/sync/:connectionId', async (req: AuthRequest, res: Response) => {
   try {
-    const result = await googleSyncService.pullEvents(req.userId!, req.params.connectionId);
+    const result = await googleSyncService.pullEvents(req.userId!, String(req.params.connectionId));
     res.json(result);
   } catch (err: any) {
     const status = err.statusCode || 500;
@@ -49,7 +49,7 @@ router.post('/sync/:connectionId', async (req: AuthRequest, res: Response) => {
 
 router.post('/push/:eventId', async (req: AuthRequest, res: Response) => {
   try {
-    const result = await googleSyncService.pushEvent(req.userId!, req.params.eventId);
+    const result = await googleSyncService.pushEvent(req.userId!, String(req.params.eventId));
     res.json(result);
   } catch (err: any) {
     const status = err.statusCode || 500;
@@ -59,7 +59,7 @@ router.post('/push/:eventId', async (req: AuthRequest, res: Response) => {
 
 router.delete('/connections/:connectionId', async (req: AuthRequest, res: Response) => {
   try {
-    const result = await googleSyncService.disconnect(req.userId!, req.params.connectionId);
+    const result = await googleSyncService.disconnect(req.userId!, String(req.params.connectionId));
     res.json(result);
   } catch (err: any) {
     const status = err.statusCode || 500;

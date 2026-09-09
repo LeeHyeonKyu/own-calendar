@@ -6,6 +6,8 @@ import 'package:intl/date_symbol_data_local.dart';
 import 'package:home_widget/home_widget.dart';
 import 'providers/auth_provider.dart';
 import 'providers/calendar_provider.dart';
+import 'providers/category_provider.dart';
+import 'providers/routine_provider.dart';
 import 'providers/theme_provider.dart';
 import 'router.dart';
 import 'services/fcm_service.dart';
@@ -109,6 +111,8 @@ class _OwnCalendarAppState extends State<OwnCalendarApp> {
         ChangeNotifierProvider.value(value: widget.authProvider),
         ChangeNotifierProvider.value(value: widget.themeProvider),
         ChangeNotifierProvider(create: (_) => CalendarProvider()),
+        ChangeNotifierProvider(create: (_) => RoutineProvider()),
+        ChangeNotifierProvider(create: (_) => CategoryProvider()),
       ],
       child: Consumer<ThemeProvider>(
         builder: (context, themeProvider, _) {

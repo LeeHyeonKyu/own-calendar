@@ -19,6 +19,8 @@ model User {
   refreshTokens       RefreshToken[]
   familyMemberships   FamilyMembership[]
   createdFamilyGroups FamilyGroup[]      @relation("CreatedFamilyGroups")
+  createdGroups       Group[]            @relation("CreatedGroups")
+  groupMemberships    GroupMembership[]
   externalConnections ExternalCalendarConnection[]
   defaultReminderMinutes Int            @default(10)
   deviceTokens        DeviceToken[]
@@ -64,6 +66,8 @@ model Calendar {
   owner         User               @relation(fields: [ownerId], references: [id], onDelete: Cascade)
   familyGroupId String?            @unique
   familyGroup   FamilyGroup?       @relation(fields: [familyGroupId], references: [id])
+  groupId       String?            @unique
+  group         Group?             @relation(fields: [groupId], references: [id])
   events        Event[]
   tasks         Task[]
   externalConnection ExternalCalendarConnection?
@@ -291,6 +295,36 @@ model EventInvite {
   createdAt DateTime     @default(now())
 
   @@unique([eventId, inviteeId])
+}
+
+enum GroupRole {
+  OWNER
+  MEMBER
+}
+
+model Group {
+  id          String            @id @default(cuid())
+  name        String
+  code        String            @unique
+  type        String            @default("가족")
+  createdById String
+  createdBy   User              @relation("CreatedGroups", fields: [createdById], references: [id])
+  members     GroupMembership[]
+  calendar    Calendar?
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+}
+
+model GroupMembership {
+  id       String    @id @default(cuid())
+  userId   String
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  groupId  String
+  group    Group     @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  role     GroupRole @default(MEMBER)
+  joinedAt DateTime  @default(now())
+
+  @@unique([userId, groupId])
 }
 
 model RoutineGroup {

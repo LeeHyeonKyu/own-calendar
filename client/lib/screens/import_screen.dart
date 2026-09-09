@@ -19,20 +19,15 @@ class _ImportScreenState extends State<ImportScreen> {
   String? _selectedFileName;
 
   Future<void> _pickAndUpload() async {
-    // Pick an ICS file
-    final result = await FilePicker.platform.pickFiles(
+    // Pick an ICS file (file_picker 12.x static API)
+    final file = await FilePicker.pickFile(
       type: FileType.custom,
       allowedExtensions: ['ics'],
-      withData: true,
     );
 
-    if (result == null || result.files.isEmpty) return;
+    if (file == null) return;
 
-    final file = result.files.first;
-    if (file.bytes == null) {
-      setState(() => _error = '파일을 읽을 수 없습니다');
-      return;
-    }
+    final bytes = await file.readAsBytes();
 
     setState(() {
       _isUploading = true;
@@ -52,7 +47,7 @@ class _ImportScreenState extends State<ImportScreen> {
 
       request.files.add(http.MultipartFile.fromBytes(
         'file',
-        file.bytes!,
+        bytes,
         filename: file.name,
       ));
 

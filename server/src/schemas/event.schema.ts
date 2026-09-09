@@ -10,7 +10,7 @@ const timeOrderRefinement = <T extends { startTime?: string; endTime?: string }>
   return true;
 };
 
-const timeOrderMessage = { message: 'endTime must be after startTime', path: ['endTime'] as const };
+const timeOrderMessage = { message: 'endTime must be after startTime', path: ['endTime'] };
 
 const EDIT_MODES = ['this', 'thisAndFuture', 'all'] as const;
 

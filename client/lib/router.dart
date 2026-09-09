@@ -12,6 +12,13 @@ import 'screens/search_screen.dart';
 import 'screens/settings_screen.dart';
 import 'screens/tab_settings_screen.dart';
 import 'screens/theme_settings_screen.dart';
+import 'screens/category_settings_screen.dart';
+import 'screens/import_screen.dart';
+import 'screens/routine_screen.dart';
+import 'screens/routine_form_screen.dart';
+import 'screens/group_screen.dart';
+import 'screens/group_detail_screen.dart';
+import 'screens/follow_search_screen.dart';
 import 'widgets/navigation_shell.dart';
 
 GoRouter createRouter(AuthProvider authProvider) {
@@ -118,6 +125,42 @@ GoRouter createRouter(AuthProvider authProvider) {
       GoRoute(
         path: '/settings/theme',
         builder: (context, state) => const ThemeSettingsScreen(),
+      ),
+      GoRoute(
+        path: '/settings/categories',
+        builder: (context, state) => const CategorySettingsScreen(),
+      ),
+      GoRoute(
+        path: '/import',
+        builder: (context, state) => const ImportScreen(),
+      ),
+      GoRoute(
+        path: '/routines',
+        builder: (context, state) => const RoutineScreen(),
+      ),
+      GoRoute(
+        path: '/routine/new',
+        builder: (context, state) => const RoutineFormScreen(),
+      ),
+      GoRoute(
+        path: '/routine/:id/edit',
+        builder: (context, state) => RoutineFormScreen(
+          routineId: state.pathParameters['id'],
+        ),
+      ),
+      GoRoute(
+        path: '/groups',
+        builder: (context, state) => const GroupScreen(),
+      ),
+      GoRoute(
+        path: '/groups/:id',
+        builder: (context, state) => GroupDetailScreen(
+          groupId: state.pathParameters['id']!,
+        ),
+      ),
+      GoRoute(
+        path: '/follow/search',
+        builder: (context, state) => const FollowSearchScreen(),
       ),
 
       // Deep link routes for widget interactions

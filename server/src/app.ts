@@ -12,6 +12,11 @@ import groupRoutes from './routes/groups';
 import followRoutes from './routes/follows';
 import inviteRoutes from './routes/invites';
 import googleRoutes from './routes/google';
+import importRoutes from './routes/import';
+import routineRoutes from './routes/routines';
+import categoryRoutes from './routes/categories';
+import deviceTokenRoutes from './routes/device-tokens';
+import userSettingsRoutes from './routes/user-settings';
 
 const app = express();
 
@@ -64,6 +69,11 @@ app.use('/api/groups', groupRoutes);
 app.use('/api/follows', followRoutes);
 app.use('/api/invites', inviteRoutes);
 app.use('/api/google', googleRoutes);
+app.use('/api/import', importRoutes);
+app.use('/api/routines', routineRoutes);
+app.use('/api/categories', categoryRoutes);
+app.use('/api/device-tokens', deviceTokenRoutes);
+app.use('/api/user-settings', userSettingsRoutes);
 
 app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
   console.error(err.stack);

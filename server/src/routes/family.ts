@@ -56,7 +56,7 @@ router.get('/members', async (req: AuthRequest, res: Response) => {
 
 router.delete('/members/:userId', async (req: AuthRequest, res: Response) => {
   try {
-    await familyService.removeMember(req.userId!, req.params.userId);
+    await familyService.removeMember(req.userId!, String(req.params.userId));
     res.status(204).send();
   } catch (err: any) {
     const status = err.statusCode || 500;
