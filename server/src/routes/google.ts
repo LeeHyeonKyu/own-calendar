@@ -56,6 +56,16 @@ router.get('/connections', async (req: AuthRequest, res: Response) => {
   }
 });
 
+router.post('/auto-sync', async (req: AuthRequest, res: Response) => {
+  try {
+    const result = await googleSyncService.autoSync(req.userId!);
+    res.json(result);
+  } catch (err: any) {
+    const status = err.statusCode || 500;
+    res.status(status).json({ error: err.message });
+  }
+});
+
 router.post('/sync/:connectionId', async (req: AuthRequest, res: Response) => {
   try {
     const result = await googleSyncService.pullEvents(req.userId!, String(req.params.connectionId));

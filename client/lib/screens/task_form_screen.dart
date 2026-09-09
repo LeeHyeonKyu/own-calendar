@@ -24,6 +24,9 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
   final _formKey = GlobalKey<FormState>();
   final _titleController = TextEditingController();
   final _descController = TextEditingController();
+  final _locationController = TextEditingController();
+  final _notesController = TextEditingController();
+  final _attendeeController = TextEditingController();
   DateTime? _dueDate;
   DateTime? _scheduledDate;
   TimeOfDay? _scheduledTime;
@@ -35,6 +38,8 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
   String? _selectedEventId;
   bool _isLoading = false;
   TaskModel? _originalTask;
+  List<Map<String, dynamic>> _attendees = [];
+  bool _showMetadata = false;
 
   bool get isEditing => widget.taskId != null;
   bool get _isEditingInstance => _originalTask?.isVirtualInstance ?? false;
@@ -55,6 +60,9 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
   void dispose() {
     _titleController.dispose();
     _descController.dispose();
+    _locationController.dispose();
+    _notesController.dispose();
+    _attendeeController.dispose();
     super.dispose();
   }
 
@@ -93,8 +101,26 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
         _rrule = task.rrule;
         _selectedCalendarId = task.calendarId;
         _selectedEventId = task.eventId;
+        _locationController.text = task.location ?? '';
+        _notesController.text = task.notes ?? '';
+        _attendees = List.from(task.attendees);
+        _showMetadata = task.location != null ||
+            task.notes != null ||
+            task.attendees.isNotEmpty;
       });
     }
+  }
+
+  void _addAttendee() {
+    final text = _attendeeController.text.trim();
+    if (text.isEmpty) return;
+    final isEmail = text.contains('@');
+    setState(() {
+      _attendees.add({
+        if (isEmail) 'email': text else 'name': text,
+      });
+      _attendeeController.clear();
+    });
   }
 
   Future<void> _pickDate(String field) async {
@@ -148,6 +174,13 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
       'rrule': _rrule,
       'calendarId': _selectedCalendarId,
       'eventId': _selectedEventId,
+      'location': _locationController.text.trim().isEmpty
+          ? null
+          : _locationController.text.trim(),
+      'notes': _notesController.text.trim().isEmpty
+          ? null
+          : _notesController.text.trim(),
+      'attendees': _attendees.isEmpty ? null : _attendees,
     };
 
     if (_dueDate != null) {
@@ -368,6 +401,77 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
                 );
               },
             ),
+            const SizedBox(height: Spacing.lg),
+            // ── Metadata section (Feature 018) ──
+            ListTile(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(AppRadius.sm),
+                side: BorderSide(color: Theme.of(context).colorScheme.outline),
+              ),
+              leading: const Icon(Icons.info_outline),
+              title: const Text('추가 정보'),
+              subtitle: Text(_showMetadata ? '장소, 메모, 참여자' : '탭하여 펼치기'),
+              trailing: Icon(_showMetadata ? Icons.expand_less : Icons.expand_more),
+              onTap: () => setState(() => _showMetadata = !_showMetadata),
+            ),
+            if (_showMetadata) ...[
+              const SizedBox(height: Spacing.md),
+              TextFormField(
+                controller: _locationController,
+                decoration: const InputDecoration(
+                  labelText: '장소',
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.location_on_outlined),
+                ),
+              ),
+              const SizedBox(height: Spacing.md),
+              TextFormField(
+                controller: _notesController,
+                decoration: const InputDecoration(
+                  labelText: '메모',
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.note_outlined),
+                ),
+                maxLines: 2,
+              ),
+              const SizedBox(height: Spacing.md),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _attendeeController,
+                      decoration: const InputDecoration(
+                        labelText: '참여자',
+                        hintText: '이름 또는 이메일',
+                        border: OutlineInputBorder(),
+                        prefixIcon: Icon(Icons.person_add_outlined),
+                      ),
+                      onSubmitted: (_) => _addAttendee(),
+                    ),
+                  ),
+                  const SizedBox(width: Spacing.sm),
+                  IconButton.filled(
+                    onPressed: _addAttendee,
+                    icon: const Icon(Icons.add),
+                  ),
+                ],
+              ),
+              if (_attendees.isNotEmpty) ...[
+                const SizedBox(height: Spacing.sm),
+                Wrap(
+                  spacing: Spacing.sm,
+                  runSpacing: Spacing.xs,
+                  children: _attendees.map((a) {
+                    final display = a['name'] ?? a['email'] ?? '';
+                    return Chip(
+                      label: Text(display),
+                      deleteIcon: const Icon(Icons.close, size: 16),
+                      onDeleted: () => setState(() => _attendees.remove(a)),
+                    );
+                  }).toList(),
+                ),
+              ],
+            ],
             const SizedBox(height: Spacing.lg),
             // Event 연결
             DropdownButtonFormField<String?>(

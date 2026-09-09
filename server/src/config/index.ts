@@ -57,4 +57,5 @@ export const config = {
   firebase: {
     serviceAccountJson: process.env.FIREBASE_SERVICE_ACCOUNT_JSON || '',
   },
+  koreaHolidayApiKey: process.env.KOREA_HOLIDAY_API_KEY || '',
 };

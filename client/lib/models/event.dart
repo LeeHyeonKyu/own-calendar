@@ -16,6 +16,14 @@ class EventModel {
   final String calendarId;
   final String? calendarName;
   final String? calendarColor;
+  final String? location;
+  final String? notes;
+  final List<Map<String, dynamic>> attendees;
+  final int? reminderMinutes;
+  final String? categoryId;
+  final String? categoryName;
+  final String? categoryColor;
+  final String? categoryEmoji;
 
   EventModel({
     required this.id,
@@ -33,6 +41,14 @@ class EventModel {
     required this.calendarId,
     this.calendarName,
     this.calendarColor,
+    this.location,
+    this.notes,
+    this.attendees = const [],
+    this.reminderMinutes,
+    this.categoryId,
+    this.categoryName,
+    this.categoryColor,
+    this.categoryEmoji,
   });
 
   factory EventModel.fromJson(Map<String, dynamic> json) {
@@ -54,6 +70,17 @@ class EventModel {
       calendarId: json['calendarId'],
       calendarName: json['calendar']?['name'],
       calendarColor: json['calendar']?['color'],
+      location: json['location'],
+      notes: json['notes'],
+      attendees: (json['attendees'] as List<dynamic>?)
+              ?.map((a) => Map<String, dynamic>.from(a as Map))
+              .toList() ??
+          [],
+      reminderMinutes: json['reminderMinutes'],
+      categoryId: json['categoryId'],
+      categoryName: json['categoryRef']?['name'],
+      categoryColor: json['categoryRef']?['color'],
+      categoryEmoji: json['categoryRef']?['emoji'],
     );
   }
 

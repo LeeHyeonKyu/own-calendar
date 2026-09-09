@@ -17,6 +17,8 @@ import routineRoutes from './routes/routines';
 import categoryRoutes from './routes/categories';
 import deviceTokenRoutes from './routes/device-tokens';
 import userSettingsRoutes from './routes/user-settings';
+import naverRoutes from './routes/naver';
+import holidayRoutes from './routes/holidays';
 
 const app = express();
 
@@ -74,6 +76,8 @@ app.use('/api/routines', routineRoutes);
 app.use('/api/categories', categoryRoutes);
 app.use('/api/device-tokens', deviceTokenRoutes);
 app.use('/api/user-settings', userSettingsRoutes);
+app.use('/api/naver', naverRoutes);
+app.use('/api/holidays', holidayRoutes);
 
 app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
   console.error(err.stack);

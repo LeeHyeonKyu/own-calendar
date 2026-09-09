@@ -13,6 +13,7 @@ import 'screens/settings_screen.dart';
 import 'screens/tab_settings_screen.dart';
 import 'screens/theme_settings_screen.dart';
 import 'screens/category_settings_screen.dart';
+import 'screens/holiday_settings_screen.dart';
 import 'screens/import_screen.dart';
 import 'screens/routine_screen.dart';
 import 'screens/routine_form_screen.dart';
@@ -129,6 +130,10 @@ GoRouter createRouter(AuthProvider authProvider) {
       GoRoute(
         path: '/settings/categories',
         builder: (context, state) => const CategorySettingsScreen(),
+      ),
+      GoRoute(
+        path: '/settings/holidays',
+        builder: (context, state) => const HolidaySettingsScreen(),
       ),
       GoRoute(
         path: '/import',

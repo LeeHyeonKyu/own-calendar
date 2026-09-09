@@ -155,6 +155,11 @@ export const googleSyncService = {
         where: { externalId: gEvent.id, calendarId: connection.calendarId },
       });
 
+      const location = gEvent.location || null;
+      const attendees = gEvent.attendees
+        ? gEvent.attendees.map((a: any) => ({ name: a.displayName || null, email: a.email || null }))
+        : null;
+
       if (existing) {
         await prisma.event.update({
           where: { id: existing.id },
@@ -164,6 +169,8 @@ export const googleSyncService = {
             startTime,
             endTime,
             isAllDay,
+            location,
+            attendees: attendees ?? undefined,
           },
         });
         updated++;
@@ -175,6 +182,8 @@ export const googleSyncService = {
             startTime,
             endTime,
             isAllDay,
+            location,
+            attendees: attendees ?? undefined,
             calendarId: connection.calendarId,
             createdById: userId,
             externalId: gEvent.id,
@@ -305,5 +314,28 @@ export const googleSyncService = {
     await prisma.calendar.delete({ where: { id: connection.calendarId } });
 
     return { success: true };
+  },
+
+  async autoSync(userId: string) {
+    const connections = await prisma.externalCalendarConnection.findMany({
+      where: { userId, provider: 'google' },
+    });
+
+    let totalCreated = 0;
+    let totalUpdated = 0;
+    let totalDeleted = 0;
+
+    for (const conn of connections) {
+      try {
+        const result = await googleSyncService.pullEvents(userId, conn.id);
+        totalCreated += result.created;
+        totalUpdated += result.updated;
+        totalDeleted += result.deleted;
+      } catch {
+        // Skip failed connections
+      }
+    }
+
+    return { created: totalCreated, updated: totalUpdated, deleted: totalDeleted, synced: connections.length };
   },
 };

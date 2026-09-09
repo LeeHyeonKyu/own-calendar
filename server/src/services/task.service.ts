@@ -208,6 +208,11 @@ export const taskService = {
       eventId?: string | null;
       calendarId: string;
       sortOrder?: number;
+      location?: string;
+      notes?: string;
+      attendees?: any;
+      metaInherited?: boolean;
+      categoryId?: string | null;
     },
   ) {
     const calendar = await prisma.calendar.findUnique({
@@ -250,6 +255,11 @@ export const taskService = {
         calendarId: data.calendarId,
         createdById: userId,
         sortOrder: data.sortOrder ?? 0,
+        location: data.location || null,
+        notes: data.notes || null,
+        attendees: data.attendees || undefined,
+        metaInherited: data.metaInherited ?? false,
+        categoryId: data.categoryId || null,
       },
       include: taskIncludes,
     });
@@ -272,6 +282,11 @@ export const taskService = {
       eventId?: string | null;
       calendarId?: string;
       sortOrder?: number;
+      location?: string | null;
+      notes?: string | null;
+      attendees?: any;
+      metaInherited?: boolean;
+      categoryId?: string | null;
     },
   ) {
     const { baseId } = resolveInstance(taskId);
@@ -328,6 +343,11 @@ export const taskService = {
     if (data.eventId !== undefined) updateData.eventId = data.eventId;
     if (data.calendarId !== undefined) updateData.calendarId = data.calendarId;
     if (data.sortOrder !== undefined) updateData.sortOrder = data.sortOrder;
+    if (data.location !== undefined) updateData.location = data.location;
+    if (data.notes !== undefined) updateData.notes = data.notes;
+    if (data.attendees !== undefined) updateData.attendees = data.attendees;
+    if (data.metaInherited !== undefined) updateData.metaInherited = data.metaInherited;
+    if (data.categoryId !== undefined) updateData.categoryId = data.categoryId;
 
     return prisma.task.update({
       where: { id: baseId },

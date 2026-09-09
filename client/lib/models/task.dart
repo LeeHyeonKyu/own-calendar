@@ -18,6 +18,16 @@ class TaskModel {
   final String? calendarName;
   final String? calendarColor;
   final String? eventTitle;
+  final int sortOrder;
+  final String? location;
+  final String? notes;
+  final List<Map<String, dynamic>> attendees;
+  final bool metaInherited;
+  final String? categoryId;
+  final String? categoryName;
+  final String? categoryColor;
+  final String? categoryEmoji;
+
   TaskModel({
     required this.id,
     required this.title,
@@ -36,6 +46,15 @@ class TaskModel {
     this.calendarName,
     this.calendarColor,
     this.eventTitle,
+    this.sortOrder = 0,
+    this.location,
+    this.notes,
+    this.attendees = const [],
+    this.metaInherited = false,
+    this.categoryId,
+    this.categoryName,
+    this.categoryColor,
+    this.categoryEmoji,
   });
 
   factory TaskModel.fromJson(Map<String, dynamic> json) {
@@ -63,6 +82,18 @@ class TaskModel {
       calendarName: json['calendar']?['name'],
       calendarColor: json['calendar']?['color'],
       eventTitle: json['event']?['title'],
+      sortOrder: json['sortOrder'] ?? 0,
+      location: json['location'],
+      notes: json['notes'],
+      attendees: (json['attendees'] as List<dynamic>?)
+              ?.map((a) => Map<String, dynamic>.from(a as Map))
+              .toList() ??
+          [],
+      metaInherited: json['metaInherited'] ?? false,
+      categoryId: json['categoryId'],
+      categoryName: json['categoryRef']?['name'],
+      categoryColor: json['categoryRef']?['color'],
+      categoryEmoji: json['categoryRef']?['emoji'],
     );
   }
 

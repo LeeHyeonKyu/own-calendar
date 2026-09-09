@@ -162,6 +162,11 @@ export const eventService = {
       recurrenceEnd?: string | null;
       rrule?: string | null;
       calendarId: string;
+      location?: string;
+      notes?: string;
+      attendees?: any;
+      reminderMinutes?: number | null;
+      categoryId?: string | null;
     },
   ) {
     const calendar = await prisma.calendar.findUnique({
@@ -195,6 +200,11 @@ export const eventService = {
         rrule: data.rrule || null,
         calendarId: data.calendarId,
         createdById: userId,
+        location: data.location || null,
+        notes: data.notes || null,
+        attendees: data.attendees || undefined,
+        reminderMinutes: data.reminderMinutes ?? null,
+        categoryId: data.categoryId || null,
       },
     });
   },
@@ -215,6 +225,11 @@ export const eventService = {
       recurrenceEnd?: string | null;
       rrule?: string | null;
       calendarId?: string;
+      location?: string | null;
+      notes?: string | null;
+      attendees?: any;
+      reminderMinutes?: number | null;
+      categoryId?: string | null;
     },
   ) {
     // Strip recurrence instance suffix to find the original event
@@ -299,6 +314,11 @@ export const eventService = {
       recurrenceEnd?: string | null;
       rrule?: string | null;
       calendarId?: string;
+      location?: string | null;
+      notes?: string | null;
+      attendees?: any;
+      reminderMinutes?: number | null;
+      categoryId?: string | null;
     },
   ) {
     const { baseId, instanceDate } = resolveInstance(eventId, instanceDateParam);

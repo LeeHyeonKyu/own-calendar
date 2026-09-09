@@ -24,6 +24,9 @@ class _EventFormScreenState extends State<EventFormScreen> {
   final _titleController = TextEditingController();
   final _descController = TextEditingController();
   final _tagController = TextEditingController();
+  final _locationController = TextEditingController();
+  final _notesController = TextEditingController();
+  final _attendeeController = TextEditingController();
   late DateTime _startDate;
   late TimeOfDay _startTime;
   late DateTime _endDate;
@@ -38,6 +41,10 @@ class _EventFormScreenState extends State<EventFormScreen> {
   String? _selectedCalendarId;
   bool _isLoading = false;
   EventModel? _originalEvent;
+  int? _reminderMinutes = 10;
+  String? _categoryId;
+  List<Map<String, dynamic>> _attendees = [];
+  bool _showMetadata = false;
 
   bool get isEditing => widget.eventId != null;
   bool get _isEditingInstance => _originalEvent?.isVirtualInstance ?? false;
@@ -62,6 +69,9 @@ class _EventFormScreenState extends State<EventFormScreen> {
     _titleController.dispose();
     _descController.dispose();
     _tagController.dispose();
+    _locationController.dispose();
+    _notesController.dispose();
+    _attendeeController.dispose();
     super.dispose();
   }
 
@@ -98,6 +108,14 @@ class _EventFormScreenState extends State<EventFormScreen> {
         _recurrenceEnd = event.recurrenceEnd;
         _rrule = event.rrule;
         _selectedCalendarId = event.calendarId;
+        _locationController.text = event.location ?? '';
+        _notesController.text = event.notes ?? '';
+        _attendees = List.from(event.attendees);
+        _reminderMinutes = event.reminderMinutes;
+        _categoryId = event.categoryId;
+        _showMetadata = event.location != null ||
+            event.notes != null ||
+            event.attendees.isNotEmpty;
       });
     }
   }
@@ -138,6 +156,25 @@ class _EventFormScreenState extends State<EventFormScreen> {
         }
       });
     }
+  }
+
+  String _reminderLabel(int? minutes) {
+    if (minutes == null) return '끄기';
+    if (minutes == 0) return '정시';
+    if (minutes == 60) return '1시간 전';
+    return '$minutes분 전';
+  }
+
+  void _addAttendee() {
+    final text = _attendeeController.text.trim();
+    if (text.isEmpty) return;
+    final isEmail = text.contains('@');
+    setState(() {
+      _attendees.add({
+        if (isEmail) 'email': text else 'name': text,
+      });
+      _attendeeController.clear();
+    });
   }
 
   void _addTag() {
@@ -183,6 +220,15 @@ class _EventFormScreenState extends State<EventFormScreen> {
       'recurrenceEnd': _recurrenceEnd?.toIso8601String(),
       'rrule': _rrule,
       'calendarId': _selectedCalendarId,
+      'location': _locationController.text.trim().isEmpty
+          ? null
+          : _locationController.text.trim(),
+      'notes': _notesController.text.trim().isEmpty
+          ? null
+          : _notesController.text.trim(),
+      'attendees': _attendees.isEmpty ? null : _attendees,
+      'reminderMinutes': _reminderMinutes,
+      'categoryId': _categoryId,
     };
 
     final provider = context.read<CalendarProvider>();
@@ -426,6 +472,115 @@ class _EventFormScreenState extends State<EventFormScreen> {
                 );
               },
             ),
+            const SizedBox(height: Spacing.lg),
+            // ── Reminder (Feature 010) ──
+            ListTile(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(AppRadius.sm),
+                side: BorderSide(color: Theme.of(context).colorScheme.outline),
+              ),
+              leading: const Icon(Icons.notifications_outlined),
+              title: const Text('알림'),
+              subtitle: Text(_reminderLabel(_reminderMinutes)),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () async {
+                final options = <int?, String>{
+                  null: '끄기',
+                  0: '정시',
+                  5: '5분 전',
+                  10: '10분 전',
+                  15: '15분 전',
+                  30: '30분 전',
+                  60: '1시간 전',
+                };
+                final selected = await showDialog<int?>(
+                  context: context,
+                  builder: (ctx) => SimpleDialog(
+                    title: const Text('알림 시간'),
+                    children: options.entries.map((entry) {
+                      return SimpleDialogOption(
+                        onPressed: () => Navigator.pop(ctx, entry.key ?? -1),
+                        child: Text(entry.value),
+                      );
+                    }).toList(),
+                  ),
+                );
+                if (selected != null) {
+                  setState(() => _reminderMinutes = selected == -1 ? null : selected);
+                }
+              },
+            ),
+            const SizedBox(height: Spacing.lg),
+            // ── Metadata section (Feature 018) ──
+            ListTile(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(AppRadius.sm),
+                side: BorderSide(color: Theme.of(context).colorScheme.outline),
+              ),
+              leading: const Icon(Icons.info_outline),
+              title: const Text('추가 정보'),
+              subtitle: Text(_showMetadata ? '장소, 메모, 참여자' : '탭하여 펼치기'),
+              trailing: Icon(_showMetadata ? Icons.expand_less : Icons.expand_more),
+              onTap: () => setState(() => _showMetadata = !_showMetadata),
+            ),
+            if (_showMetadata) ...[
+              const SizedBox(height: Spacing.md),
+              TextFormField(
+                controller: _locationController,
+                decoration: const InputDecoration(
+                  labelText: '장소',
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.location_on_outlined),
+                ),
+              ),
+              const SizedBox(height: Spacing.md),
+              TextFormField(
+                controller: _notesController,
+                decoration: const InputDecoration(
+                  labelText: '메모',
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.note_outlined),
+                ),
+                maxLines: 2,
+              ),
+              const SizedBox(height: Spacing.md),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _attendeeController,
+                      decoration: const InputDecoration(
+                        labelText: '참여자',
+                        hintText: '이름 또는 이메일',
+                        border: OutlineInputBorder(),
+                        prefixIcon: Icon(Icons.person_add_outlined),
+                      ),
+                      onSubmitted: (_) => _addAttendee(),
+                    ),
+                  ),
+                  const SizedBox(width: Spacing.sm),
+                  IconButton.filled(
+                    onPressed: _addAttendee,
+                    icon: const Icon(Icons.add),
+                  ),
+                ],
+              ),
+              if (_attendees.isNotEmpty) ...[
+                const SizedBox(height: Spacing.sm),
+                Wrap(
+                  spacing: Spacing.sm,
+                  runSpacing: Spacing.xs,
+                  children: _attendees.map((a) {
+                    final display = a['name'] ?? a['email'] ?? '';
+                    return Chip(
+                      label: Text(display),
+                      deleteIcon: const Icon(Icons.close, size: 16),
+                      onDeleted: () => setState(() => _attendees.remove(a)),
+                    );
+                  }).toList(),
+                ),
+              ],
+            ],
             const SizedBox(height: Spacing.lg),
             DropdownButtonFormField<String>(
               value: _selectedCalendarId,
