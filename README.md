@@ -20,7 +20,9 @@ Node.js(TypeScript) + PostgreSQL API 서버로 이루어져 있으며, 구글/�
 
 ## Run
 
-Prerequisite: 서버는 직접 만들어야 하는 `server/.env` 설정 파일을 읽는다 — 필요한 변수 목록은 [docs/TECHNICAL.md](docs/TECHNICAL.md)를 본다.
+Prerequisite: 서버는 직접 만들어야 하는 `server/.env` 설정 파일을 읽는다 — 채울 변수 이름은 [server/.env.example](server/.env.example)을 복사해서 쓰고, 배경은 [docs/TECHNICAL.md](docs/TECHNICAL.md)를 본다.
+
+DB 접속 문자열은 `server/docker-compose.yml`이 컨테이너에 주입하므로 `server/.env.example`에는 없다 — 도커 없이 `npm run dev`로 띄우려면 같은 값을 직접 `server/.env`에 넣어야 한다.
 
 Client (Flutter):
 
@@ -50,10 +52,10 @@ Server:
 cd server && npm test
 ```
 
-주의: `cd server && npm test`는 `server/.env`가 가리키는 database의 모든 행을 **삭제**한다.
-(`server/tests/setup.ts`가 전역 `beforeEach`에서 전체 테이블을 비운다.) 실행 중인 PostgreSQL이
-필요하며, 반드시 버려도 되는 전용 테스트 DB를 가리키게 한 뒤에 실행한다 — 실제 캘린더 데이터가
-들어 있는 곳을 가리킨 채로 실행하면 되돌릴 수 없다.
+주의: `cd server && npm test`는 `server/.env`가 가리키는 database의 모든 행을 **삭제**한다 —
+`server/tests/setup.ts`가 전역 `beforeEach`에서 사용자·가족·캘린더·일정·토큰 테이블을 비운다.
+실행 중인 PostgreSQL이 필요하며, 반드시 버려도 되는 전용 테스트 DB를 가리키게 한 뒤에 실행한다 —
+실제 캘린더 데이터가 들어 있는 곳을 가리킨 채로 실행하면 되돌릴 수 없다.
 
 ## Docs
 
