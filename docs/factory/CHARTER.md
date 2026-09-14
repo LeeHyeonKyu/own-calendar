@@ -1,6 +1,6 @@
 ---
 schema: factory.charter.v1
-status: draft
+status: ready
 tier_default: standard
 limits: { K: 3, M: 3, R: 2 }
 roster:
