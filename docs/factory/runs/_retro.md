@@ -1,68 +1,185 @@
 # Retro State
 
-- last retro: 없음
+- last retro: 2026-09-14T16:34:23.746Z
 - merges since last retro: 0
 - current N: 1
 
 ## History (last 5)
 
-_이력 없음_
+| at | yield | n_before | n_after | needs_human_since |
+| --- | --- | --- | --- | --- |
+| 2026-09-14T16:34:23.746Z | 1 | 1 | 1 | 5 |
 
 ## Stats
 
 | metric | this window | cumulative |
 | --- | --- | --- |
-| merged | 0 | 0 |
-| review rounds avg | 0 | 0 |
-| needs-human | 3 | 0 |
-| rejects by role | 없음 | 없음 |
-| reviewer overlap | 없음 | 없음 |
-| unique findings by role | 없음 | 없음 |
-| cost (usd) | 9.85 | 0.00 |
-| tokens | input 3322013 / output 67050 | input 0 / output 0 |
-| retro cost (usd) | 0.00 | 0.00 |
-| retro tokens | input 0 / output 0 | input 0 / output 0 |
-| full retros | — | 0 |
+| merged | 1 | 1 |
+| review rounds avg | 4 | 4 |
+| needs-human | 5 | 5 |
+| rejects by role | correctness 2, architecture 1, spec-conformance 1 | correctness 2, architecture 1, spec-conformance 1 |
+| reviewer overlap | 0.00 (0/6, runs 4) | 0.00 (0/6, runs 4) |
+| unique findings by role | correctness 4, architecture 1, spec-conformance 1 | correctness 4, architecture 1, spec-conformance 1 |
+| cost (usd) | 59.75 | 59.75 |
+| tokens | input 9642879 / output 214644 | input 9642879 / output 214644 |
+| retro cost (usd) | 0.77 | 0.77 |
+| retro tokens | input 2 / output 1245 | input 2 / output 1245 |
+| full retros | — | 1 |
 
 <!-- factory-retro-state:v1 -->
 ```json
 {
   "cursor": {
-    "last_retro_at": null,
+    "last_retro_at": "2026-09-14T16:34:23.746Z",
     "last_record_offsets": {}
   },
   "merges_since": 0,
   "n": 1,
-  "history": [],
+  "history": [
+    {
+      "at": "2026-09-14T16:34:23.746Z",
+      "yield": 1,
+      "needs_human_since": 5,
+      "applied": [
+        {
+          "step": "harness",
+          "title": "harness: promote to M2 — HTTP route surface present (express/fastify/hono/koa/next dependency, or routes-style files) but harness maturity is M1 or below",
+          "issue": 9
+        }
+      ],
+      "n_before": 1,
+      "n_after": 1
+    }
+  ],
   "candidates": {
-    "lessons": [],
+    "lessons": [
+      {
+        "role": "correctness",
+        "text": "dw4의 파괴 경고 가드가 fail-closed가 아니다 — README에서 경고를 통째로 지우고 무해한 셋업 문장으로 바꿔도 5개 테스트가 전부 통과한다. 이 변경에서 유일하게 데이터 안전과 직결된 단언이 아무것도 지키지 못한다.",
+        "runs": [
+          3
+        ],
+        "source": "must_fix"
+      },
+      {
+        "role": "correctness",
+        "text": "`## Run`의 prerequisite가 가리키는 docs/TECHNICAL.md에는 환경변수가 한 글자도 없다 — 실제 목록이 담긴 server/.env.example이 바로 옆에 있는데도 README가 언급하지 않아, 독자는 README를 따라가서 서버를 띄울 수 없다. 라운드1에서 나는 이를 '스펙이 그렇게 지정했으므로 비차단'으로 낮춰 잡았으나, 가드를 건드리지 않고 README 한 줄만으로 고칠 수 있음을 실측해 판단을 바꾼다.",
+        "runs": [
+          3
+        ],
+        "source": "must_fix"
+      },
+      {
+        "role": "correctness",
+        "text": "The published client run command connects to the maintainer's live production API, not to the local server that the same section (README.md:33-37) just told the reader to start. Following `## Run` literally makes a new contributor register accounts and write calendar rows into the production database, while their freshly started local server sits idle.",
+        "runs": [
+          3
+        ],
+        "source": "must_fix"
+      },
+      {
+        "role": "correctness",
+        "text": "`cd server && npm ci && npm run dev` cannot bring the server up on a fresh clone: it omits the Prisma migration (and, empirically here, the Prisma client generation) that both of the repo's own working recipes run. With no `prisma migrate deploy`/`npm run db:migrate` the tables never exist, so every request fails and `cd server && npm test` — the command the new destructive warning guards — cannot even reach the deleteMany() it warns about.",
+        "runs": [
+          3
+        ],
+        "source": "must_fix"
+      },
+      {
+        "role": "architecture",
+        "text": "`## Run`'s client command `cd client && flutter pub get && flutter run` points a new contributor's build at the LIVE production API, and contradicts the server command three lines below it. The repository's build-config mechanism for this is `client/config/{dev,prod}.json` + `--dart-define-from-file`; the README is now the only place in the repo that publishes the bare form, so the entry-point document teaches the one usage that bypasses the config files and mutates the family's real calendar.",
+        "runs": [
+          3
+        ],
+        "source": "must_fix"
+      },
+      {
+        "role": "spec-conformance",
+        "text": "dw4's own sentence requires the warning to appear 'Before a reader can act on the server test command,' but the guard test only checks symmetric adjacency (`(i - commandIndex).abs() <= proximity`, proximity=6), and the merged README actually places the destructive warning *after* the fenced `cd server && npm test` block, not before it. The test is green despite the artifact violating the literal ordering the done_when text promises — a direct text-vs-test-vs-artifact mismatch, not a stylistic quibble.",
+        "runs": [
+          3
+        ],
+        "source": "must_fix"
+      }
+    ],
     "examples": [],
     "flaky": [],
     "needs_human": [
       {
         "issue": 3,
-        "reason": "implement head_sha bfff638 != branch head f1909c6",
-        "at": "2026-09-14T13:32:27Z"
+        "reason": "review verification failed — review round 4 > K=3",
+        "at": "2026-09-14T16:31:40Z"
       }
     ]
   },
   "stats": {
-    "merged": 0,
-    "review_rounds_avg": 0,
-    "rejects_by_role": {},
-    "review_runs": 0,
-    "findings_total": 0,
+    "merged": 1,
+    "review_rounds_avg": 4,
+    "rejects_by_role": {
+      "correctness": 2,
+      "architecture": 1,
+      "spec-conformance": 1
+    },
+    "review_runs": 4,
+    "findings_total": 6,
     "overlapping_findings": 0,
-    "unique_findings_by_role": {},
+    "unique_findings_by_role": {
+      "correctness": 4,
+      "architecture": 1,
+      "spec-conformance": 1
+    },
     "overlap_ratio": 0,
-    "needs_human": 3,
+    "needs_human": 5,
     "usage": {
-      "cost_usd": 9.851937,
+      "cost_usd": 59.747453,
       "tokens": {
-        "input": 3322013,
-        "output": 67050
+        "input": 9642879,
+        "output": 214644
+      }
+    },
+    "retro_usage": {
+      "cost_usd": 0.769956,
+      "tokens": {
+        "input": 2,
+        "output": 1245
       }
     }
-  }
+  },
+  "stats_total": {
+    "merged": 1,
+    "review_rounds_avg": 4,
+    "rejects_by_role": {
+      "correctness": 2,
+      "architecture": 1,
+      "spec-conformance": 1
+    },
+    "review_runs": 4,
+    "findings_total": 6,
+    "overlapping_findings": 0,
+    "unique_findings_by_role": {
+      "correctness": 4,
+      "architecture": 1,
+      "spec-conformance": 1
+    },
+    "overlap_ratio": 0,
+    "needs_human": 5,
+    "usage": {
+      "cost_usd": 59.747453,
+      "tokens": {
+        "input": 9642879,
+        "output": 214644
+      }
+    },
+    "retro_usage": {
+      "cost_usd": 0.769956,
+      "tokens": {
+        "input": 2,
+        "output": 1245
+      }
+    },
+    "retros": 1
+  },
+  "deferred_proposals": [],
+  "deletion_candidates": []
 }
 ```
