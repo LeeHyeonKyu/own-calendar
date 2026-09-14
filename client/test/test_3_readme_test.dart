@@ -188,7 +188,11 @@ void main() {
       }
     }
 
-    // Flutter commands the README publishes must be real flutter subcommands.
+    // Flutter commands the README *publishes* (i.e. inside a fenced code block,
+    // the lines a reader copies and pastes) must be real flutter subcommands.
+    // Prose that merely mentions a flutter subcommand is not a published
+    // command and must not red the unit gate.
+    final fenced = _fencedLines(const LineSplitter().convert(readme)).join('\n');
     const knownFlutterSubcommands = {
       'run',
       'test',
@@ -200,7 +204,7 @@ void main() {
       'doctor',
       'devices',
     };
-    for (final match in RegExp(r'flutter ([a-z]+)').allMatches(readme)) {
+    for (final match in RegExp(r'flutter ([a-z]+)').allMatches(fenced)) {
       expect(
         knownFlutterSubcommands,
         contains(match.group(1)),
@@ -230,6 +234,30 @@ void main() {
           '${pointerLines.length}.',
     );
 
+    // The pointer must lead somewhere a reader can actually get the variable
+    // names from. docs/TECHNICAL.md is prose about the stack and carries no
+    // variable list; the tracked `server/.env.example` is the file that does
+    // ("copy to .env and fill in values"), so `## Run` must name it and the
+    // file must exist. Naming the file is not enumerating the variables, so
+    // the issue's non-goal is untouched.
+    final exampleLines =
+        run.where((line) => line.contains('server/.env.example')).toList();
+    expect(
+      exampleLines,
+      isNotEmpty,
+      reason:
+          '`## Run` tells the reader to create `server/.env` but never names '
+          '`server/.env.example`, the tracked file that lists the variables to '
+          'fill in — a reader following `## Run` cannot start the server.',
+    );
+    expect(
+      File('${_repoRoot().path}/server/.env.example').existsSync(),
+      isTrue,
+      reason:
+          '`## Run` points the reader at `server/.env.example`, but that file '
+          'does not exist in the repository — the pointer has rotted.',
+    );
+
     // ...and the README must NOT enumerate the variables themselves.
     const forbiddenNames = [
       'DATABASE_URL',
@@ -251,11 +279,14 @@ void main() {
     }
     // Generic guard: any SCREAMING_SNAKE_CASE identifier looks like an env var.
     // File names such as `docs/QA_CHECKLIST.md` are not, so a match that is
-    // immediately followed by a file extension does not count.
-    final fileExtension = RegExp(r'^\.[a-z]{1,4}\b');
+    // immediately followed by a file extension does not count — nor does a
+    // markdown link label (`[QA_CHECKLIST](docs/QA_CHECKLIST.md)`), which is a
+    // document pointer rather than a variable. The explicit forbidden list
+    // above still covers real variable names written in either position.
+    final notAVariable = RegExp(r'^(\.[a-z]{1,4}\b|\]\()');
     final envShaped = RegExp(r'\b[A-Z][A-Z0-9]*_[A-Z0-9_]+\b')
         .allMatches(readme)
-        .where((m) => !fileExtension.hasMatch(readme.substring(m.end)))
+        .where((m) => !notAVariable.hasMatch(readme.substring(m.end)))
         .map((m) => m.group(0))
         .toList();
     expect(
@@ -280,49 +311,96 @@ void main() {
           'npm test`).',
     );
 
-    // server/tests/setup.ts runs deleteMany() over every table in a global
-    // beforeEach against whatever DATABASE_URL server/.env points at — which
-    // `## Run` just told the reader to create. The reader must be warned
-    // right next to the command, not in some other section.
-    final dbWords = ['database', 'db', '데이터베이스'];
-    final destructiveWords = [
-      'delete',
-      'deletes',
-      'wipe',
-      'wipes',
-      'truncate',
-      'truncates',
-      'destroy',
-      'destroys',
-      '삭제',
-      '초기화',
-    ];
-    var warningIndex = -1;
+    // server/tests/setup.ts runs deleteMany() over the user/family/calendar/
+    // event/token tables in a global beforeEach against whatever database
+    // server/.env points at — which `## Run` just told the reader to create.
+    //
+    // This is the only assertion in this change that stands between a reader
+    // and irreversible data loss, so it has to be fail-closed: a warning that
+    // merely mentions "db" and "setup" in the same breath must NOT satisfy it.
+    // Each signal below therefore carries meaning that a benign setup sentence
+    // cannot accidentally supply, and the tokens are word-bounded so that
+    // `db:migrate` or `backup-db.sh` do not stand in for "your database".
+    //
+    // The warning must sit next to the command (within 6 lines), not in some
+    // other corner of `## Test`.
+    const proximity = 6;
+    final window = <String>[];
     for (var i = 0; i < testSection.length; i++) {
-      final lower = testSection[i].toLowerCase();
-      final namesDb = dbWords.any((w) => lower.contains(w));
-      final namesDestruction = destructiveWords.any((w) => lower.contains(w));
-      final namesEnv = testSection[i].contains('server/.env');
-      if (namesDb && namesDestruction && namesEnv) {
-        warningIndex = i;
-        break;
-      }
+      if ((i - commandIndex).abs() <= proximity) window.add(testSection[i]);
     }
-    expect(
-      warningIndex,
-      greaterThanOrEqualTo(0),
-      reason:
-          '`## Test` must warn that `cd server && npm test` deletes every row '
-          'in the database `server/.env` points at (server/tests/setup.ts '
-          'truncates all tables in a global beforeEach). No line in `## Test` '
-          'names server/.env, the database and the deletion together.',
+
+    // (a) WHICH database is at risk — the one `server/.env` points at.
+    final dbToken = RegExp(
+      r'(\bdatabases?\b|\bdbs?\b|\bpostgres(ql)?\b|데이터베이스)',
+      caseSensitive: false,
     );
     expect(
-      (warningIndex - commandIndex).abs(),
-      lessThanOrEqualTo(6),
+      window.any(
+        (line) => line.contains('server/.env') && dbToken.hasMatch(line),
+      ),
+      isTrue,
       reason:
-          'The destructive-database warning must sit next to the server test '
-          'command (within 6 lines), not elsewhere in `## Test`.',
+          'The warning next to `cd server && npm test` must say WHICH database '
+          'is at risk — the one `server/.env` points at. No line within '
+          '$proximity lines of the command names `server/.env` together with '
+          'the database.',
+    );
+
+    // (b) WHAT happens — deletion, and of everything, on the same line. A
+    // neutral verb ("초기화한다", "set up") or a bare verb without the scope
+    // does not warn anybody: both halves must be in one sentence.
+    final destructionToken = RegExp(
+      r'(\bdeletes?\b|\bdeleted\b|\bwipes?\b|\btruncates?\b|\bdestroys?\b'
+      r'|\berases?\b|삭제|지운다|지웁니다|날린다)',
+      caseSensitive: false,
+    );
+    final scopeToken = RegExp(
+      r'(every row|all rows|all the rows|all data|모든 행|전체 행|모든 데이터)',
+      caseSensitive: false,
+    );
+    expect(
+      window.any(
+        (line) =>
+            destructionToken.hasMatch(line) && scopeToken.hasMatch(line),
+      ),
+      isTrue,
+      reason:
+          'The warning must say that running the server suite DELETES EVERY '
+          'ROW (server/tests/setup.ts calls deleteMany() on the user, family, '
+          'calendar, event and token tables in a global beforeEach) — one line '
+          'within $proximity lines of the command must carry both the deletion '
+          'and its scope. A sentence that only says the database is "set up" '
+          'or "initialised" warns nobody.',
+    );
+
+    // (c) THAT IT CANNOT BE UNDONE — the property that makes this the one
+    // irreversible consequence of an otherwise revertible docs change.
+    final irreversibleToken = RegExp(
+      r'(irreversible|cannot be (undone|recovered|reverted)'
+      r'|되돌릴 수 없|복구할 수 없|복구되지 않)',
+      caseSensitive: false,
+    );
+    expect(
+      window.any(irreversibleToken.hasMatch),
+      isTrue,
+      reason:
+          'The warning must say the deletion cannot be undone. Without that, a '
+          'reader weighs it as a normal setup step.',
+    );
+
+    // (d) WHAT TO DO INSTEAD — point the suite at a throwaway database, which
+    // is the action dw4 exists to make the reader take before they run it.
+    final throwawayToken = RegExp(
+      r'(throwaway|disposable|scratch|dedicated test|전용 테스트|버려도|일회용)',
+      caseSensitive: false,
+    );
+    expect(
+      window.any(throwawayToken.hasMatch),
+      isTrue,
+      reason:
+          'The warning must tell the reader to point `server/.env` at a '
+          'throwaway/dedicated test database before running the server suite.',
     );
   });
 
