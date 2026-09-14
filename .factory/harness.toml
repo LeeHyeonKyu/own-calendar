@@ -25,11 +25,11 @@ setup = "command -v flutter >/dev/null 2>&1 || { git clone --depth 1 -b stable h
 node  = "22"                     # used by the factory's own Node-based tooling, not by this project's app runtime
 
 [commands]                       # all judged by exit code
-lint       = "cd client && flutter analyze"
+lint       = "cd client && flutter analyze --no-fatal-infos"   # brownfield: pre-existing deprecation infos must not block; errors/warnings still fatal (own-calendar #3, 2026-09-14)
 unit       = "cd client && flutter test"
-test_files = "cd client && flutter test {files}"
-test_one   = "cd client && flutter test {file} --plain-name \"{name}\""
-lint_file  = "cd client && flutter analyze {file}"
+test_files = "scripts/factory-flutter-test.sh {files}"      # paths arrive repo-root-relative; the helper cds into client/ (own-calendar #3)
+test_one   = "scripts/factory-flutter-test.sh {file} --plain-name \"{name}\""
+lint_file  = "cd client && flutter analyze --no-fatal-infos {file}"
 
 [harness]
 # M1, not M0 and not M2 — see report "Maturity decision" for full justification against
