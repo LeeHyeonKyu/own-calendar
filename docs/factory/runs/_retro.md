@@ -14,12 +14,12 @@ _이력 없음_
 | --- | --- | --- |
 | merged | 0 | 0 |
 | review rounds avg | 0 | 0 |
-| needs-human | 1 | 0 |
+| needs-human | 2 | 0 |
 | rejects by role | 없음 | 없음 |
 | reviewer overlap | 없음 | 없음 |
 | unique findings by role | 없음 | 없음 |
-| cost (usd) | 0.22 | 0.00 |
-| tokens | input 36669 / output 588 | input 0 / output 0 |
+| cost (usd) | 4.88 | 0.00 |
+| tokens | input 1113335 / output 19743 | input 0 / output 0 |
 | retro cost (usd) | 0.00 | 0.00 |
 | retro tokens | input 0 / output 0 | input 0 / output 0 |
 | full retros | — | 0 |
@@ -41,8 +41,8 @@ _이력 없음_
     "needs_human": [
       {
         "issue": 3,
-        "reason": "worktree dirty after triage (no-write stage): client/analysis_options.yaml, client/linux/flutter/generated_plugin_registrant.cc, client/linux/flutter/generated_plugins.cmake, client/macos/Flutter/GeneratedPluginRegistrant.swift, client/pubspec.lock, client/windows/flutter/generated_plugin_registrant.cc, client/windows/flutter/generated_plugins.cmake",
-        "at": "2026-09-14T12:25:28Z"
+        "reason": "stage artifact missing or invalid: gates RED: failing=lint,new-test-repeat",
+        "at": "2026-09-14T13:14:09Z"
       }
     ]
   },
@@ -55,12 +55,12 @@ _이력 없음_
     "overlapping_findings": 0,
     "unique_findings_by_role": {},
     "overlap_ratio": 0,
-    "needs_human": 1,
+    "needs_human": 2,
     "usage": {
-      "cost_usd": 0.222993,
+      "cost_usd": 4.883453,
       "tokens": {
-        "input": 36669,
-        "output": 588
+        "input": 1113335,
+        "output": 19743
       }
     }
   }
