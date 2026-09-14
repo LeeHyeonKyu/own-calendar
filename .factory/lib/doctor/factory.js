@@ -1,16 +1,19 @@
 import { join, basename } from "node:path";
 import { mkdtempSync, writeFileSync as writeFixture, rmSync, readdirSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { render as renderTemplate, MOVED_DENIES_ADR_019 } from "../../cli/install.js";
-import { lintWorkflow, lintLoggingHook } from "../yml-lint.js";
+import { isDeepStrictEqual } from "node:util";
+import { render as renderTemplate, mergeSettings, MOVED_DENIES_ADR_019 } from "../../cli/install.js";
+import { lintWorkflow, lintLoggingHook, isFactoryWorkflowFile } from "../yml-lint.js";
 import { lintAgentMd } from "../agent-md.js";
 import { lintSkillMd, ALL_SKILLS } from "../skill-md.js";
-import { L0_CONTEXTS } from "../bootstrap.js";
+import { L0_CONTEXTS, CODEOWNERS_PATH } from "../bootstrap.js";
+import { checkMergeAuthority } from "./merge-authority.js";
 import { GH_FREE_PLAN_PROTECTION_RE } from "../gh.js";
 
 const c = (id, level, detail = "") => ({ id, level, detail });
 
 const WORKFLOWS = ["triage", "plan", "implement", "review", "merge", "sweeper", "integrity"].map((n) => `factory-${n}.yml`);
+const WORKFLOWS_DIR = ".github/workflows";
 
 const HOOK_INPUT = {
   "block-dangerous.sh": { hook_event_name: "PreToolUse", tool_name: "Bash", tool_input: { command: "echo doctor" } },
@@ -31,6 +34,24 @@ const EXPECTED_EXIT = { "verdict-format.sh": 2 };
 // 로깅형 훅은 절대 차단하면 안 되므로 스크립트 마지막 줄이 `exit 0`이어야 한다(ADR-009) — lintLoggingHook로 추가 검사한다.
 const LOGGING_HOOKS = new Set(["record-agents.sh", "lint-touched.sh"]);
 
+/**
+ * merge:"settings" 항목(`.claude/settings.json`)의 "stale"을 바이트 동등이 아니라 `mergeSettings`
+ * 자체로 정의한다(KTB-11). init/upgrade가 이 파일을 `mergeSettings(installed, template)`로 병합하므로
+ * (manifest.js, install.js) — 병합해도 설치된 내용이 그대로면(=템플릿의 deny/allow/훅을 전부 갖고 있으면)
+ * 사용자가 자기 항목을 더 넣었어도 stale이 아니다. 병합 결과가 달라지면(=템플릿 항목이 빠졌으면) stale이다.
+ * 둘 중 하나라도 JSON으로 못 읽으면(사람이 깨뜨린 파일 등) 안전하게 바이트 비교로 되돌아간다.
+ */
+function settingsIsStale(installedText, freshText) {
+  let installed, template;
+  try {
+    installed = JSON.parse(installedText);
+    template = JSON.parse(freshText);
+  } catch {
+    return installedText !== freshText;
+  }
+  return !isDeepStrictEqual(mergeSettings(installed, template), installed);
+}
+
 /** manifest 중 owner === "factory" 항목만 대상(project/script 소유 파일은 CHARTER 등 사람이 편집하므로 비교 대상이 아니다). */
 export function checkFiles({ manifest, root, exists, readFile, render = renderTemplate, vars = {} }) {
   const missing = [];
@@ -40,12 +61,46 @@ export function checkFiles({ manifest, root, exists, readFile, render = renderTe
     const target = join(root, e.dest);
     if (!exists(target)) { missing.push(e.dest); continue; }
     const fresh = render(readFile(e.src), vars);
-    if (readFile(target) !== fresh) stale.push(e.dest);
+    const installed = readFile(target);
+    const isStale = e.merge === "settings" ? settingsIsStale(installed, fresh) : installed !== fresh;
+    if (isStale) stale.push(e.dest);
   }
   return [
     missing.length ? c("files.missing", "FAIL", `missing: ${missing.join(", ")}`) : c("files.missing", "PASS"),
     stale.length ? c("files.stale", "WARN", `run factory init --upgrade — stale: ${stale.join(", ")}`) : c("files.stale", "PASS"),
   ];
+}
+
+// factory init이 디스크에 쓰는 것과 그 파일이 커밋되는 것은 별개다(KTB-12) — 생성물로서 의도적으로
+// gitignore된 경로는 이 검사 대상이 아니다(디스크에 있어도 정상).
+const GITIGNORED_BY_DESIGN = [".factory/out/", ".factory/node_modules/"];
+
+/**
+ * 설치된 manifest 파일이 실제로 git에 추적되는지 검사한다(KTB-12, 결함은 KTB 자신에서 관찰됨:
+ * `.gitignore`가 `.claude/commands/`를 통째로 무시해 `factory init`이 쓴 `.claude/commands/factory-*.md`
+ * 디스패처가 untracked였다 → CI 체크아웃엔 그 파일이 없고 `claude -p /factory-<stage>`가 전부 실패한다).
+ * `git check-ignore --stdin`을 한 번에 배치로 돌려 디스크에 있는 manifest 대상 중 무시되는 것만 골라낸다.
+ * git 저장소가 아니면(예: 격리된 픽스처) 추적 여부를 판단할 수 없으니 PASS-info로 넘어간다 — fail-closed로
+ * FAIL을 내면 git 없는 환경에서 이 검사가 항상 빨갛게 고정된다.
+ */
+export async function checkFilesTracked({ manifest, root, exists, run }) {
+  const paths = manifest
+    .map((e) => e.dest)
+    .filter((dest) => !GITIGNORED_BY_DESIGN.some((p) => dest.startsWith(p)))
+    .filter((dest) => exists(join(root, dest)));
+
+  if (!paths.length) return [c("files.tracked", "PASS")];
+
+  const r = await run("git", ["check-ignore", "--stdin"], { cwd: root, input: paths.join("\n") + "\n" });
+  // check-ignore exits 0(하나 이상 매치)/1(매치 없음)일 때만 정상 응답이다 — 그 외(127 spawn 실패,
+  // 128 "not a git repository" 등)는 git을 신뢰할 수 없다는 뜻이라 "not a git repo"로 뭉뚱그린다.
+  if (r.code !== 0 && r.code !== 1) {
+    return [c("files.tracked", "PASS", "not a git repo")];
+  }
+  const ignored = (r.stdout || "").split("\n").map((s) => s.trim()).filter(Boolean);
+  return [ignored.length
+    ? c("files.tracked", "FAIL", `ignored by .gitignore: ${ignored.join(", ")} — un-ignore in .gitignore (e.g. \`!.claude/commands/factory-*.md\`) — CI checks out only tracked files`)
+    : c("files.tracked", "PASS")];
 }
 
 /** CHARTER.md는 사람이 작성하는 project-owned 파일이라 아직 없거나 draft여도 정상 진행 상태다(WARN) — 파싱/스키마 깨짐만 FAIL. */
@@ -187,13 +242,26 @@ export function checkSkills({ root, exists, readFile, list = readdirSync }) {
  *   deny 전부가 여기 산다. CI 에이전트의 L2는 그대로다.
  * 둘 다 검사한다: 한쪽만 보면 "설치됐다"가 "막힌다"를 뜻하지 않게 된다.
  */
-export function checkSettings({ settings, template, ciSettings, ciTemplate }) {
+export function checkSettings({ settings, template, ciSettings, ciTemplate, ciHarness, ciHarnessTemplate }) {
   const out = [settings ? c("settings.present", "PASS") : c("settings.present", "FAIL", ".claude/settings.json missing")];
   const s = settings || {};
   const wantDeny = template.permissions?.deny || [];
   const haveDeny = new Set(s.permissions?.deny || []);
   const missingDeny = wantDeny.filter((d) => !haveDeny.has(d));
-  out.push(missingDeny.length ? c("settings.deny", "FAIL", `deny list missing: ${missingDeny.join(", ")}`) : c("settings.deny", "PASS"));
+  out.push(missingDeny.length
+    ? c("settings.deny", "FAIL", `deny list missing: ${missingDeny.join(", ")} — run \`npx know-thy-build factory init --upgrade\``)
+    : c("settings.deny", "PASS"));
+
+  // allow도 deny와 같은 무게로 검사한다(KTB-13). `--permission-mode dontAsk`는 allow에 걸리지 않는 도구
+  // 호출을 묻지 않고 **거절**한다 — "묻지 않는다"가 "승인한다"가 아니다(ADR-002/ADR-008의 스파이크 관측은
+  // 지금 CLI에서 더는 성립하지 않는다). 그래서 allow는 편의 목록이 아니라 **에이전트가 가진 도구 목록**이고,
+  // 항목이 빠진 설치본은 builder가 파일을 쓰지 못하는 설치본이다 — WARN이 아니라 FAIL이다.
+  const wantAllow = template.permissions?.allow || [];
+  const haveAllow = new Set(s.permissions?.allow || []);
+  const missingAllow = wantAllow.filter((a) => !haveAllow.has(a));
+  out.push(missingAllow.length
+    ? c("settings.allow", "FAIL", `allow list missing: ${missingAllow.join(", ")} — under \`dontAsk\` an un-allowed tool call is denied; run \`npx know-thy-build factory init --upgrade\``)
+    : c("settings.allow", "PASS"));
 
   // ADR-019 이전에 설치한 저장소는 옮겨간 경로 deny를 아직 들고 있다 — `mergeSettings`가 가산적이라
   // 스스로 사라지지 않는다. WARN인 이유: L2는 (더 좁아진 것이 아니라) 여전히 유효하고, 깨진 것은
@@ -213,6 +281,21 @@ export function checkSettings({ settings, template, ciSettings, ciTemplate }) {
       out.push(missingCi.length
         ? c("settings.ci-deny", "FAIL", `.factory/ci-settings.json deny list missing: ${missingCi.join(", ")}`)
         : c("settings.ci-deny", "PASS"));
+    }
+  }
+
+  // KTB-20: `factory:harness` 이슈의 implement가 `--settings`로 싣는 변형 파일(§5.2.1). 없으면 run-stage가
+  // 그 이슈에서 needs-human으로 멈춘다(조용한 fallback은 승격 없는 승격 PR을 재현한다) — 그래서 FAIL이다.
+  // ci-settings.json과 같은 무게로 deny 목록까지 본다: "설치됐다"가 "막는다"를 뜻해야 한다.
+  if (ciHarnessTemplate) {
+    if (!ciHarness) {
+      out.push(c("settings.ci-harness", "FAIL", `.factory/ci-settings-harness.json missing — a factory:harness issue would stop at needs-human instead of doing the promotion; run \`npx know-thy-build factory init --upgrade\``));
+    } else {
+      const have = new Set(ciHarness.permissions?.deny || []);
+      const missing = (ciHarnessTemplate.permissions?.deny || []).filter((d) => !have.has(d));
+      out.push(missing.length
+        ? c("settings.ci-harness", "FAIL", `.factory/ci-settings-harness.json deny list missing: ${missing.join(", ")}`)
+        : c("settings.ci-harness", "PASS"));
     }
   }
 
@@ -266,22 +349,60 @@ export async function checkHooks({
   return out;
 }
 
-export function checkWorkflows({ root, exists, readFile }) {
-  const missing = WORKFLOWS.filter((w) => !exists(join(root, ".github/workflows", w)));
+/**
+ * **존재 검사는 팩토리의 일곱 파일에만, lint는 `.github/workflows/*.yml` 전부에** 건다(ADR-021 r1 MF-2 d).
+ *
+ * 예전에는 둘 다 그 일곱 이름만 돌았고, 그것이 `merge-token-scope`의 파일 범위 갈래를 무력하게
+ * 만들었다: 목록에 없는 이름(`ci.yml`·`x.yml`·에이전트가 방금 밀어 넣은 아무 파일)은 머지 토큰을
+ * 통째로 env에 실어도 린트가 **쳐다보지도 않았다**. 규칙의 넓이가 목록의 길이였던 셈이다.
+ * 이제 디렉터리를 읽어 실재하는 모든 워크플로를 돈다 — 규칙이 저장소를 따라다닌다.
+ *
+ * 디렉터리를 못 읽으면(`.github/workflows`가 없는 저장소) 일곱 파일의 부재가 이미 FAIL로 보고되므로
+ * lint 쪽은 조용히 빈 목록으로 둔다 — 같은 사실을 두 줄로 말하지 않는다.
+ */
+export function checkWorkflows({ root, exists, readFile, list = readdirSync }) {
+  const dir = join(root, WORKFLOWS_DIR);
+  const missing = WORKFLOWS.filter((w) => !exists(join(dir, w)));
+  let files = [];
+  try {
+    files = list(dir).filter((f) => /\.ya?ml$/.test(f)).sort();
+  } catch {
+    files = WORKFLOWS.filter((w) => exists(join(dir, w)));
+  }
   const violations = [];
-  for (const w of WORKFLOWS) {
-    if (missing.includes(w)) continue;
-    const text = readFile(join(root, ".github/workflows", w));
-    for (const v of lintWorkflow(text)) violations.push(`${w}:${v.line} ${v.rule}`);
+  for (const w of files) {
+    let text;
+    try {
+      text = readFile(join(dir, w));
+    } catch (e) {
+      violations.push(`${w}: unreadable — ${e.message}`);
+      continue;
+    }
+    // 파일명을 함께 넘긴다(ADR-021) — `merge-token-scope`의 파일 범위 갈래는 "이 텍스트가 어느
+    // 워크플로인가"를 알아야만 판정할 수 있다(이름 없는 스니펫에서는 침묵한다).
+    //
+    // KTB-34: 소유권도 여기서 판정해 넘긴다 — "어떤 이름이 팩토리 것인가"는 `factory init`이 무엇을
+    // 설치하는지 아는 이 모듈의 지식이지, 순수 텍스트 린터(`lintWorkflow`)의 지식이 아니다. 소유가
+    // 아니면(예: 입양자의 `build.yml`) 팩토리 템플릿 모양을 가정하는 규칙들은 침묵하고,
+    // `merge-token-scope`(ADR-021)만 어느 파일에서든 그대로 판정한다.
+    const factoryOwned = isFactoryWorkflowFile(w);
+    for (const v of lintWorkflow(text, { file: w, factoryOwned })) violations.push(`${w}:${v.line} ${v.rule}`);
   }
   return [
     missing.length ? c("workflows.present", "FAIL", `missing: ${missing.join(", ")}`) : c("workflows.present", "PASS"),
-    violations.length ? c("workflows.lint", "FAIL", violations.join("; ")) : c("workflows.lint", "PASS"),
+    violations.length ? c("workflows.lint", "FAIL", violations.join("; ")) : c("workflows.lint", "PASS", `linted ${files.length} file(s) in ${WORKFLOWS_DIR}`),
   ];
 }
 
 /** gh 호출이 하나라도 throw하면(오프라인 등) 세부 검사를 포기하고 단일 WARN으로 떨어진다 — fail closed가 아니라 "확인 못 함"으로 취급(오프라인 허용). */
-export async function checkGitHub({ gh, harness, labels }) {
+export async function checkGitHub({ gh, harness, labels, env = process.env, root = null, exists = null, readFile = null }) {
+  // ADR-021 r1 MF-1 — CODEOWNERS는 **저장소의 파일**이지 API 상태가 아니다. gh가 하나라도 실패해
+  // 아래 catch로 떨어지면 이 값은 쓰이지 않는다 — 읽기 자체는 부수효과가 없으므로 먼저 읽어 둔다.
+  let codeowners = null;
+  if (root && exists && readFile) {
+    const p = join(root, CODEOWNERS_PATH);
+    if (exists(p)) { try { codeowners = readFile(p); } catch { codeowners = null; } }
+  }
   try {
     const secrets = await gh.listSecrets();
     const hasClaude = secrets.includes("CLAUDE_CODE_OAUTH_TOKEN") || secrets.includes("ANTHROPIC_API_KEY");
@@ -296,10 +417,12 @@ export async function checkGitHub({ gh, harness, labels }) {
     // reported — falling through to `github.unavailable` would throw away all of them over one 403.
     let protection = null;
     let protectionCheck;
+    let protectionUnavailable = false;
     try {
       protection = await gh.getBranchProtection(branch);
     } catch (e) {
       if (!GH_FREE_PLAN_PROTECTION_RE.test(e.message)) throw e;
+      protectionUnavailable = true;
       protectionCheck = c("github.protection", "WARN", "branch protection unavailable on this plan (private repo on GitHub Free) — L0 off; make the repo public or upgrade");
     }
     const contexts = new Set(protection?.required_status_checks?.contexts || []);
@@ -322,6 +445,7 @@ export async function checkGitHub({ gh, harness, labels }) {
       missingLabels.length ? c("github.labels", "WARN", `run factory bootstrap — missing labels: ${missingLabels.join(", ")}`) : c("github.labels", "PASS"),
       protectionCheck,
       c("github.required-checks", "PASS", `enforced by L1 at merge: ${l1.length ? l1.join(", ") : "(none configured)"}`),
+      ...(await checkMergeAuthority({ gh, secrets, branch, protection, protectionUnavailable, env, codeowners })),
     ];
   } catch (e) {
     return [c("github.unavailable", "WARN", `gh unavailable — ${e.message}`)];

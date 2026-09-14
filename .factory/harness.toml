@@ -43,6 +43,9 @@ maturity = "M1"
 [factory]
 orchestration   = "workflow"
 required_checks = ["factory/gates", "factory/review", "factory/integrity"]
+# KTB 1.0 (ADR-020 O25): harness-tier plans that dispatch a Workflow ran out of the default 12 turns
+# before the result arrived. This monorepo's plans are harness-heavy, so start higher.
+max_turns       = 24
 
 [commands.proof]
 # Not filled: [gates.required]/[gates.fast|full|deep] below only reference "lint"/"unit", so no
@@ -95,7 +98,9 @@ ready_timeout_sec = 90
 # files [commands] and the release pipeline resolve through are actually covered — the generic
 # defaults (package.json, tsconfig*.json, ...) match nothing in this repo (no root manifest), so
 # keeping only the generic list would protect nothing real. See report "[protected] decision".
-factory       = [".factory/**", ".claude/**", ".github/workflows/factory-*.yml", "docs/factory/CHARTER.md",
+# KTB 1.0 (ADR-021): all of .github/** is factory-protected — workflows, CODEOWNERS, actions — so an
+# agent PR touching CI is human-merge only (this also covers .github/workflows/build.yml below).
+factory       = [".factory/**", ".claude/**", ".github/**", "docs/factory/CHARTER.md",
                  "package.json", "package-lock.json", "vitest.config.*", "playwright.config.*",
                  "tsconfig*.json", ".eslintrc*", "eslint.config.*",
                  "client/pubspec.yaml", "client/pubspec.lock", "client/analysis_options.yaml",

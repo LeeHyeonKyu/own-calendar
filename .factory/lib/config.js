@@ -9,8 +9,21 @@ export function loadHarness(root) {
   h.gates ??= {}; h.gates.thresholds = { ...THRESHOLD_DEFAULTS, ...(h.gates.thresholds || {}) };
   h.test = { test_glob: [], source_glob: [], unit_report: ".factory/out/unit.json", ...(h.test || {}) };
   h.commands ??= {}; h.commands.proof = { ...(h.commands.proof || {}) };
-  h.factory = { orchestration: "workflow", required_checks: ["factory/gates", "factory/review", "factory/integrity"], ...(h.factory || {}) };
+  // max_turns(KTB-16): `claude -p --max-turns`. 기본 12 — 5는 백그라운드 Workflow 디스패처의
+  // 최소 턴 수(호출·접수증·완료 알림·출력 + output 파일 읽기 조각)를 감당하지 못했다.
+  // merge_check_wait_sec(KTB-19): ready로 뒤집은 뒤 필수 체크가 queued/pending/in_progress에서
+  // 벗어날 때까지 기다리는 상한(초). 15초 간격으로 폴링한다(merge-stage.js MERGE_CHECK_POLL_INTERVAL_MS).
+  h.factory = { orchestration: "workflow", required_checks: ["factory/gates", "factory/review", "factory/integrity"], max_turns: 12, merge_check_wait_sec: 600, ...(h.factory || {}) };
   return h;
+}
+/**
+ * `loadHarness`가 채우는 기본값(특히 `[factory].max_turns: 12`) 없이, harness.toml을 있는 그대로
+ * 파싱한다. doctor의 "키가 아예 없다"는 판정(`init --upgrade` 안내)은 정규화된 객체로는 절대
+ * 성립하지 않는다 — `loadHarness`가 항상 먼저 12를 채워 넣기 때문이다. 그 판정만을 위한 두 번째
+ * 파스.
+ */
+export function loadHarnessRaw(root) {
+  return parseToml(readFileSync(join(root, ".factory/harness.toml"), "utf8"));
 }
 export function loadRoles(root) {
   return parseToml(readFileSync(join(root, ".factory/roles.toml"), "utf8"));

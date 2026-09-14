@@ -44,9 +44,12 @@ import {
 } from "../lib/retro/quarantine-ops.js";
 import { applyRoleAdditions as applyRoleAdditionsText } from "../lib/retro/role-additions.js";
 import { nextN, parseRetroState, renderRetroState, shouldRunFull } from "../lib/retro/state.js";
+import { stageMaxTurns } from "./run-stage.js";
+import { hitApiError, apiErrorReason } from "../lib/verify-stage.js";
+import { HARNESS_LABEL } from "../lib/label-catalog.js";
+export { HARNESS_LABEL };   // 재수출 — run-stage.js와 이 값이 같은 소스에서 왔다는 것을 테스트가 import equality로 확인한다
 
 const QUEUE_LABEL = "factory:queue";
-const HARNESS_LABEL = "factory:harness";
 const FLAKY_LABEL = "factory:flaky";
 const PROPOSAL_LABEL = "factory:retro-proposal";
 const MIN_EVIDENCE = 2;                                               // lesson·예시·관점의 최소 근거 run(§8.4)
@@ -473,9 +476,14 @@ export async function runRetro({ deps, force = false, now } = {}) {
     if (envelope && !envelope.is_error) {
       try { transcriptText = (await d.transcript?.(envelope)) || ""; } catch { transcriptText = ""; }
     }
+    // KTB-22: claude -p 자신의 API 쿼터/장애(429/5xx/스로틀)는 회차가 통째로 죽었다는 사실은 같지만
+    // 사유는 달라야 한다 — "claude -p reported is_error"는 사람에게 아무것도 말해주지 않지만
+    // 프로바이더 메시지 원문은 그대로 읽을 수 있다. `run-stage.js`(KTB-16)와 달리 여기서는 트랜스크립트
+    // 복구를 시도하지 않는다 — retro의 실패는 이미 무해하다(라벨을 옮기지 않고, `merges_since`를
+    // 리셋하지 않아 다음 머지가 다시 시도한다, 커서도 그대로다): 복구해서 얻는 것이 없다.
     const ex = envelope && !envelope.is_error
       ? extractStageArtifact({ envelopeResult: envelope.result, transcriptText, validate: (o) => validate("retro.v1", o) })
-      : { ok: false, reason: envelope ? "claude -p reported is_error" : (called.error || "claude -p failed") };
+      : { ok: false, reason: envelope ? (hitApiError(envelope) ? apiErrorReason(envelope) : "claude -p reported is_error") : (called.error || "claude -p failed") };
     const out = ex.ok ? ex.data : null;
     const v = { ok: ex.ok, errors: ex.ok ? [] : [ex.reason] };
     // 호출이 실패했어도 토큰은 이미 쓰였다 — 비용은 성공한 회차만의 것이 아니다(F10). `retroUsage`는
@@ -730,6 +738,19 @@ export async function collectIssues({ gh, since }) {
  * 유일한 출처이므로, 여기서 두 키를 같은 항목에 매달아 둔다. 모르는 역할은 파일을 만들지 않는다
  * (retro는 역할을 신설하지 않는다 — 신설은 사람이 머지하는 제안 PR의 몫이다).
  */
+/**
+ * retro의 `claude -p` 인자(KTB-15b item 2). 예전에는 `--max-turns 5`가 박혀 있었다 — run-stage.js가
+ * 이미 KTB-16으로 고친 것과 같은 문제(짧은 하드코딩이 백그라운드 워크플로/자격 확인 왕복 턴을
+ * 감당 못 한다)를 retro도 그대로 앓을 수 있어, 같은 `stageMaxTurns(harness, "retro")` 규칙 —
+ * `[factory].max_turns` 공통값, `[factory].max_turns_by_stage.retro`가 있으면 그것이 이긴다,
+ * 둘 다 없으면 기본 12 — 를 그대로 재사용한다. 순수 함수라 하네스만 바꿔가며 테스트할 수 있다.
+ */
+export function retroClaudeArgs({ harness, charter, ciSettingsPath }) {
+  const args = ["-p", "/factory-retro", "--permission-mode", "dontAsk", "--max-turns", String(stageMaxTurns(harness, "retro")), "--output-format", "json", "--settings", ciSettingsPath];
+  if (charter?.budget?.usd_per_stage) args.push("--max-budget-usd", String(charter.budget.usd_per_stage));
+  return args;
+}
+
 export function roleFileMap(roles) {
   const map = new Map();
   const add = (name, def) => {
@@ -821,8 +842,7 @@ async function main() {
     claudeP: async ({ period, candidates, stats, history, maturity_gaps }) => {
       mkdirSync(outDir, { recursive: true });
       writeFileSync(join(outDir, "retro-candidates.json"), `${JSON.stringify({ period, candidates, stats, history, maturity_gaps }, null, 2)}\n`);
-      const args = ["-p", "/factory-retro", "--permission-mode", "dontAsk", "--max-turns", "5", "--output-format", "json", "--settings", join(root, ".factory/ci-settings.json")];
-      if (charter?.budget?.usd_per_stage) args.push("--max-budget-usd", String(charter.budget.usd_per_stage));
+      const args = retroClaudeArgs({ harness, charter, ciSettingsPath: join(root, ".factory/ci-settings.json") });
       const r = await run("claude", args, { cwd: root, env: { CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS: "0", CLAUDE_PROJECT_DIR: root } });
       writeFileSync(join(outDir, "retro.json"), r.stdout);
       try { return JSON.parse(r.stdout); } catch { return { is_error: true, result: r.stdout + r.stderr }; }
