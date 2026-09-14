@@ -622,4 +622,107 @@ void main() {
           'of ${migrateScripts.map((s) => '`npm run $s`').join(' / ')}.',
     );
   });
+
+  test('test_3_readme_server_test_warning_precedes_command', () {
+    final testSection = _sectionLines(_sections(_readme()), 'Test');
+
+    // dw4 is about ORDER, not distance: "Before a reader can act on the server
+    // test command, `## Test` warns them...". A reader acts on the fenced
+    // block — they scroll to the first runnable block for the server and copy
+    // it — so the warning has to be ABOVE the opening fence of that block. A
+    // warning placed underneath it is read after the rows are already gone.
+    //
+    // This is deliberately a different contract from the proximity check in
+    // test_3_readme_server_test_warns_destructive: that one asks "is the
+    // warning next to the command", this one asks "does the reader meet it
+    // first". Both are needed — adjacency is symmetric and cannot see order.
+    var fenceOpenIndex = -1;
+    var openFenceAt = -1;
+    var inFence = false;
+    for (var i = 0; i < testSection.length; i++) {
+      final line = testSection[i];
+      if (line.trimLeft().startsWith('```')) {
+        inFence = !inFence;
+        openFenceAt = inFence ? i : -1;
+        continue;
+      }
+      if (inFence && line.contains('cd server') && line.contains('npm test')) {
+        fenceOpenIndex = openFenceAt;
+        break;
+      }
+    }
+    expect(
+      fenceOpenIndex,
+      greaterThanOrEqualTo(0),
+      reason:
+          '`## Test` must publish `cd server && npm test` inside a fenced code '
+          'block (the thing a reader copies). Section lines: $testSection',
+    );
+
+    // Everything a top-down reader has already passed when they reach that
+    // block. The warning must live in here.
+    final before = testSection.sublist(0, fenceOpenIndex);
+
+    void expectWarningBefore(
+      bool Function(String line) signal,
+      String what,
+    ) {
+      expect(
+        before.any(signal),
+        isTrue,
+        reason:
+            'dw4: before the fenced `cd server && npm test` block (section '
+            'line $fenceOpenIndex), `## Test` must already have told the '
+            'reader $what. Nothing above the block does. Lines above it: '
+            '$before',
+      );
+    }
+
+    // (a) WHICH database is at risk — the one `server/.env` points at.
+    final dbToken = RegExp(
+      r'(\bdatabases?\b|\bdbs?\b|\bpostgres(ql)?\b|데이터베이스)',
+      caseSensitive: false,
+    );
+    expectWarningBefore(
+      (line) => line.contains('server/.env') && dbToken.hasMatch(line),
+      'which database is at risk — the one `server/.env` points at',
+    );
+
+    // (b) WHAT happens — deletion, of everything, in one sentence.
+    final destructionToken = RegExp(
+      r'(\bdeletes?\b|\bdeleted\b|\bwipes?\b|\btruncates?\b|\bdestroys?\b'
+      r'|\berases?\b|삭제|지운다|지웁니다|날린다)',
+      caseSensitive: false,
+    );
+    final scopeToken = RegExp(
+      r'(every row|all rows|all the rows|all data|모든 행|전체 행|모든 데이터)',
+      caseSensitive: false,
+    );
+    expectWarningBefore(
+      (line) => destructionToken.hasMatch(line) && scopeToken.hasMatch(line),
+      'that the suite DELETES EVERY ROW of it '
+      '(server/tests/setup.ts deleteMany() in a global beforeEach)',
+    );
+
+    // (c) THAT IT CANNOT BE UNDONE.
+    final irreversibleToken = RegExp(
+      r'(irreversible|cannot be (undone|recovered|reverted)'
+      r'|되돌릴 수 없|복구할 수 없|복구되지 않)',
+      caseSensitive: false,
+    );
+    expectWarningBefore(
+      irreversibleToken.hasMatch,
+      'that the deletion cannot be undone',
+    );
+
+    // (d) WHAT TO DO INSTEAD — point `server/.env` at a throwaway database.
+    final throwawayToken = RegExp(
+      r'(throwaway|disposable|scratch|dedicated test|전용 테스트|버려도|일회용)',
+      caseSensitive: false,
+    );
+    expectWarningBefore(
+      throwawayToken.hasMatch,
+      'to point `server/.env` at a throwaway/dedicated test database first',
+    );
+  });
 }
