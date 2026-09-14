@@ -14,16 +14,17 @@
 
 | metric | this window | cumulative |
 | --- | --- | --- |
-| merged | 1 | 1 |
-| review rounds avg | 4 | 4 |
-| needs-human | 5 | 5 |
-| rejects by role | correctness 2, architecture 1, spec-conformance 1 | correctness 2, architecture 1, spec-conformance 1 |
-| reviewer overlap | 0.00 (0/6, runs 4) | 0.00 (0/6, runs 4) |
-| unique findings by role | correctness 4, architecture 1, spec-conformance 1 | correctness 4, architecture 1, spec-conformance 1 |
-| cost (usd) | 59.75 | 59.75 |
-| tokens | input 9642879 / output 214644 | input 9642879 / output 214644 |
-| retro cost (usd) | 0.77 | 0.77 |
-| retro tokens | input 2 / output 1245 | input 2 / output 1245 |
+| merged | 0 | 1 |
+| review rounds avg | 0 | 4 |
+| needs-human | 0 | 5 |
+| rejects by role | 없음 | correctness 2, architecture 1, spec-conformance 1 |
+| reviewer overlap | 없음 | 0.00 (0/6, runs 4) |
+| unique findings by role | 없음 | correctness 4, architecture 1, spec-conformance 1 |
+| qa na ratio | 없음 | 없음 |
+| cost (usd) | 0.18 | 59.75 |
+| tokens | input 37218 / output 669 | input 9642879 / output 214644 |
+| retro cost (usd) | 0.00 | 0.77 |
+| retro tokens | input 0 / output 0 | input 2 / output 1245 |
 | full retros | — | 1 |
 
 <!-- factory-retro-state:v1 -->
@@ -113,35 +114,25 @@
     ]
   },
   "stats": {
-    "merged": 1,
-    "review_rounds_avg": 4,
-    "rejects_by_role": {
-      "correctness": 2,
-      "architecture": 1,
-      "spec-conformance": 1
-    },
-    "review_runs": 4,
-    "findings_total": 6,
+    "merged": 0,
+    "review_rounds_avg": 0,
+    "rejects_by_role": {},
+    "review_runs": 0,
+    "findings_total": 0,
     "overlapping_findings": 0,
-    "unique_findings_by_role": {
-      "correctness": 4,
-      "architecture": 1,
-      "spec-conformance": 1
-    },
+    "unique_findings_by_role": {},
     "overlap_ratio": 0,
-    "needs_human": 5,
+    "needs_human": 0,
+    "qa_approvals": 0,
+    "qa_claims_total": 0,
+    "qa_na_total": 0,
+    "qa_na_ratio": 0,
+    "qa_na_heavy_approvals": 0,
     "usage": {
-      "cost_usd": 59.747453,
+      "cost_usd": 0.177376,
       "tokens": {
-        "input": 9642879,
-        "output": 214644
-      }
-    },
-    "retro_usage": {
-      "cost_usd": 0.769956,
-      "tokens": {
-        "input": 2,
-        "output": 1245
+        "input": 37218,
+        "output": 669
       }
     }
   },
