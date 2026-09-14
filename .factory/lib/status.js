@@ -1,0 +1,190 @@
+import { STATES } from "./labels.js";
+
+/**
+ * §13.3 `:status`의 계산 절반(읽기 전용 데이터 합성). GitHub 호출·파일 읽기는 전부 `cli/status.js`가
+ * 하고, 이 파일은 이미 읽어온 값들을 조합해 사람이 볼 화면을 만들 뿐이다 — 그래서 순수 함수다:
+ * 테스트가 gh/git 없이 buildStatus/renderStatus를 직접 검증할 수 있다.
+ */
+
+const NEEDS_HUMAN = "factory:needs-human";
+const NEEDS_INFO = "factory:needs-info";
+const IN_PROGRESS = "factory:in-progress";
+const BLOCKED = "factory:blocked";
+const MERGED = "factory:merged";
+const AWAITING_REVIEW = "factory:awaiting-review";
+const REWORK = "factory:rework";
+
+// "진행 중"으로 보여줄 상태들 — 지금 어떤 스테이지가 돌고 있거나(in-progress·awaiting-review 동안
+// review가 돈다·rework는 implement 재진입 직전) 자동 회수가 시도되는 중(blocked)인 상태 전부.
+// blocked는 fix round 1(Critical #2)까지는 조회만 되고 화면 어디에도 안 떴다 — sweeper가 회수를
+// 시도하는 중이라도 사람이 지금 뭘 기다리는지는 봐야 한다(다만 Needs You는 아니다 — 아직 사람 차례가
+// 아니다. sweeper가 못 살리면 needs-human으로 에스컬레이션되고 그때 Needs You에 뜬다).
+const LIVE_STATES = [IN_PROGRESS, BLOCKED, AWAITING_REVIEW, REWORK];
+// "대기 중" — 아직 어떤 스테이지도 시작 안 한 상태.
+const QUEUE_STATES = ["factory:queue", "factory:ready", "factory:planned", "factory:approved"];
+
+const labelOf = (issue) => (issue.labels || []).find((l) => STATES.has(l)) || null;
+
+function minutesBetween(fromIso, toIso) {
+  const a = Date.parse(fromIso), b = Date.parse(toIso);
+  if (Number.isNaN(a) || Number.isNaN(b)) return null;
+  return Math.round((b - a) / 60000);
+}
+
+// heartbeat이 없을 때만 쓰는 fallback — 라벨 자체가 "지금 어느 스테이지를 기다리는지"를 말해주는
+// 두 상태(awaiting-review → review가 돈다, rework → implement가 재진입한다)에만 적용된다.
+// in-progress·blocked는 라벨만으로 어느 스테이지였는지 알 수 없다(in-progress는 claim 시점에 라벨이
+// 이미 바뀌어 있고, blocked는 임의의 게이트 스테이지에서 올 수 있다) — heartbeat이 없으면 null.
+function labelFallbackStage(state) {
+  if (state === AWAITING_REVIEW) return "review";
+  if (state === REWORK) return "implement";
+  return null;
+}
+
+export function buildStatus({
+  issues = [], prs = {}, heartbeats = new Map(), quarantine = { quarantined: [] },
+  thresholds = {}, charter = {}, usage = null, overlap = null, now, staleMinutes = 30,
+} = {}) {
+  const needsYou = [];
+  for (const i of issues) {
+    if (labelOf(i) === NEEDS_HUMAN) needsYou.push({ kind: "needs-human", number: i.number, title: i.title, hint: `:unstick ${i.number}` });
+  }
+  for (const i of issues) {
+    if (labelOf(i) === NEEDS_INFO) needsYou.push({ kind: "needs-info", number: i.number, title: i.title, hint: `:clarify ${i.number}` });
+  }
+  /**
+   * ADR-020 KTB-30 — factory 라벨은 달고 있는데 **상태 라벨이 하나도 없는** 열린 이슈. 라벨 스왑이
+   * 중간에 실패한 흔적이고(데모 #2 08:52Z·#15 08:55Z), 그 이슈는 상태별 조회 어디에도 안 걸려
+   * 이 화면에서 통째로 사라졌다 — 사람이 "아무 일도 안 일어나는 이슈"를 볼 창구가 필요하다.
+   * sweeper가 대개 먼저 되살리므로 힌트는 사람이 할 일이 아니라 그 사실을 가리킨다.
+   */
+  /**
+   * r2 SF6 — **sweeper 8번 팔과 같은 집합을 본다.** 예전에는 `factory:*` 라벨이 남아 있는 이슈만
+   * 셌는데, 그 팔은 라벨이 **하나도** 없는 이슈도 전이 이력으로 잡는다(`sweeper.js`) — triage가 tier
+   * 라벨을 붙이기 전에 상태 라벨을 잃은 이슈가 정확히 그 모양이다(#2). 사람이 보는 창구가 복구 팔보다
+   * 좁으면, 팔이 고치지 못한 바로 그 이슈가 화면에서도 사라진다. `factoryTransition`은 CLI가 코멘트를
+   * 읽어 세워 주는 플래그다(순수 함수인 이 파일은 gh를 만지지 않는다).
+   */
+  for (const i of issues) {
+    if (labelOf(i) !== null) continue;
+    if (!(i.labels || []).some((l) => String(l).startsWith("factory:")) && i.factoryTransition !== true) continue;
+    needsYou.push({ kind: "no-state-label", number: i.number, title: i.title, hint: "sweeper → label restore" });
+  }
+  for (const p of prs.retroProposal || []) {
+    needsYou.push({ kind: "retro-proposal", number: p.number, title: p.title, hint: `:proposal ${p.number}` });
+  }
+  for (const p of prs.harness || []) {
+    needsYou.push({ kind: "harness", number: p.number, title: p.title, hint: `:harness ${p.number}` });
+  }
+
+  const inProgress = [];
+  for (const state of LIVE_STATES) {
+    for (const i of issues) {
+      if (labelOf(i) !== state) continue;
+      const hb = heartbeats.get(i.number) || null;
+      const age_min = hb?.last != null ? minutesBetween(hb.last, now) : null;
+      const stage = hb?.stage ?? labelFallbackStage(state);
+      inProgress.push({
+        number: i.number,
+        title: i.title,
+        state,
+        stage,
+        age_min,
+        stale: age_min != null && age_min >= staleMinutes,
+        hint: state === BLOCKED ? "sweeper → needs-human" : null,
+      });
+    }
+  }
+
+  const queue = [];
+  for (const state of QUEUE_STATES) {
+    for (const i of issues) {
+      if (labelOf(i) === state) queue.push({ number: i.number, title: i.title, state });
+    }
+  }
+
+  const recent = issues
+    .filter((i) => labelOf(i) === MERGED)
+    .slice()
+    .sort((a, b) => Date.parse(b.closedAt || 0) - Date.parse(a.closedAt || 0))
+    .slice(0, 10)
+    .map((i) => ({ number: i.number, title: i.title, mergedAt: i.closedAt }));
+
+  const backPressure = {
+    awaiting_review: issues.filter((i) => labelOf(i) === AWAITING_REVIEW).length,
+    max: charter?.back_pressure?.awaiting_review_max,
+    quarantined: (quarantine.quarantined || []).length,
+    quarantine_max: thresholds.quarantine_max,
+  };
+
+  return { needsYou, queue, inProgress, recent, backPressure, usage, overlap };
+}
+
+/**
+ * 외부 감사 2026-09-14 P2-13 — 리뷰어 겹침 한 줄. 이 화면은 "지금 무엇을 기다리는가"를 보여주지만,
+ * 리뷰어 5명을 계속 띄울지 말지는 **겹침**이 답한다: 겹침이 1에 가까우면 다섯이 같은 것을 다섯 번
+ * 찾고 있다는 뜻이고, 0에 가까우면 각 렌즈가 자기만 보는 것을 들고 온다는 뜻이다. 분모가 0인 창은
+ * 비율을 만들지 않는다 — "겹치지 않았다"와 "판정할 finding이 없었다"는 다른 사실이다.
+ */
+export function overlapLine(o) {
+  if (!o || !Number.isFinite(Number(o.findings_total))) return "- review overlap (30d): (no data)";
+  const total = Number(o.findings_total) || 0;
+  if (total === 0) return `- review overlap (30d): no findings in ${Number(o.review_runs) || 0} review run(s)`;
+  const uniq = Object.entries(o.unique_findings_by_role || {});
+  const uniqText = uniq.length ? uniq.map(([r, n]) => `${r} ${n}`).join(", ") : "none";
+  return `- review overlap (30d): ${Number(o.overlap_ratio ?? 0).toFixed(2)} (${Number(o.overlapping_findings) || 0}/${total} findings raised by ≥2 roles, ${Number(o.review_runs) || 0} review run(s)) · unique: ${uniqText}`;
+}
+
+/** §13 `:status`와 같은 섹션 순서: Needs You → 진행 중 → 큐 → 역압 → 최근 머지 → 사용량. */
+export function renderStatus(s) {
+  const lines = [];
+
+  lines.push("## Needs You");
+  if (s.needsYou.length === 0) lines.push("(none)");
+  else for (const n of s.needsYou) lines.push(`- [${n.kind}] #${n.number} ${n.title} — ${n.hint}`);
+  lines.push("");
+
+  lines.push("## 진행 중");
+  if (s.inProgress.length === 0) lines.push("(none)");
+  else for (const p of s.inProgress) {
+    const stage = p.stage ?? "?";
+    const suffix = [p.stale ? "STALE" : null, p.hint].filter(Boolean).join(" · ");
+    lines.push(`- #${p.number} ${p.title} · ${p.state} · ${stage} · ${p.age_min ?? "?"}m${suffix ? " · " + suffix : ""}`);
+  }
+  lines.push("");
+
+  lines.push("## 큐");
+  if (s.queue.length === 0) lines.push("(none)");
+  else for (const q of s.queue) lines.push(`- #${q.number} ${q.title} · ${q.state}`);
+  lines.push("");
+
+  lines.push("## 역압");
+  lines.push(`- awaiting-review: ${s.backPressure.awaiting_review}/${s.backPressure.max}`);
+  lines.push(`- quarantined: ${s.backPressure.quarantined}/${s.backPressure.quarantine_max}`);
+  lines.push("");
+
+  lines.push("## 최근 머지");
+  if (s.recent.length === 0) lines.push("(none)");
+  else for (const r of s.recent) lines.push(`- #${r.number} ${r.title} · ${r.mergedAt}`);
+  lines.push(overlapLine(s.overlap));
+  lines.push("");
+
+  lines.push("## 사용량");
+  if (s.usage) {
+    if (s.usage.perIssue.length === 0) lines.push("(none)");
+    else for (const p of s.usage.perIssue.slice(0, 10)) {
+      lines.push(`- #${p.issue} $${p.cost_usd} · ${p.runs} runs · ${p.tokens.input} input(+cache) / ${p.tokens.output} output tokens`);
+    }
+    lines.push(`- window (since ${s.usage.window.since}): $${s.usage.window.cost_usd} / ${s.usage.window.runs} runs`);
+    lines.push(`- total: $${s.usage.total.cost_usd} / ${s.usage.total.runs} runs`);
+  } else {
+    lines.push("(no data)");
+  }
+
+  // ADR-022 Task B — 이 보고서는 **한 시점**이다. 스테이지가 8–35분을 도는 동안 무엇이 일어나는지는
+  // 여기 없다(하트비트의 age_min 한 숫자뿐이다). 보드가 그 자리를 채운다는 사실을 사람이 알 수 있는
+  // 곳은 사람이 이미 보고 있는 이 화면이다 — 그래서 마지막 한 줄로 남긴다.
+  lines.push("", "board: npx know-thy-build factory board");
+
+  return lines.join("\n");
+}

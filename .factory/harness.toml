@@ -1,0 +1,145 @@
+schema = 1
+
+# know-thy-build factory harness — brownfield adopt draft for own-calendar (Plan 6 Task 6 prep).
+# This repo is a Flutter (client/) + Node/TypeScript (server/) monorepo with NO root package.json —
+# the template's Node-monorepo assumptions ([runtime].setup = "npm ci", commands = npm scripts) do
+# not apply as-is. See docs/factory/CHARTER.md and the adoption report for full rationale.
+# Sections marked (protected) can only change through a human-merged PR (the merge stage refuses to auto-merge one).
+
+[project]
+name           = "own-calendar"
+spec_dir       = "docs/features"
+runs_dir       = "docs/factory/runs"
+default_branch = "main"
+
+[runtime]
+# No root package.json/pubspec — client and server are independent manifests under subdirs.
+# `setup` fetches the Flutter client's deps because [commands] below currently gates the client
+# only (see report: "server gate gap"). The factory's setup action provides Node only, so the
+# Flutter SDK is installed here as a one-liner (stable channel, shallow clone, ~1–2 min) and put on
+# $GITHUB_PATH so every later step of the same job (gates, review, merge) sees `flutter`. On a
+# developer machine with Flutter already on PATH the clone is skipped. The app's own build.yml uses
+# subosito/flutter-action; the factory keeps one shell line (ADR-020 ⑥ "installs must be one shell
+# line") — first live failure: PR #1 integrity, exit 127 `flutter: command not found` (2026-09-14).
+setup = "command -v flutter >/dev/null 2>&1 || { git clone --depth 1 -b stable https://github.com/flutter/flutter.git \"$HOME/flutter\" && [ -n \"$GITHUB_PATH\" ] && echo \"$HOME/flutter/bin\" >> \"$GITHUB_PATH\"; export PATH=\"$HOME/flutter/bin:$PATH\"; }; flutter --version && cd client && flutter pub get"
+node  = "22"                     # used by the factory's own Node-based tooling, not by this project's app runtime
+
+[commands]                       # all judged by exit code
+lint       = "cd client && flutter analyze"
+unit       = "cd client && flutter test"
+test_files = "cd client && flutter test {files}"
+test_one   = "cd client && flutter test {file} --plain-name \"{name}\""
+lint_file  = "cd client && flutter analyze {file}"
+
+[harness]
+# M1, not M0 and not M2 — see report "Maturity decision" for full justification against
+# factory/lib/retro/maturity.js's signals:
+#   - prisma/schema.prisma + server/prisma/migrations/** (11 migrations) => DB schema signal => >= M1.
+#   - server/src/routes/** + express dependency (server/package.json) => HTTP surface signal => >= M2.
+# We deliberately do NOT jump to M2: [commands] above does not exercise the server/HTTP surface at
+# all (no CI-runnable Postgres test env exists yet — server/docker-compose.yml is a production
+# Tailscale-coupled compose, not a portable CI service). Claiming M2 would overstate real gate
+# coverage. M1 honestly reflects "DB-backed project, HTTP surface not yet gated" and leaves the
+# http-at-m1 gap for retro to flag on first run (expected, not a bug) once the server is in scope.
+maturity = "M1"
+
+[factory]
+orchestration   = "workflow"
+required_checks = ["factory/gates", "factory/review", "factory/integrity"]
+# KTB 1.0 (ADR-020 O25): harness-tier plans that dispatch a Workflow ran out of the default 12 turns
+# before the result arrived. This monorepo's plans are harness-heavy, so start higher.
+max_turns       = 24
+
+[commands.proof]
+# Not filled: [gates.required]/[gates.fast|full|deep] below only reference "lint"/"unit", so no
+# proof gate (coverage/mutation) is active — nothing here is required by doctor's proof.commands
+# check yet. Fill this only alongside actually adding a coverage/mutation gate, not just because
+# maturity >= M1.
+# coverage        = "cd client && flutter test --coverage"
+# coverage_report = "client/coverage/lcov.info"
+
+[gates]
+required = ["lint", "unit"]
+fast     = ["lint", "unit"]
+full       = ["lint", "unit", "prove-test", "new-test-repeat"]   # audit H2: full adds the proof gates
+deep       = ["lint", "unit", "prove-test", "new-test-repeat"]
+
+[gates.thresholds]               # (protected) — kept at template defaults, not narrowed for brownfield
+diff_coverage_pct       = 90
+mutation_score_pct      = 70
+new_test_repeats        = 3
+flaky_isolation_runs    = 3
+flaky_base_runs         = 5
+quarantine_max          = 5
+quarantine_ttl_days     = 28
+quarantine_return_after = 30
+
+[test]
+guide       = "docs/QA.md"
+naming      = "test_{issue}_{slug}"
+smoke       = { unit = "client/test/widget_test.dart" }
+runtime_budget_min = 12
+test_glob   = ["client/test/**/*_test.dart"]
+source_glob = ["client/lib/**/*.dart"]
+unit_report = ".factory/out/unit.json"
+
+[test.env]
+# Intentionally empty: no CI-portable DB/e2e harness exists yet (see [harness].maturity note).
+# server/docker-compose.yml provisions Tailscale + Postgres + nginx for self-hosting, not a
+# throwaway CI test DB — do not point `compose` at it without first extracting a
+# docker-compose.test.yml that drops the tailscale/network_mode:service:tailscale coupling.
+ready_timeout_sec = 90
+
+[test.fakes]
+# Empty on purpose (owned by /qa SETUP per the file header comment). Expect retro's
+# detectMaturityGaps to raise a non-promoting "sdk-without-fake" finding for `googleapis`
+# (server/package.json dependency, in the known-SDK list) on first run — that is expected,
+# not a defect; fill a fake here when /qa SETUP covers the Google Calendar sync path.
+
+[protected]                      # (protected)
+runner_only = ["docs/factory/runs/**"]   # audit batch-2: run records are runner-written evidence, sealed for agents
+# Template defaults kept (not narrowed) + repo-specific build-config/deploy files ADDED so the
+# files [commands] and the release pipeline resolve through are actually covered — the generic
+# defaults (package.json, tsconfig*.json, ...) match nothing in this repo (no root manifest), so
+# keeping only the generic list would protect nothing real. See report "[protected] decision".
+# KTB 1.0 (ADR-021): all of .github/** is factory-protected — workflows, CODEOWNERS, actions — so an
+# agent PR touching CI is human-merge only (this also covers .github/workflows/build.yml below).
+factory       = [".factory/**", ".claude/**", ".github/**", "docs/factory/CHARTER.md",
+                 "package.json", "package-lock.json", "vitest.config.*", "playwright.config.*",
+                 "tsconfig*.json", ".eslintrc*", "eslint.config.*",
+                 "client/pubspec.yaml", "client/pubspec.lock", "client/analysis_options.yaml",
+                 "server/package.json", "server/package-lock.json", "server/tsconfig.json",
+                 "server/vitest.config.ts", "server/prisma/schema.prisma",
+                 "altstore/**", ".github/workflows/build.yml",
+                 "server/docker-compose.yml", "server/Dockerfile", "server/nginx.conf",
+                 "scripts/deploy.sh"]
+except        = [".factory/lessons/**", "docs/factory/runs/**", ".factory/out/qa/**"]
+additive_only = { ".claude/agents/*.md" = ["## Examples", "## Perspectives"] }
+tests_are_load_bearing = true
+
+[load_bearing]
+# Irreversible/hard-to-roll-back paths: auth, external sync, calendar-write, schema, deploy.
+paths = [
+  "server/prisma/schema.prisma",
+  "server/prisma/migrations/**",
+  "server/src/routes/auth.ts",
+  "server/src/middleware/auth.ts",
+  "server/src/services/auth.service.ts",
+  "server/src/services/google-sync.service.ts",
+  "server/src/services/naver-sync.service.ts",
+  "server/src/services/ics-import.service.ts",
+  "server/src/routes/events.ts",
+  "server/src/services/event.service.ts",
+  "server/src/routes/family.ts",
+  "server/src/services/family.service.ts",
+  "server/src/routes/groups.ts",
+  "server/src/routes/follows.ts",
+  "server/src/routes/invites.ts",
+  "client/lib/services/api_service.dart",
+  "client/lib/providers/auth_provider.dart",
+  "scripts/deploy.sh",
+  "scripts/migrate-to-cloud.sh",
+]
+
+[evidence]
+qa_artifacts = ".factory/out/qa/**"

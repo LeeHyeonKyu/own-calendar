@@ -14,3 +14,12 @@ qa-*.png
 client/ios/Podfile.lock
 client/macos/Podfile
 client/macos/Podfile.lock
+
+# know-thy-build factory
+.factory/out/
+.factory/node_modules/
+.factory/package-lock.json
+docs/factory/runs/
+test-results/
+coverage/
+.nyc_output/
