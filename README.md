@@ -24,17 +24,24 @@ Prerequisite: 서버는 직접 만들어야 하는 `server/.env` 설정 파일�
 
 DB 접속 문자열은 `server/docker-compose.yml`이 컨테이너에 주입하므로 `server/.env.example`에는 없다 — 도커 없이 `npm run dev`로 띄우려면 같은 값을 직접 `server/.env`에 넣어야 한다.
 
-Client (Flutter):
-
-```bash
-cd client && flutter pub get && flutter run
-```
-
 Server (Node.js + TypeScript, PostgreSQL 필요):
 
 ```bash
-cd server && npm ci && npm run dev
+cd server && npm ci && npm run db:generate && npm run db:migrate && npm run dev
 ```
+
+`npm run db:generate`는 `server/src`가 import하는 Prisma 클라이언트를 만들고, `npm run db:migrate`는
+`server/prisma/migrations/`의 스키마를 빈 DB에 적용한다. 둘 중 하나라도 건너뛰면 서버 프로세스는 뜨지만
+첫 요청부터 "테이블이 없다"로 실패한다.
+
+Client (Flutter) — 위에서 띄운 로컬 서버를 보게 하려면 `config/dev.json`을 넘긴다:
+
+```bash
+cd client && flutter pub get && flutter run --dart-define-from-file=config/dev.json
+```
+
+이 플래그를 빼면 클라이언트는 코드에 박힌 기본값, 즉 **운영 서버**에 붙는다 — 방금 띄운 로컬 서버는 놀고
+가입·일정 추가가 실제 가족 데이터에 쓰인다. 운영 서버를 향하게 하려면 `config/prod.json`을 명시해서 쓴다.
 
 배포는 직접 하지 말고 `scripts/deploy.sh` 파이프라인을 쓴다 (`CLAUDE.md` 참고).
 
@@ -56,6 +63,10 @@ cd server && npm test
 `server/tests/setup.ts`가 전역 `beforeEach`에서 사용자·가족·캘린더·일정·토큰 테이블을 비운다.
 실행 중인 PostgreSQL이 필요하며, 반드시 버려도 되는 전용 테스트 DB를 가리키게 한 뒤에 실행한다 —
 실제 캘린더 데이터가 들어 있는 곳을 가리킨 채로 실행하면 되돌릴 수 없다.
+
+그 전용 테스트 DB도 빈 상태로는 스위트를 돌릴 수 없다 — `server/.env`를 테스트 DB로 맞춘 뒤
+`cd server && npm run db:generate && npm run db:migrate`을 한 번 실행해 스키마를 만들고 나서
+`npm test`를 돌린다.
 
 ## Docs
 
