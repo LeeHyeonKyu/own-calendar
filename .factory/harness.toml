@@ -61,8 +61,8 @@ max_turns       = 24
 [gates]
 required = ["lint", "unit"]
 fast     = ["lint", "unit"]
-full     = ["lint", "unit"]
-deep     = ["lint", "unit"]
+full       = ["lint", "unit", "prove-test", "new-test-repeat"]   # audit H2: full adds the proof gates
+deep       = ["lint", "unit", "prove-test", "new-test-repeat"]
 
 [gates.thresholds]               # (protected) — kept at template defaults, not narrowed for brownfield
 diff_coverage_pct       = 90
@@ -97,6 +97,7 @@ ready_timeout_sec = 90
 # not a defect; fill a fake here when /qa SETUP covers the Google Calendar sync path.
 
 [protected]                      # (protected)
+runner_only = ["docs/factory/runs/**"]   # audit batch-2: run records are runner-written evidence, sealed for agents
 # Template defaults kept (not narrowed) + repo-specific build-config/deploy files ADDED so the
 # files [commands] and the release pipeline resolve through are actually covered — the generic
 # defaults (package.json, tsconfig*.json, ...) match nothing in this repo (no root manifest), so
