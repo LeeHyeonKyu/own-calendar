@@ -109,6 +109,14 @@ Set<String> _serverScripts() {
   return scripts.keys.toSet();
 }
 
+/// The `scripts` map declared by server/package.json, name -> command line.
+Map<String, String> _serverScriptCommands() {
+  final file = File('${_repoRoot().path}/server/package.json');
+  final json = jsonDecode(file.readAsStringSync()) as Map<String, dynamic>;
+  final scripts = json['scripts'] as Map<String, dynamic>? ?? <String, dynamic>{};
+  return scripts.map((key, value) => MapEntry(key, '$value'));
+}
+
 void main() {
   test('test_3_readme_sections', () {
     final sections = _sections(_readme());
@@ -436,5 +444,182 @@ void main() {
     expectCommand(runCommands, 'Run', ['cd server', 'npm ci']);
     expectCommand(testCommands, 'Test', ['cd client', 'flutter test']);
     expectCommand(testCommands, 'Test', ['cd server', 'npm test']);
+  });
+
+  test('test_3_readme_client_run_targets_local_server', () {
+    final run = _sectionLines(_sections(_readme()), 'Run');
+    final runCommands = _fencedLines(run);
+
+    final clientRun = runCommands.firstWhere(
+      (line) => line.contains('flutter run'),
+      orElse: () => fail(
+        '`## Run` must publish a `flutter run` command inside a fenced code '
+        'block. Fenced lines found: $runCommands',
+      ),
+    );
+
+    // The client compiles its backend address in at build time
+    // (client/lib/services/api_service.dart reads it from the environment and
+    // falls back to the deployed server), so a bare `flutter run` talks to the
+    // deployed API — NOT to the server `## Run` tells the reader to start three
+    // lines below. The repository's mechanism for choosing is
+    // `--dart-define-from-file=<config>`; the README must publish it.
+    final defineFromFile =
+        RegExp(r'--dart-define-from-file=([^\s&|]+)').firstMatch(clientRun);
+    expect(
+      defineFromFile,
+      isNotNull,
+      reason:
+          '`## Run` publishes `$clientRun`, which builds the client against '
+          'its compiled-in default backend — the deployed server — while the '
+          'local server the very next command starts sits idle. The published '
+          'client command must select a build config with '
+          '`--dart-define-from-file=<config>`.',
+    );
+
+    // The config it names must exist, resolved the way the reader resolves it:
+    // relative to the `cd client` the same line performs.
+    final configPath = defineFromFile!.group(1)!;
+    final configFile = File('${_repoRoot().path}/client/$configPath');
+    expect(
+      configFile.existsSync(),
+      isTrue,
+      reason:
+          '`## Run` runs the client with `--dart-define-from-file=$configPath`, '
+          'but ${configFile.path} does not exist — the reader\'s first command '
+          'fails outright.',
+    );
+
+    // ...and it must point the client at the local server, not at a remote
+    // one. Anything non-loopback here means following `## Run` writes to
+    // somebody else's database. The port is deliberately not pinned: the
+    // config and the server both default to the same one today, and pinning it
+    // would red the client's unit gate for a legitimate server-side change.
+    final defines =
+        jsonDecode(configFile.readAsStringSync()) as Map<String, dynamic>;
+    final urls = defines.values
+        .whereType<String>()
+        .where((value) => value.contains('://'))
+        .toList();
+    expect(
+      urls,
+      isNotEmpty,
+      reason:
+          'client/$configPath defines no backend URL, so `## Run`\'s client '
+          'command does not actually redirect the client anywhere.',
+    );
+    const loopbackHosts = {'localhost', '127.0.0.1', '0.0.0.0', '::1', '[::1]'};
+    for (final url in urls) {
+      final host = Uri.parse(url).host;
+      expect(
+        loopbackHosts,
+        contains(host),
+        reason:
+            '`## Run` tells the reader to run the client with '
+            '`--dart-define-from-file=$configPath`, but that config points the '
+            'client at `$host` instead of the local server `## Run` just told '
+            'them to start. Following the README would send their registration '
+            'and calendar writes to a remote database.',
+      );
+    }
+  });
+
+  test('test_3_readme_server_run_bootstraps_schema', () {
+    final sections = _sections(_readme());
+    final runCommands = _fencedLines(_sectionLines(sections, 'Run'));
+
+    final serverRun = runCommands.firstWhere(
+      (line) => line.contains('cd server') && line.contains('npm run dev'),
+      orElse: () => fail(
+        '`## Run` must publish a `cd server && … npm run dev` command inside a '
+        'fenced code block. Fenced lines found: $runCommands',
+      ),
+    );
+
+    // On a fresh clone the database is empty and the Prisma client is not
+    // generated (server/.gitignore ignores the generated output), so starting
+    // the server without those two steps yields a process that listens and
+    // then fails every request with "table does not exist". Which scripts do
+    // them is read out of server/package.json rather than hard-coded here, so
+    // renaming a script reds this guard instead of silently rotting the README.
+    final scriptCommands = _serverScriptCommands();
+    List<String> scriptsMatching(RegExp pattern) => scriptCommands.entries
+        .where((entry) => pattern.hasMatch(entry.value))
+        .map((entry) => entry.key)
+        .toList();
+
+    final migrateScripts = scriptsMatching(RegExp(r'prisma\s+migrate'));
+    final generateScripts = scriptsMatching(RegExp(r'prisma\s+generate'));
+    expect(
+      migrateScripts,
+      isNotEmpty,
+      reason:
+          'server/package.json declares no script running `prisma migrate`, so '
+          'this guard cannot check the README against it — the schema '
+          'bootstrap moved and the README must be revisited.',
+    );
+    expect(
+      generateScripts,
+      isNotEmpty,
+      reason:
+          'server/package.json declares no script running `prisma generate`, '
+          'so this guard cannot check the README against it — the client '
+          'generation step moved and the README must be revisited.',
+    );
+
+    int indexOfAnyScript(String line, List<String> scripts) {
+      var found = -1;
+      for (final script in scripts) {
+        final at = line.indexOf('npm run $script');
+        if (at >= 0 && (found < 0 || at < found)) found = at;
+      }
+      return found;
+    }
+
+    final migrateAt = indexOfAnyScript(serverRun, migrateScripts);
+    expect(
+      migrateAt,
+      greaterThanOrEqualTo(0),
+      reason:
+          '`## Run` publishes `$serverRun`, which never applies the migrations '
+          'in server/prisma/migrations — the server starts against a schema-'
+          'less database and every request fails. Name one of '
+          '${migrateScripts.map((s) => '`npm run $s`').join(' / ')}.',
+    );
+    final generateAt = indexOfAnyScript(serverRun, generateScripts);
+    expect(
+      generateAt,
+      greaterThanOrEqualTo(0),
+      reason:
+          '`## Run` publishes `$serverRun`, which never generates the Prisma '
+          'client that server/src imports. Name one of '
+          '${generateScripts.map((s) => '`npm run $s`').join(' / ')}.',
+    );
+
+    final devAt = serverRun.indexOf('npm run dev');
+    expect(
+      migrateAt < devAt && generateAt < devAt,
+      isTrue,
+      reason:
+          'The schema bootstrap must run BEFORE `npm run dev` in '
+          '`$serverRun` — a migration started after the server is watching '
+          'does not help the requests it is already failing.',
+    );
+
+    // The server suite is in the same boat: server/tests/setup.ts truncates
+    // tables that only exist once the migrations have been applied, so `##
+    // Test` must name the bootstrap too rather than leaving the reader to
+    // discover it from a Prisma error code.
+    final testSection = _sectionLines(sections, 'Test').join('\n');
+    expect(
+      migrateScripts.any((s) => testSection.contains('npm run $s')),
+      isTrue,
+      reason:
+          '`## Test` publishes the server suite but never tells the reader to '
+          'apply the migrations to the throwaway database first; '
+          'server/tests/setup.ts deletes rows from tables that do not exist '
+          'yet, so the suite fails before it can run a single test. Name one '
+          'of ${migrateScripts.map((s) => '`npm run $s`').join(' / ')}.',
+    );
   });
 }
