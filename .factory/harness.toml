@@ -14,11 +14,14 @@ default_branch = "main"
 
 [runtime]
 # No root package.json/pubspec — client and server are independent manifests under subdirs.
-# `setup` only fetches the Flutter client's deps because [commands] below currently gates the
-# client only (see report: "server gate gap"). `flutter pub get` requires a Flutter SDK on PATH,
-# which the factory's setup action does NOT provide today (it hardcodes actions/setup-node@v4
-# only) — this is the "Flutter-on-runner" gap documented in the adoption report, not fixed here.
-setup = "cd client && flutter pub get"
+# `setup` fetches the Flutter client's deps because [commands] below currently gates the client
+# only (see report: "server gate gap"). The factory's setup action provides Node only, so the
+# Flutter SDK is installed here as a one-liner (stable channel, shallow clone, ~1–2 min) and put on
+# $GITHUB_PATH so every later step of the same job (gates, review, merge) sees `flutter`. On a
+# developer machine with Flutter already on PATH the clone is skipped. The app's own build.yml uses
+# subosito/flutter-action; the factory keeps one shell line (ADR-020 ⑥ "installs must be one shell
+# line") — first live failure: PR #1 integrity, exit 127 `flutter: command not found` (2026-09-14).
+setup = "command -v flutter >/dev/null 2>&1 || { git clone --depth 1 -b stable https://github.com/flutter/flutter.git \"$HOME/flutter\" && [ -n \"$GITHUB_PATH\" ] && echo \"$HOME/flutter/bin\" >> \"$GITHUB_PATH\"; export PATH=\"$HOME/flutter/bin:$PATH\"; }; flutter --version && cd client && flutter pub get"
 node  = "22"                     # used by the factory's own Node-based tooling, not by this project's app runtime
 
 [commands]                       # all judged by exit code
