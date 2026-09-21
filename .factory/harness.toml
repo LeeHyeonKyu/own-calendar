@@ -49,6 +49,7 @@ required_checks = ["factory/gates", "factory/review", "factory/integrity"]
 # KTB 1.0 (ADR-020 O25): harness-tier plans that dispatch a Workflow ran out of the default 12 turns
 # before the result arrived. This monorepo's plans are harness-heavy, so start higher.
 max_turns       = 24
+upstream = "LeeHyeonKyu/know_thy_build"
 
 [commands.proof]
 # Not filled: [gates.required]/[gates.fast|full|deep] below only reference "lint"/"unit", so no
