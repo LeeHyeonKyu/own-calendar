@@ -74,7 +74,7 @@ quarantine_return_after = 30
 [test]
 guide       = "docs/QA.md"
 naming      = "test_{issue}_{slug}"
-smoke       = { unit = "client/test/widget_test.dart" }
+smoke       = { unit = "client/test/widget_test.dart", integration = "server/tests/test_9_integration_smoke.test.ts" }
 runtime_budget_min = 12
 test_glob   = ["client/test/**/*_test.dart"]
 source_glob = ["client/lib/**/*.dart"]
