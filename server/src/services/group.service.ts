@@ -3,7 +3,7 @@ import prisma from '../lib/prisma';
 
 export const groupService = {
   async create(userId: string, name: string, type: string = '가족') {
-    const code = crypto.randomBytes(8).toString('base64url');
+    const code = crypto.randomBytes(8).toString('base64url').slice(0, 8);
 
     const group = await prisma.group.create({
       data: {
@@ -19,7 +19,7 @@ export const groupService = {
         },
         calendar: {
           create: {
-            name: `${name} 공유 캘린더`,
+            name: `${name} ${type} 캘린더`,
             type: 'FAMILY',
             ownerId: userId,
           },
