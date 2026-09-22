@@ -19,7 +19,7 @@ export const groupService = {
         },
         calendar: {
           create: {
-            name: type === '가족' ? `${name} 가족 캘린더` : `${name} 공유 캘린더`,
+            name: `${name} ${type} 캘린더`,
             type: 'FAMILY',
             ownerId: userId,
           },
