@@ -19,13 +19,13 @@
 | rounds/issue (plan/impl/review) | 0 / 0 / 0 | 0 / 0 / 4 |
 | escaped defects | 0 | 0 |
 | revert rate | 없음 | 0.00 (0/1) |
-| needs-human | 0 | 5 |
+| needs-human | 2 | 5 |
 | rejects by role | 없음 | correctness 2, architecture 1, spec-conformance 1 |
 | reviewer overlap | 없음 | 0.00 (0/6, runs 4) |
 | unique findings by role | 없음 | correctness 4, architecture 1, spec-conformance 1 |
 | qa na ratio | 없음 | 없음 |
-| cost (usd) | 0.18 | 59.75 |
-| tokens | input 37218 / output 669 | input 9642879 / output 214644 |
+| cost (usd) | 17.52 | 59.75 |
+| tokens | input 842210 / output 12171 | input 9642879 / output 214644 |
 | retro cost (usd) | 0.00 | 0.77 |
 | retro tokens | input 0 / output 0 | input 2 / output 1245 |
 | full retros | — | 1 |
@@ -121,6 +121,11 @@
         "issue": 3,
         "reason": "review verification failed — review round 4 > K=3",
         "at": "2026-09-14T16:31:40Z"
+      },
+      {
+        "issue": 9,
+        "reason": "stage artifact missing or invalid: gates RED: failing=prove-test",
+        "at": "2026-09-22T07:17:03Z"
       }
     ]
   },
@@ -141,17 +146,17 @@
     "overlapping_findings": 0,
     "unique_findings_by_role": {},
     "overlap_ratio": 0,
-    "needs_human": 0,
+    "needs_human": 2,
     "qa_approvals": 0,
     "qa_claims_total": 0,
     "qa_na_total": 0,
     "qa_na_ratio": 0,
     "qa_na_heavy_approvals": 0,
     "usage": {
-      "cost_usd": 0.177376,
+      "cost_usd": 17.518626,
       "tokens": {
-        "input": 37218,
-        "output": 669
+        "input": 842210,
+        "output": 12171
       }
     }
   },
