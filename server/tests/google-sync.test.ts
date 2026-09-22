@@ -42,7 +42,9 @@ describe('Google Sync API', () => {
       const res = await request(app).get('/api/google/callback');
 
       expect(res.status).toBe(400);
-      expect(res.body.error).toBe('Missing code or state');
+      // The callback is where the user's BROWSER lands after Google consent — the contract is an HTML page, not JSON.
+      expect(res.headers['content-type']).toMatch(/text\/html/);
+      expect(res.text).toContain('인증 정보가 누락되었습니다');
     });
 
     it('returns 400 without state', async () => {
@@ -51,7 +53,8 @@ describe('Google Sync API', () => {
         .query({ code: 'test-code' });
 
       expect(res.status).toBe(400);
-      expect(res.body.error).toBe('Missing code or state');
+      expect(res.headers['content-type']).toMatch(/text\/html/);
+      expect(res.text).toContain('인증 정보가 누락되었습니다');
     });
   });
 });
