@@ -11,7 +11,7 @@ cd "$(dirname "$0")/../server"
 # node_modules does not rely on npx downloading packages on the fly.
 npm ci --ignore-scripts
 
-export DATABASE_URL="postgresql://postgres:test@127.0.0.1:5433/own_calendar_test?schema=public"
+export DATABASE_URL="postgresql://postgres:testpass@127.0.0.1:5433/own_calendar_test?schema=public"
 export JWT_SECRET="factory-test-secret"
 export NODE_ENV="test"
 # Dummy Google OAuth credentials so the /api/google/auth endpoint returns a URL

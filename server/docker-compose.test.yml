@@ -7,7 +7,7 @@ services:
     image: postgres:15
     environment:
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: test
+      POSTGRES_PASSWORD: testpass
       POSTGRES_DB: own_calendar_test
     ports:
       - "127.0.0.1:5433:5432"
