@@ -11,8 +11,10 @@ beforeEach(async () => {
   await prisma.externalCalendarConnection.deleteMany();
   await prisma.refreshToken.deleteMany();
   await prisma.familyMembership.deleteMany();
+  await prisma.groupMembership.deleteMany();
   await prisma.calendar.deleteMany();
   await prisma.familyGroup.deleteMany();
+  await prisma.group.deleteMany();
   await prisma.user.deleteMany();
 });
 

@@ -14,8 +14,8 @@ default_branch = "main"
 
 [runtime]
 # No root package.json/pubspec — client and server are independent manifests under subdirs.
-# `setup` fetches the Flutter client's deps because [commands] below currently gates the client
-# only (see report: "server gate gap"). The factory's setup action provides Node only, so the
+# `setup` fetches the Flutter client's deps. Server deps are installed by
+# scripts/factory-server-test.sh (npm ci) before prisma/vitest (#9 dw5). The factory's setup action provides Node only, so the
 # Flutter SDK is installed here as a one-liner (stable channel, shallow clone, ~1–2 min) and put on
 # $GITHUB_PATH so every later step of the same job (gates, review, merge) sees `flutter`. On a
 # developer machine with Flutter already on PATH the clone is skipped. The app's own build.yml uses
@@ -27,21 +27,17 @@ node  = "22"                     # used by the factory's own Node-based tooling,
 [commands]                       # all judged by exit code
 lint       = "cd client && flutter analyze --no-fatal-infos"   # brownfield: pre-existing deprecation infos must not block; errors/warnings still fatal (own-calendar #3, 2026-09-14)
 unit       = "cd client && flutter test"
+integration = "scripts/factory-server-test.sh"               # server integration suite via vitest + test-compose Postgres (M2 promotion, #9)
 test_files = "scripts/factory-flutter-test.sh {files}"      # paths arrive repo-root-relative; the helper cds into client/ (own-calendar #3)
 test_one   = "scripts/factory-flutter-test.sh {file} --plain-name {name}"   # the factory quotes {name} itself (template: "do not add quotes here") — the extra \"…\" made flutter look for a name with literal quotes (rehearsal 1.3.0)
 lint_file  = "scripts/factory-flutter-analyze.sh {file}"                 # repo-root-relative path; the helper cds into client/ and strips the prefix (rehearsal 1.3.0: client/client/lib/…)
 
 [harness]
-# M1, not M0 and not M2 — see report "Maturity decision" for full justification against
-# factory/lib/retro/maturity.js's signals:
-#   - prisma/schema.prisma + server/prisma/migrations/** (11 migrations) => DB schema signal => >= M1.
-#   - server/src/routes/** + express dependency (server/package.json) => HTTP surface signal => >= M2.
-# We deliberately do NOT jump to M2: [commands] above does not exercise the server/HTTP surface at
-# all (no CI-runnable Postgres test env exists yet — server/docker-compose.yml is a production
-# Tailscale-coupled compose, not a portable CI service). Claiming M2 would overstate real gate
-# coverage. M1 honestly reflects "DB-backed project, HTTP surface not yet gated" and leaves the
-# http-at-m1 gap for retro to flag on first run (expected, not a bug) once the server is in scope.
-maturity = "M1"
+# M2 — promoted from M1 (#9): [commands].integration now exercises the server/HTTP surface
+# via vitest + supertest against a throwaway Postgres (server/docker-compose.test.yml).
+# Previous M1 justification: DB schema signal (prisma) + HTTP surface signal (express routes)
+# existed, but no CI-runnable Postgres test env was available. That gap is closed.
+maturity = "M2"
 
 [factory]
 orchestration   = "workflow"
@@ -62,8 +58,8 @@ upstream = "LeeHyeonKyu/know_thy_build"
 [gates]
 required = ["lint", "unit"]
 fast     = ["lint", "unit"]
-full       = ["lint", "unit", "prove-test", "new-test-repeat"]   # audit H2: full adds the proof gates
-deep       = ["lint", "unit", "prove-test", "new-test-repeat"]
+full       = ["lint", "unit", "integration", "prove-test", "new-test-repeat"]   # audit H2: full adds the proof gates; M2 adds integration (#9)
+deep       = ["lint", "unit", "integration", "prove-test", "new-test-repeat"]
 
 [gates.thresholds]               # (protected) — kept at template defaults, not narrowed for brownfield
 diff_coverage_pct       = 90
@@ -85,10 +81,9 @@ source_glob = ["client/lib/**/*.dart"]
 unit_report = ".factory/out/unit.json"
 
 [test.env]
-# Intentionally empty: no CI-portable DB/e2e harness exists yet (see [harness].maturity note).
-# server/docker-compose.yml provisions Tailscale + Postgres + nginx for self-hosting, not a
-# throwaway CI test DB — do not point `compose` at it without first extracting a
-# docker-compose.test.yml that drops the tailscale/network_mode:service:tailscale coupling.
+# CI-portable throwaway Postgres for server integration tests (M2 promotion, #9).
+# server/docker-compose.yml is production-coupled (Tailscale) — never point compose at it.
+compose           = "server/docker-compose.test.yml"
 ready_timeout_sec = 90
 
 [test.fakes]
