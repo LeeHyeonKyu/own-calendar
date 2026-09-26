@@ -19,13 +19,13 @@
 | rounds/issue (plan/impl/review) | 0 / 0 / 0 | 0 / 0 / 4 |
 | escaped defects | 0 | 0 |
 | revert rate | 없음 | 0.00 (0/1) |
-| needs-human | 5 | 5 |
+| needs-human | 9 | 5 |
 | rejects by role | 없음 | correctness 2, architecture 1, spec-conformance 1 |
 | reviewer overlap | 없음 | 0.00 (0/6, runs 4) |
 | unique findings by role | 없음 | correctness 4, architecture 1, spec-conformance 1 |
 | qa na ratio | 없음 | 없음 |
-| cost (usd) | 31.11 | 59.75 |
-| tokens | input 2059109 / output 26878 | input 9642879 / output 214644 |
+| cost (usd) | 58.63 | 59.75 |
+| tokens | input 4269445 / output 48928 | input 9642879 / output 214644 |
 | retro cost (usd) | 0.00 | 0.77 |
 | retro tokens | input 0 / output 0 | input 2 / output 1245 |
 | full retros | — | 1 |
@@ -112,6 +112,14 @@
           3
         ],
         "source": "must_fix"
+      },
+      {
+        "role": "spec-conformance",
+        "text": "File outside handoffs.plan.files_expected was added with no in-diff Scope change justification.",
+        "runs": [
+          9
+        ],
+        "source": "must_fix"
       }
     ],
     "examples": [],
@@ -131,6 +139,21 @@
         "issue": 21,
         "reason": "stage artifact missing or invalid: gates RED: failing=prove-test",
         "at": "2026-09-22T07:59:40Z"
+      },
+      {
+        "issue": 30,
+        "reason": "stalled restart limit (2) reached",
+        "at": "2026-09-26T18:33:04Z"
+      },
+      {
+        "issue": 29,
+        "reason": "verifier rejected",
+        "at": "2026-09-26T17:33:31Z"
+      },
+      {
+        "issue": 28,
+        "reason": "verifier rejected",
+        "at": "2026-09-26T17:08:32Z"
       }
     ]
   },
@@ -151,17 +174,17 @@
     "overlapping_findings": 0,
     "unique_findings_by_role": {},
     "overlap_ratio": 0,
-    "needs_human": 5,
+    "needs_human": 9,
     "qa_approvals": 0,
     "qa_claims_total": 0,
     "qa_na_total": 0,
     "qa_na_ratio": 0,
     "qa_na_heavy_approvals": 0,
     "usage": {
-      "cost_usd": 31.111403,
+      "cost_usd": 58.629401,
       "tokens": {
-        "input": 2059109,
-        "output": 26878
+        "input": 4269445,
+        "output": 48928
       }
     }
   },
