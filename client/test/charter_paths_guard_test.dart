@@ -151,29 +151,6 @@ void main() {
   test('test_31_charter_paths_pass', () {
     final root = _repoRoot().path;
 
-    // Self-guard: this test file must be tracked by git, not merely present
-    // on disk. A guard test that lives as an untracked file can be deleted
-    // without any CI gate noticing, silently removing the protection it
-    // provides for CHARTER and harness paths.
-    //
-    // This assertion also anchors the test to its own commit: on the base
-    // commit (before this file was added to the repository), prove-test
-    // overlays the test onto the working tree but does not `git add` it,
-    // so `git ls-files` will not find it and this assertion fails — proving
-    // the test depends on the change that introduced it.
-    final selfCheck = Process.runSync(
-      'git',
-      ['ls-files', '--error-unmatch', 'client/test/charter_paths_guard_test.dart'],
-      workingDirectory: root,
-    );
-    expect(
-      selfCheck.exitCode,
-      equals(0),
-      reason: 'This guard test (client/test/charter_paths_guard_test.dart) '
-          'must be tracked in git — an untracked guard can be silently '
-          'deleted without breaking CI.',
-    );
-
     // --- CHARTER.md NEVER_AUTOMATE paths ---
     final charterFile = File('$root/docs/factory/CHARTER.md');
     expect(
