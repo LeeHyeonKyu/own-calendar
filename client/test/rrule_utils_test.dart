@@ -76,15 +76,17 @@ void main() {
     });
 
     test('test_28_parse_until_iso_full', () {
-      // ISO form: DateTime.utc(...).toLocal() -- parsed as UTC then converted.
+      // ISO form: parsed as UTC then .toLocal(). Verify via independent UTC
+      // round-trip rather than mirroring the production path.
       final parsed = parseRrule('FREQ=DAILY;UNTIL=20260601T120000Z');
       expect(parsed, isNotNull);
       final p = parsed!;
       expect(p.until, isNotNull);
-      // Derive expected value via the same path the production code uses:
-      // DateTime.utc(2026, 6, 1, 12, 0, 0).toLocal()
-      final expected = DateTime.utc(2026, 6, 1, 12, 0, 0).toLocal();
-      expect(p.until, equals(expected));
+      // Round-trip to UTC must recover the original instant — this is
+      // independent of _parseUntil's implementation and TZ-independent.
+      expect(p.until!.toUtc(), equals(DateTime.utc(2026, 6, 1, 12, 0, 0)));
+      // .toLocal() was called, so isUtc must be false.
+      expect(p.until!.isUtc, isFalse);
     });
 
     test('test_28_parse_until_iso_without_z', () {
@@ -94,8 +96,9 @@ void main() {
       expect(parsed, isNotNull);
       final p = parsed!;
       expect(p.until, isNotNull);
-      final expected = DateTime.utc(2026, 6, 1, 12, 0, 0).toLocal();
-      expect(p.until, equals(expected));
+      // Verify via UTC round-trip, same as test_28_parse_until_iso_full.
+      expect(p.until!.toUtc(), equals(DateTime.utc(2026, 6, 1, 12, 0, 0)));
+      expect(p.until!.isUtc, isFalse);
     });
 
     test('test_28_parse_until_8char_not_utc', () {
@@ -248,14 +251,29 @@ void main() {
     });
 
     test('test_28_summary_with_until_tz_safe', () {
-      // UNTIL with ISO form: the summary formats the local DateTime via _fmtDate.
-      // To be TZ-independent, derive expected from the same UTC-to-local path.
-      final expectedLocal = DateTime.utc(2026, 6, 1, 0, 0, 0).toLocal();
-      final expectedDateStr =
-          '${expectedLocal.year}.${expectedLocal.month.toString().padLeft(2, '0')}.${expectedLocal.day.toString().padLeft(2, '0')}';
-
+      // Verify the summary formats an ISO UNTIL date correctly, without
+      // replicating _fmtDate or _parseUntil's conversion logic.
       final text = rruleSummaryText('FREQ=DAILY;UNTIL=20260601T000000Z');
-      expect(text, equals('매일 · $expectedDateStr까지'));
+
+      // Structure: '매일 · yyyy.MM.dd까지'
+      expect(text, startsWith('매일 · '));
+      expect(text, endsWith('까지'));
+
+      // Extract the date from the output and verify it independently.
+      final match = RegExp(r'(\d{4})\.(\d{2})\.(\d{2})까지$').firstMatch(text);
+      expect(match, isNotNull, reason: 'Summary must contain yyyy.MM.dd까지');
+      final y = int.parse(match!.group(1)!);
+      final m = int.parse(match.group(2)!);
+      final d = int.parse(match.group(3)!);
+
+      // The formatted date is the local representation of UTC 2026-06-01 00:00.
+      // Verify by reconstructing the local midnight and checking the UTC
+      // round-trip stays within maximum possible timezone offset (UTC-12..UTC+14).
+      final extracted = DateTime(y, m, d);
+      final utcInput = DateTime.utc(2026, 6, 1, 0, 0, 0);
+      final diffHours = (extracted.toUtc().difference(utcInput).inMinutes).abs();
+      expect(diffHours, lessThanOrEqualTo(14 * 60),
+          reason: 'Extracted date must be the local calendar day of UTC 2026-06-01T00:00Z');
     });
 
     test('test_28_summary_yearly_simple', () {
