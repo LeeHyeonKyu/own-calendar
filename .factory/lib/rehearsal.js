@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { matchesAny } from "./glob.js";
+import { composeEnv } from "./test-env.js";
 import { q, baseInstallCommand } from "./prove-test.js";
 
 /**
@@ -33,8 +34,17 @@ export const REHEARSAL_TIMEOUT_SEC = {
   lint: 600, unit: 1800, test_files: 900, test_one: 600, lint_file: 300,
   "prove-test": 1800, "gh-auth": 60, "gh-labels": 120, "gh-push": 180,
 };
-/** `timeout`은 coreutils의 것이다(러너에 항상 있다). 124 = 상한에 걸렸다 — 실패와 구별해 적는다. */
-export const timedCommand = (cmd, sec) => `timeout -k 10 ${sec} bash -lc ${q(cmd)}`;
+/**
+ * `timeout`은 coreutils의 것이다 — hosted ubuntu 러너에는 항상 있지만 **macOS 셀프호스트 러너에는 없다**
+ * (own-calendar 1.4.3 리허설: 모든 스텝이 `bash: timeout: command not found`로 RED). `timeout` →
+ * `gtimeout`(brew coreutils) 순으로 찾고, 둘 다 없으면 상한 없이 돌리되 그 사실을 stderr에 남긴다 —
+ * 리허설이 "명령이 없다"는 이유로 RED가 되면 그것은 게이트의 판정이 아니라 러너의 사고다.
+ * 124 = 상한에 걸렸다 — 실패와 구별해 적는다.
+ */
+export const NO_TIMEOUT_BINARY = "rehearsal: no `timeout`/`gtimeout` on this runner (install coreutils) — step cap not enforced";
+// 명령은 문자열의 **끝**에 그대로 남는다(`… bash -lc '<cmd>'`) — 기록·테스트가 그 꼬리로 스텝을 알아본다.
+export const timedCommand = (cmd, sec) =>
+  `t=$(command -v timeout 2>/dev/null || command -v gtimeout 2>/dev/null); [ -n "$t" ] || echo ${q(NO_TIMEOUT_BINARY)} >&2; exec \${t:+"$t" -k 10 ${sec}} bash -lc ${q(cmd)}`;
 
 /** 판정 재료는 앞 세 줄이다 — 표는 증거이지 로그 덤프가 아니다(로그는 잡 화면에 그대로 있다). */
 export const firstLines = (text, n = 3) =>
@@ -161,7 +171,8 @@ export async function runRehearsal({
   const timed = async (name, cmd, opts = {}) => {
     const sec = REHEARSAL_TIMEOUT_SEC[name] ?? 600;
     const t0 = now();
-    const r = await run("bash", ["-lc", timedCommand(cmd, sec)], { cwd, ...opts });
+    // 1.4.6 — 리허설 스텝도 test-env의 compose 프로젝트를 봐야 한다(데모 `docker compose … exec db`).
+    const r = await run("bash", ["-lc", timedCommand(cmd, sec)], { cwd, env: composeEnv(harness, cwd), ...opts });
     const ms = Math.max(0, now() - t0);
     const out = firstLines(`${r.stderr || ""}\n${r.stdout || ""}`.trim() || `exit ${r.code}`);
     // 124는 `timeout`이 SIGTERM으로 끝낸 경우이고, **>128은 시그널로 죽은 경우**다(`timeout -k 10`이
