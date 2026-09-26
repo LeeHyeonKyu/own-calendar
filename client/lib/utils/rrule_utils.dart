@@ -18,13 +18,6 @@ class ParsedRrule {
     this.count,
     this.until,
   });
-
-  @override
-  String toString() =>
-      'ParsedRrule(freq: $freq, interval: $interval, byDay: $byDay'
-      '${count != null ? ', count: $count' : ''}'
-      '${until != null ? ', until: $until' : ''}'
-      ')';
 }
 
 const weekdayCodes = ['MO', 'TU', 'WE', 'TH', 'FR', 'SA', 'SU'];
