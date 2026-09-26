@@ -18,6 +18,32 @@ class ParsedRrule {
     this.count,
     this.until,
   });
+
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) return true;
+    if (other is! ParsedRrule) return false;
+    if (freq != other.freq ||
+        interval != other.interval ||
+        count != other.count ||
+        until != other.until) {
+      return false;
+    }
+    if (byDay.length != other.byDay.length) return false;
+    for (var i = 0; i < byDay.length; i++) {
+      if (byDay[i] != other.byDay[i]) return false;
+    }
+    return true;
+  }
+
+  @override
+  int get hashCode => Object.hash(
+        freq,
+        interval,
+        Object.hashAll(byDay),
+        count,
+        until,
+      );
 }
 
 const weekdayCodes = ['MO', 'TU', 'WE', 'TH', 'FR', 'SA', 'SU'];

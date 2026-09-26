@@ -223,4 +223,64 @@ void main() {
       expect(text, equals('매일 · $expectedDateStr까지'));
     });
   });
+
+  // ---------------------------------------------------------------------------
+  // ParsedRrule value equality (proves operator == / hashCode implementation)
+  // ---------------------------------------------------------------------------
+  group('ParsedRrule value equality', () {
+    test('test_28_equality_same_input_parsed_twice', () {
+      // Two separate parse calls with the same input produce equal objects.
+      final a = parseRrule('FREQ=WEEKLY;INTERVAL=2;BYDAY=MO,FR');
+      final b = parseRrule('FREQ=WEEKLY;INTERVAL=2;BYDAY=MO,FR');
+      expect(a, isNotNull);
+      expect(b, isNotNull);
+      expect(a, equals(b));
+    });
+
+    test('test_28_equality_constructed_matches_parsed', () {
+      // A manually constructed ParsedRrule equals one produced by parseRrule
+      // when all fields match.
+      final parsed = parseRrule('FREQ=DAILY;COUNT=5');
+      expect(parsed, isNotNull);
+      expect(
+        parsed,
+        equals(ParsedRrule(freq: 'DAILY', count: 5)),
+      );
+    });
+
+    test('test_28_equality_with_all_fields', () {
+      // Full-field equality including byDay list and until.
+      final until8 = DateTime(2026, 3, 15); // 8-char path: local DateTime
+      final a = parseRrule('FREQ=WEEKLY;INTERVAL=3;BYDAY=TU,TH;UNTIL=20260315');
+      final b = ParsedRrule(
+        freq: 'WEEKLY',
+        interval: 3,
+        byDay: ['TU', 'TH'],
+        until: until8,
+      );
+      expect(a, isNotNull);
+      expect(a, equals(b));
+    });
+
+    test('test_28_inequality_different_freq', () {
+      final daily = parseRrule('FREQ=DAILY');
+      final weekly = parseRrule('FREQ=WEEKLY');
+      expect(daily, isNot(equals(weekly)));
+    });
+
+    test('test_28_inequality_different_byday', () {
+      final a = parseRrule('FREQ=WEEKLY;BYDAY=MO,WE');
+      final b = parseRrule('FREQ=WEEKLY;BYDAY=MO,FR');
+      expect(a, isNot(equals(b)));
+    });
+
+    test('test_28_hashcode_equal_objects', () {
+      // Equal objects must have equal hash codes.
+      final a = parseRrule('FREQ=WEEKLY;BYDAY=TU,TH');
+      final b = parseRrule('FREQ=WEEKLY;BYDAY=TU,TH');
+      expect(a, isNotNull);
+      expect(b, isNotNull);
+      expect(a.hashCode, equals(b.hashCode));
+    });
+  });
 }
