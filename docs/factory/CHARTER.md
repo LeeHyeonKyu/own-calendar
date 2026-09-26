@@ -12,7 +12,7 @@ plan_roles:
   default: [product-advocate, architect, skeptic, operator]
 plan_rounds: { docs: 2, default: 3 }
 back_pressure: { awaiting_review_max: 4 }   # quarantine 상한은 두지 않는다 — harness.toml [gates.thresholds].quarantine_max가 유일한 출처(§5.1, Plan 1b 실행 판결)
-budget: {}
+budget: { usd_per_issue: 60 }
 retro: { every_merges: { initial: 1, min: 1, max: 20 }, light_on_merge: true }
 merge: { human_gate: false }   # dark-first by owner decision (audit H6); flip to true to require a person per merge
 triage: { default: needs-info } # brownfield: silence stops (audit M1)
