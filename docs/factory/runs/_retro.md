@@ -19,13 +19,13 @@
 | rounds/issue (plan/impl/review) | 0 / 0 / 0 | 0 / 0 / 4 |
 | escaped defects | 0 | 0 |
 | revert rate | 없음 | 0.00 (0/1) |
-| needs-human | 9 | 5 |
+| needs-human | 12 | 5 |
 | rejects by role | 없음 | correctness 2, architecture 1, spec-conformance 1 |
 | reviewer overlap | 없음 | 0.00 (0/6, runs 4) |
 | unique findings by role | 없음 | correctness 4, architecture 1, spec-conformance 1 |
 | qa na ratio | 없음 | 없음 |
-| cost (usd) | 58.63 | 59.75 |
-| tokens | input 4269445 / output 48928 | input 9642879 / output 214644 |
+| cost (usd) | 62.68 | 59.75 |
+| tokens | input 4532041 / output 52490 | input 9642879 / output 214644 |
 | retro cost (usd) | 0.00 | 0.77 |
 | retro tokens | input 0 / output 0 | input 2 / output 1245 |
 | full retros | — | 1 |
@@ -132,8 +132,8 @@
       },
       {
         "issue": 9,
-        "reason": "blocked (environment/credentials) — needs human",
-        "at": "2026-09-26T15:58:44Z"
+        "reason": "stalled restart limit (2) reached",
+        "at": "2026-09-26T19:20:04Z"
       },
       {
         "issue": 21,
@@ -143,7 +143,7 @@
       {
         "issue": 30,
         "reason": "stalled restart limit (2) reached",
-        "at": "2026-09-26T18:33:04Z"
+        "at": "2026-09-26T19:19:49Z"
       },
       {
         "issue": 29,
@@ -152,8 +152,8 @@
       },
       {
         "issue": 28,
-        "reason": "verifier rejected",
-        "at": "2026-09-26T17:08:32Z"
+        "reason": "stalled restart limit (2) reached",
+        "at": "2026-09-26T19:19:57Z"
       }
     ]
   },
@@ -174,17 +174,17 @@
     "overlapping_findings": 0,
     "unique_findings_by_role": {},
     "overlap_ratio": 0,
-    "needs_human": 9,
+    "needs_human": 12,
     "qa_approvals": 0,
     "qa_claims_total": 0,
     "qa_na_total": 0,
     "qa_na_ratio": 0,
     "qa_na_heavy_approvals": 0,
     "usage": {
-      "cost_usd": 58.629401,
+      "cost_usd": 62.681869,
       "tokens": {
-        "input": 4269445,
-        "output": 48928
+        "input": 4532041,
+        "output": 52490
       }
     }
   },
