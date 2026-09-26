@@ -174,6 +174,21 @@ void main() {
           'is worse than no guard at all.',
     );
 
+    // Guard against silent path removal: CHARTER.md NEVER_AUTOMATE currently
+    // lists 6 concrete file paths. A count below this means either a protected
+    // path was removed from the section (which should be investigated) or the
+    // extraction heuristic was narrowed (which needs review). This number was
+    // calibrated when the test was written and should be updated when paths are
+    // intentionally added or removed.
+    expect(
+      charterPaths.length,
+      greaterThanOrEqualTo(6),
+      reason: 'CHARTER.md NEVER_AUTOMATE should list at least 6 concrete '
+          'file paths but found ${charterPaths.length}. If paths were '
+          'intentionally removed, update this minimum. If not, the '
+          'extraction heuristic may have broken.',
+    );
+
     for (final path in charterPaths) {
       final resolved = _resolveForCheck(path);
       expect(
@@ -203,6 +218,17 @@ void main() {
       reason: 'Extracted zero paths from harness.toml [load_bearing].paths. '
           'The extraction regex may have silently broken — a vacuous pass '
           'is worse than no guard at all.',
+    );
+
+    // Guard against silent path removal: harness.toml [load_bearing].paths
+    // currently lists 19 paths. Same reasoning as the charter count above.
+    expect(
+      harnessPaths.length,
+      greaterThanOrEqualTo(19),
+      reason: 'harness.toml [load_bearing].paths should list at least 19 '
+          'paths but found ${harnessPaths.length}. If paths were '
+          'intentionally removed, update this minimum. If not, the '
+          'extraction logic may have broken.',
     );
 
     for (final path in harnessPaths) {
