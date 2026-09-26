@@ -148,6 +148,16 @@ class EventModel {
   /// Common RRULE presets keyed by a short id.
   static const rrulePresets = rrule_utils.rrulePresets;
 
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is EventModel &&
+          runtimeType == other.runtimeType &&
+          id == other.id;
+
+  @override
+  int get hashCode => id.hashCode;
+
   String get categoryLabel => categoryLabels[category] ?? '기타';
   int get categoryColorValue => categoryColors[category] ?? 0xFF95A5A6;
   String get recurrenceLabel => recurrenceLabels[recurrenceType] ?? '없음';

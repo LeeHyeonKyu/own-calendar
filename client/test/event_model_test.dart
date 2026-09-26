@@ -285,6 +285,30 @@ void main() {
     });
   });
 
+  group('test_29_equality', () {
+    test('two EventModels with the same id are equal', () {
+      final a = EventModel.fromJson(_fixture(id: 'same-id', title: 'Title A'));
+      final b = EventModel.fromJson(_fixture(id: 'same-id', title: 'Title B'));
+
+      expect(a, equals(b));
+      expect(a.hashCode, equals(b.hashCode));
+    });
+
+    test('two EventModels with different ids are not equal', () {
+      final a = EventModel.fromJson(_fixture(id: 'id-1'));
+      final b = EventModel.fromJson(_fixture(id: 'id-2'));
+
+      expect(a, isNot(equals(b)));
+    });
+
+    test('EventModel is not equal to a non-EventModel object', () {
+      final event = EventModel.fromJson(_fixture(id: 'evt-x'));
+
+      expect(event, isNot(equals('evt-x')));
+      expect(event, isNot(equals(42)));
+    });
+  });
+
   group('test_29_rruleSummary', () {
     test('returns 매일 for RRULE:FREQ=DAILY', () {
       final json = _fixture(rrule: 'RRULE:FREQ=DAILY');
