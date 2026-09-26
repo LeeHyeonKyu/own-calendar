@@ -187,6 +187,29 @@ void main() {
       expect(event.baseId, 'team_alpha_evt001');
       expect(event.instanceDateString, '2026-09-27T10:00:00');
     });
+
+    test('id with underscore and colon-only suffix (no T) is not virtual', () {
+      final json = _fixture(id: 'task_12:30:00');
+
+      final event = EventModel.fromJson(json);
+
+      // '12:30:00' contains ':' but not 'T', so the parser does not treat
+      // it as an ISO datetime suffix
+      expect(event.isVirtualInstance, false);
+      expect(event.baseId, 'task_12:30:00');
+      expect(event.instanceDateString, isNull);
+    });
+
+    test('id with underscore and T-only suffix (no colon) is not virtual', () {
+      final json = _fixture(id: 'task_meetingT3');
+
+      final event = EventModel.fromJson(json);
+
+      // 'meetingT3' contains 'T' but not ':', so it is not a datetime suffix
+      expect(event.isVirtualInstance, false);
+      expect(event.baseId, 'task_meetingT3');
+      expect(event.instanceDateString, isNull);
+    });
   });
 
   group('test_29_isRecurring', () {
