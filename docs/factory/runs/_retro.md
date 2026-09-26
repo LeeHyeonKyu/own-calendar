@@ -19,13 +19,13 @@
 | rounds/issue (plan/impl/review) | 0 / 0 / 0 | 0 / 0 / 4 |
 | escaped defects | 0 | 0 |
 | revert rate | 없음 | 0.00 (0/1) |
-| needs-human | 4 | 5 |
+| needs-human | 5 | 5 |
 | rejects by role | 없음 | correctness 2, architecture 1, spec-conformance 1 |
 | reviewer overlap | 없음 | 0.00 (0/6, runs 4) |
 | unique findings by role | 없음 | correctness 4, architecture 1, spec-conformance 1 |
 | qa na ratio | 없음 | 없음 |
-| cost (usd) | 23.06 | 59.75 |
-| tokens | input 1511345 / output 17879 | input 9642879 / output 214644 |
+| cost (usd) | 31.11 | 59.75 |
+| tokens | input 2059109 / output 26878 | input 9642879 / output 214644 |
 | retro cost (usd) | 0.00 | 0.77 |
 | retro tokens | input 0 / output 0 | input 2 / output 1245 |
 | full retros | — | 1 |
@@ -124,8 +124,8 @@
       },
       {
         "issue": 9,
-        "reason": "HOLD: test compose clobbered the production postgres container on the self-hosted Mac (shared compose project 'server'); no retries until the compose has its own project name",
-        "at": "2026-09-22T08:23:29Z"
+        "reason": "blocked (environment/credentials) — needs human",
+        "at": "2026-09-26T15:58:44Z"
       },
       {
         "issue": 21,
@@ -151,17 +151,17 @@
     "overlapping_findings": 0,
     "unique_findings_by_role": {},
     "overlap_ratio": 0,
-    "needs_human": 4,
+    "needs_human": 5,
     "qa_approvals": 0,
     "qa_claims_total": 0,
     "qa_na_total": 0,
     "qa_na_ratio": 0,
     "qa_na_heavy_approvals": 0,
     "usage": {
-      "cost_usd": 23.062288,
+      "cost_usd": 31.111403,
       "tokens": {
-        "input": 1511345,
-        "output": 17879
+        "input": 2059109,
+        "output": 26878
       }
     }
   },
