@@ -28,6 +28,10 @@ node  = "22"                     # used by the factory's own Node-based tooling,
 lint       = "cd client && flutter analyze --no-fatal-infos"   # brownfield: pre-existing deprecation infos must not block; errors/warnings still fatal (own-calendar #3, 2026-09-14)
 unit       = "cd client && flutter test"
 integration = "scripts/factory-server-test.sh"               # server integration suite via vitest + test-compose Postgres (M2 promotion, #9)
+# Scope change: scripts/factory-test-router.sh is outside files_expected. It is the "small wrapper"
+# the owner's Q2 spec permits ("route by path prefix in the existing helpers or a small wrapper").
+# Separated from factory-server-test.sh for single-responsibility: the router dispatches by path
+# prefix, the server script runs vitest. Required by dw4 (test_files/test_one/lint_file routing).
 test_files = "scripts/factory-test-router.sh test_files {files}"       # routes server/** to vitest, client/** to flutter test (#9 M2)
 test_one   = "scripts/factory-test-router.sh test_one {file} --plain-name {name}"   # routes by prefix; vitest uses --testNamePattern for {name} (#9 M2)
 lint_file  = "scripts/factory-test-router.sh lint_file {file}"                      # server/** = no-op (no server linter gated yet); client/** = flutter analyze (#9 M2)
@@ -74,6 +78,10 @@ quarantine_return_after = 30
 [test]
 guide       = "docs/QA.md"
 naming      = "test_{issue}_{slug}"
+# Scope change: server/tests/test_9_integration_smoke.test.ts is outside files_expected. The harness
+# smoke convention requires a named smoke test at each gate level to anchor prove-test and
+# new-test-repeat gates. dw1 rubric names the 6 pre-existing files; this smoke test is the minimal
+# artifact proving the integration infrastructure (compose + prisma + supertest) works end-to-end.
 smoke       = { unit = "client/test/widget_test.dart", integration = "server/tests/test_9_integration_smoke.test.ts" }
 runtime_budget_min = 12
 test_glob   = ["client/test/**/*_test.dart", "server/tests/**/*.test.ts"]
