@@ -6,7 +6,7 @@ import { isQuarantined, recordResult } from "./quarantine.js";
 import { changedFiles } from "./changed-files.js";
 import { matchesAny } from "./glob.js";
 import { classifyFailures } from "./classify-failure.js";
-import { proveTest, repeatNewTests } from "./prove-test.js";
+import { proveTest, repeatNewTests, CHARACTERIZATION } from "./prove-test.js";
 import { runDiffCoverage } from "./diff-coverage.js";
 import { mutationGate } from "./mutation.js";
 import { scrubbedRunner } from "./exec.js";
@@ -193,7 +193,8 @@ export function gateDetail({ gate, stdout = "", stderr = "", env } = {}) {
 export function attachGateDetails(result) {
   try {
     for (const [name, g] of Object.entries(result?.gates || {})) {
-      if (!g || g.status !== "RED" || g.detail) continue;
+      // 1.4.8 — MISCONFIGURED도 사람이 records 브랜치만 보고 이유를 알아야 한다(데모 #58: `misconfigured=prove-test` 한 줄뿐이었다).
+      if (!g || !["RED", "MISCONFIGURED"].includes(g.status) || g.detail) continue;
       g.detail = gateDetail({ gate: name, stdout: g.log ?? "" });
     }
   } catch { /* 증거 수집은 판정을 막지 않는다 */ }
@@ -579,8 +580,16 @@ export async function runStageGates({ run: injectedRun, cwd, harness, stage, tie
     const ch = await changedOnce();
     // 새로 추가된 테스트만이 아니라 **수정된 테스트 파일**도 증명 대상이다 — 기존 파일에 추가된
     // 케이스도 base에서는 실패해야 한다. 면제는 **실효 tier**로 판단한다(자기 신고 docs로 빠져나갈 수 없게).
-    if (effectiveTier !== "docs") {
-      const pt = await proveTest({ run, cwd, harness, base, addedTests: ch.tests });
+    // 1.4.8 (데모 #57 Dependabot 설정): source_glob·test_glob 어디에도 없는 파일만 바뀐 diff에는 테스트로 증명할 것이
+    // 없다 — "새 테스트가 없다"는 RED가 아니라 "증명할 대상이 없다"는 SKIPPED다(required에 없으면 판정을 막지 않는다).
+    if (effectiveTier !== "docs" && !ch.sources.length && !ch.tests.length) {
+      result.gates["prove-test"] = { status: "SKIPPED", code: null, duration_ms: 0, log: `no source or test files in the diff (${ch.all.length} file(s), none under [test].source_glob/test_glob) — nothing to prove by tests` };
+    } else if (effectiveTier !== "docs") {
+      // 1.4.9 — 소스는 그대로고 테스트만 늘었으면 특성화 모드(§prove-test.js CHARACTERIZATION): base에서도 통과해야 GREEN.
+      // 1.4.10 (데모 #15): 특성화는 **바뀐 파일이 전부 테스트일 때만**이다. harness.toml·설정 같은 비-소스 파일이 함께 바뀌면
+      // 그 테스트는 그 변경을 증명하려는 것이고(base에서 실패해야 한다), 특성화로 읽으면 정반대 판정이 난다.
+      const mode = ch.tests.length && ch.all.every((f) => ch.tests.includes(f)) ? CHARACTERIZATION : "prove";
+      const pt = await proveTest({ run, cwd, harness, base, addedTests: ch.tests, addedFiles: ch.added, mode });
       result.gates["prove-test"] = { status: pt.misconfigured ? "MISCONFIGURED" : pt.ok ? "GREEN" : "RED", code: null, duration_ms: 0, log: pt.detail };
       /*
        * 감사 M2 — **판정 불가는 판정 결과와 따로 기록된다.** base에서 테스트가 아예 돌지 못한 것은
