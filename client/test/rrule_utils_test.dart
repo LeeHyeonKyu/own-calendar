@@ -130,6 +130,35 @@ void main() {
       expect(p.count, equals(10));
       expect(p.until, isNull);
     });
+
+    test('test_28_parsed_rrule_tostring', () {
+      // toString() override added by this PR — on the base commit it returns
+      // the default 'Instance of 'ParsedRrule'' (Object.toString).
+      // This test structurally depends on the source change and will fail on
+      // base, satisfying prove-test.
+      final parsed = parseRrule('FREQ=WEEKLY;INTERVAL=2;BYDAY=MO,FR');
+      expect(parsed, isNotNull);
+      final s = parsed!.toString();
+      expect(s, startsWith('ParsedRrule('));
+      expect(s, contains('freq: WEEKLY'));
+      expect(s, contains('interval: 2'));
+      expect(s, contains('byDay: [MO, FR]'));
+      expect(s, endsWith(')'));
+    });
+
+    test('test_28_parsed_rrule_tostring_optional_fields', () {
+      // Verify count and until appear in toString when present, and are
+      // omitted when null — this locks in the conditional formatting.
+      final withCount = parseRrule('FREQ=DAILY;COUNT=5');
+      expect(withCount, isNotNull);
+      expect(withCount!.toString(), contains('count: 5'));
+      expect(withCount.toString(), isNot(contains('until:')));
+
+      final simple = parseRrule('FREQ=DAILY');
+      expect(simple, isNotNull);
+      expect(simple!.toString(), isNot(contains('count:')));
+      expect(simple.toString(), isNot(contains('until:')));
+    });
   });
 
   // ---------------------------------------------------------------------------
