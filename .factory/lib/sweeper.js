@@ -1,6 +1,6 @@
 import { applyPolicy } from "./quarantine.js";
 import { quarantineComment } from "./retro/quarantine-ops.js";
-import { BLOCKED_ORIGIN, TRANSITION_TO, blockedOrigin, commentsSinceRequeue, lastTransition, transitionRefusedMarker } from "./retro/issue-comments.js";
+import { BLOCKED_ORIGIN, TRANSITION_TO, blockedOrigin, commentsSinceRequeue, commentsSinceCycleStart, lastTransition, transitionRefusedMarker } from "./retro/issue-comments.js";
 import { STATES } from "./labels.js";
 import { HUMAN_MERGE_REQUIRED, verifyFactoryStatuses } from "./merge-stage.js";
 import { allChecksGreen, GH_NO_CHECKS_RE } from "./gh.js";
@@ -383,10 +383,19 @@ async function sweepStalled({ gh, nowMs, staleMinutes, dispatchStage, backPressu
         // 이력 전체를 보고 있었다 — 예전 주기에서 두 번 다시 밀렸던 이슈는 고쳐져 재큐된 뒤 **첫**
         // 스톨에서, 이번 주기에 단 한 번도 밀어보지 않은 채 `stalled restart limit (2) reached`로
         // 사람에게 올라갔다(사람은 이번 주기의 재점화를 하나도 볼 수 없다).
-        const cycle = commentsSinceRequeue(comments);
+        const cycle = commentsSinceCycleStart(comments);   // 1.4.12: a human retry/hold-lift starts a new cycle for the restart budget
         const restarts = cycle.filter((c) => String(c?.body ?? "").includes(marker));
         const restarted = restarts.at(-1);
         if (restarted && nowMs - Date.parse(restarted.createdAt) <= stale) continue;
+        // 1.4.11 (own-calendar #30, 셀프호스트 러너 1대): 이 스테이지의 런이 **큐에 앉아 러너를 기다리는 중**이면 멈춘
+        // 것이 아니다 — 하트비트가 없는 이유는 아직 시작을 못 해서다. 재점화는 큐에 런을 하나 더 얹을 뿐이고,
+        // 두 번 얹으면 `stalled restart limit`으로 사람을 부른다(라이브: #30이 정확히 그렇게 needs-human이 됐다).
+        // fail-safe: 헬퍼가 없거나 조회가 던지면 예전대로 간다.
+        if (typeof gh.pendingRuns === "function") {
+          let pending = 0;
+          try { pending = await gh.pendingRuns(`factory-${stage}.yml`); } catch { pending = 0; }
+          if (pending > 0) { actions.push({ kind: "stalled-restart-skipped", issue: it.number, stage, label, reason: `runner saturated — ${pending} queued run(s) of factory-${stage}.yml` }); continue; }
+        }
         // 흐름 제어로 세워 둔 `factory:planned`는 멈춘 것이 아니다(M5) — 조용히 넘어간다.
         if (stage === "implement") {
           const reason = await parked();
