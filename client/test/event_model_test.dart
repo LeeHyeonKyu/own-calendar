@@ -242,4 +242,92 @@ void main() {
       expect(event.categoryColorValue, equals(0xFF95A5A6));
     });
   });
+
+  group('test_29_toString', () {
+    test('includes id and title in string representation', () {
+      final json = _fixture(id: 'evt-str-001', title: 'Planning Meeting');
+      final event = EventModel.fromJson(json);
+
+      final str = event.toString();
+
+      // Must contain the event id and title for debugging usefulness
+      expect(str, contains('evt-str-001'));
+      expect(str, contains('Planning Meeting'));
+      // Must start with the class name, not the default 'Instance of'
+      expect(str, startsWith('EventModel('));
+    });
+  });
+
+  group('test_29_recurrenceEnd', () {
+    test('parses recurrenceEnd when present in JSON', () {
+      final json = _fixture(recurrenceEnd: '2026-12-31T23:59:00');
+      final event = EventModel.fromJson(json);
+
+      expect(event.recurrenceEnd, isNotNull);
+      expect(
+          event.recurrenceEnd,
+          equals(DateTime.parse('2026-12-31T23:59:00').toLocal()));
+    });
+
+    test('recurrenceEnd is null when not provided', () {
+      final json = _fixture();
+      final event = EventModel.fromJson(json);
+
+      expect(event.recurrenceEnd, isNull);
+    });
+  });
+
+  group('test_29_recurrenceLabel', () {
+    test('returns Korean label for DAILY', () {
+      final json = _fixture(recurrenceType: 'DAILY');
+      final event = EventModel.fromJson(json);
+
+      expect(event.recurrenceLabel, equals('매일'));
+    });
+
+    test('returns Korean label for YEARLY', () {
+      final json = _fixture(recurrenceType: 'YEARLY');
+      final event = EventModel.fromJson(json);
+
+      expect(event.recurrenceLabel, equals('매년'));
+    });
+
+    test('falls back to 없음 for unknown recurrence type', () {
+      final json = _fixture(recurrenceType: 'BIWEEKLY');
+      final event = EventModel.fromJson(json);
+
+      expect(event.recurrenceLabel, equals('없음'));
+    });
+  });
+
+  group('test_29_rruleSummary', () {
+    test('returns 매일 for RRULE:FREQ=DAILY', () {
+      final json = _fixture(rrule: 'RRULE:FREQ=DAILY');
+      final event = EventModel.fromJson(json);
+
+      expect(event.rruleSummary, equals('매일'));
+    });
+
+    test('returns 반복 없음 when no rrule and recurrenceType is NONE', () {
+      final json = _fixture();
+      final event = EventModel.fromJson(json);
+
+      expect(event.rruleSummary, equals('반복 없음'));
+    });
+
+    test('falls back to legacy label when rrule is null but recurrenceType set',
+        () {
+      final json = _fixture(recurrenceType: 'WEEKLY');
+      final event = EventModel.fromJson(json);
+
+      expect(event.rruleSummary, equals('매주'));
+    });
+
+    test('returns weekly summary with day names for BYDAY rule', () {
+      final json = _fixture(rrule: 'RRULE:FREQ=WEEKLY;BYDAY=MO,WE,FR');
+      final event = EventModel.fromJson(json);
+
+      expect(event.rruleSummary, equals('매주 월, 수, 금요일'));
+    });
+  });
 }

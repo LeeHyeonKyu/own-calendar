@@ -151,4 +151,7 @@ class EventModel {
   String get categoryLabel => categoryLabels[category] ?? '기타';
   int get categoryColorValue => categoryColors[category] ?? 0xFF95A5A6;
   String get recurrenceLabel => recurrenceLabels[recurrenceType] ?? '없음';
+
+  @override
+  String toString() => 'EventModel(id: $id, title: $title)';
 }
