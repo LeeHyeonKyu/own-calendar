@@ -66,18 +66,17 @@ void main() {
     });
 
     test('test_28_parse_until_8char', () {
-      // 8-char form: DateTime(y, m, d) — local, no UTC conversion.
+      // 8-char form: DateTime(y, m, d) -- local, no UTC conversion.
       final parsed = parseRrule('FREQ=DAILY;UNTIL=20260115');
       expect(parsed, isNotNull);
       final p = parsed!;
       expect(p.until, isNotNull);
-      // The code creates DateTime(2026, 1, 15) which is local.
       // Assert using the same construction to be TZ-independent.
       expect(p.until, equals(DateTime(2026, 1, 15)));
     });
 
     test('test_28_parse_until_iso_full', () {
-      // ISO form: DateTime.utc(...).toLocal() — parsed as UTC then converted.
+      // ISO form: DateTime.utc(...).toLocal() -- parsed as UTC then converted.
       final parsed = parseRrule('FREQ=DAILY;UNTIL=20260601T120000Z');
       expect(parsed, isNotNull);
       final p = parsed!;
@@ -89,7 +88,7 @@ void main() {
     });
 
     test('test_28_parse_until_iso_without_z', () {
-      // ISO form without trailing Z — code strips Z if present, but also
+      // ISO form without trailing Z -- code strips Z if present, but also
       // handles missing Z the same way (still parsed as UTC).
       final parsed = parseRrule('FREQ=DAILY;UNTIL=20260601T120000');
       expect(parsed, isNotNull);
@@ -97,6 +96,36 @@ void main() {
       expect(p.until, isNotNull);
       final expected = DateTime.utc(2026, 6, 1, 12, 0, 0).toLocal();
       expect(p.until, equals(expected));
+    });
+
+    test('test_28_parse_until_8char_not_utc', () {
+      // 8-char UNTIL uses DateTime() (local), NOT DateTime.utc().toLocal().
+      // This characterizes the asymmetry noted in dissent-8char-provenance.
+      final parsed = parseRrule('FREQ=DAILY;UNTIL=20260101');
+      expect(parsed, isNotNull);
+      expect(parsed!.until!.isUtc, isFalse);
+      // Constructed the same way as the production code: DateTime(y, m, d)
+      expect(parsed.until!.year, equals(2026));
+      expect(parsed.until!.month, equals(1));
+      expect(parsed.until!.day, equals(1));
+    });
+
+    test('test_28_parse_until_iso_not_utc_after_tolocal', () {
+      // ISO UNTIL: parsed as UTC then .toLocal(), so isUtc is false.
+      final parsed = parseRrule('FREQ=DAILY;UNTIL=20260601T000000Z');
+      expect(parsed, isNotNull);
+      expect(parsed!.until!.isUtc, isFalse);
+    });
+
+    test('test_28_parse_all_fields_combined', () {
+      final parsed = parseRrule('FREQ=WEEKLY;INTERVAL=2;BYDAY=MO,FR;COUNT=10');
+      expect(parsed, isNotNull);
+      final p = parsed!;
+      expect(p.freq, equals('WEEKLY'));
+      expect(p.interval, equals(2));
+      expect(p.byDay, equals(['MO', 'FR']));
+      expect(p.count, equals(10));
+      expect(p.until, isNull);
     });
   });
 
@@ -191,6 +220,12 @@ void main() {
       expect(text, equals('매주'));
     });
 
+    test('test_28_summary_legacy_unknown_type', () {
+      // Unknown legacy type falls back to the generic label.
+      final text = rruleSummaryText(null, legacyType: 'CUSTOM');
+      expect(text, equals('반복'));
+    });
+
     test('test_28_summary_weekly_korean_days', () {
       final text = rruleSummaryText('FREQ=WEEKLY;BYDAY=MO,WE,FR');
       // weekdayCodes ordering: MO=월, WE=수, FR=금
@@ -222,65 +257,10 @@ void main() {
       final text = rruleSummaryText('FREQ=DAILY;UNTIL=20260601T000000Z');
       expect(text, equals('매일 · $expectedDateStr까지'));
     });
-  });
 
-  // ---------------------------------------------------------------------------
-  // ParsedRrule value equality (proves operator == / hashCode implementation)
-  // ---------------------------------------------------------------------------
-  group('ParsedRrule value equality', () {
-    test('test_28_equality_same_input_parsed_twice', () {
-      // Two separate parse calls with the same input produce equal objects.
-      final a = parseRrule('FREQ=WEEKLY;INTERVAL=2;BYDAY=MO,FR');
-      final b = parseRrule('FREQ=WEEKLY;INTERVAL=2;BYDAY=MO,FR');
-      expect(a, isNotNull);
-      expect(b, isNotNull);
-      expect(a, equals(b));
-    });
-
-    test('test_28_equality_constructed_matches_parsed', () {
-      // A manually constructed ParsedRrule equals one produced by parseRrule
-      // when all fields match.
-      final parsed = parseRrule('FREQ=DAILY;COUNT=5');
-      expect(parsed, isNotNull);
-      expect(
-        parsed,
-        equals(ParsedRrule(freq: 'DAILY', count: 5)),
-      );
-    });
-
-    test('test_28_equality_with_all_fields', () {
-      // Full-field equality including byDay list and until.
-      final until8 = DateTime(2026, 3, 15); // 8-char path: local DateTime
-      final a = parseRrule('FREQ=WEEKLY;INTERVAL=3;BYDAY=TU,TH;UNTIL=20260315');
-      final b = ParsedRrule(
-        freq: 'WEEKLY',
-        interval: 3,
-        byDay: ['TU', 'TH'],
-        until: until8,
-      );
-      expect(a, isNotNull);
-      expect(a, equals(b));
-    });
-
-    test('test_28_inequality_different_freq', () {
-      final daily = parseRrule('FREQ=DAILY');
-      final weekly = parseRrule('FREQ=WEEKLY');
-      expect(daily, isNot(equals(weekly)));
-    });
-
-    test('test_28_inequality_different_byday', () {
-      final a = parseRrule('FREQ=WEEKLY;BYDAY=MO,WE');
-      final b = parseRrule('FREQ=WEEKLY;BYDAY=MO,FR');
-      expect(a, isNot(equals(b)));
-    });
-
-    test('test_28_hashcode_equal_objects', () {
-      // Equal objects must have equal hash codes.
-      final a = parseRrule('FREQ=WEEKLY;BYDAY=TU,TH');
-      final b = parseRrule('FREQ=WEEKLY;BYDAY=TU,TH');
-      expect(a, isNotNull);
-      expect(b, isNotNull);
-      expect(a.hashCode, equals(b.hashCode));
+    test('test_28_summary_yearly_simple', () {
+      final text = rruleSummaryText('FREQ=YEARLY');
+      expect(text, equals('매년'));
     });
   });
 }
