@@ -50,7 +50,7 @@ any dark run is allowed to treat it as authoritative.
   토큰 첨부 경로) — 인증 우회나 토큰 유출로 이어질 수 있는 변경은 사람이 직접 검토한다.
 - `.github/workflows/build.yml`의 릴리스·AltStore 자동배포 로직(코드사이닝 우회, `update-altstore` 잡의
   `main`으로의 직접 push) 변경 — 무인 배포 경로 자체를 건드리는 변경은 사람이 직접 검토한다.
-- 공개 API(`src/api/public/**`)의 breaking change
+- 공개 API의 breaking change(기존 엔드포인트의 응답 형태·상태코드·경로 변경) — 새 엔드포인트 추가는 허용한다. 백틱 글롭 없이 산문으로만 적었으므로 triage 에이전트의 판단이다(1.4.13 `charter.never-automate-qualified`)
 - `.env*`, 시크릿, 배포 스크립트(`scripts/deploy.sh`)
 
 ## Definition of Done (모든 tier 공통)
