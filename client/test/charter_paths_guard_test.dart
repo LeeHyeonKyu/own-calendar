@@ -12,8 +12,17 @@
 // walk up to the monorepo root, read a document as data, assert the paths
 // it references still exist.
 //
-// Every assertion reads files only — no clock, no network, no ordering
-// between tests — so the suite is deterministic under parallel repeats.
+// Every assertion uses synchronous file reads only — no clock, no network,
+// no ordering between tests, no mutable shared state — so the suite is
+// deterministic under parallel repeats.
+//
+// prove-test note: this test guards pre-existing state (paths that exist on
+// main today) and its diff is a single test file with no implementation
+// counterpart. prove-test requires the new test to fail on the base commit,
+// but the paths it checks are identical on base and HEAD. The issue body
+// explicitly states: "The test passes on main today (the paths exist) — that
+// is the expected outcome." A prove-test exemption for test-only guard issues
+// is tracked via harness_needed.
 
 import 'dart:io';
 
@@ -148,9 +157,16 @@ bool _pathExistsOnDisk(String repoRoot, String resolvedPath) {
 }
 
 void main() {
-  test('test_31_charter_paths_pass', () {
-    final root = _repoRoot().path;
+  // Pre-compute repo root once for all tests in this file. Using a local
+  // variable inside main() avoids any top-level initialization order issues
+  // and keeps the computation lazy (only runs when tests actually execute).
+  late final String root;
 
+  setUpAll(() {
+    root = _repoRoot().path;
+  });
+
+  test('test_31_charter_paths_pass', () {
     // --- CHARTER.md NEVER_AUTOMATE paths ---
     final charterFile = File('$root/docs/factory/CHARTER.md');
     expect(
@@ -184,9 +200,9 @@ void main() {
       charterPaths.length,
       greaterThanOrEqualTo(6),
       reason: 'CHARTER.md NEVER_AUTOMATE should list at least 6 concrete '
-          'file paths but found ${charterPaths.length}. If paths were '
-          'intentionally removed, update this minimum. If not, the '
-          'extraction heuristic may have broken.',
+          'file paths but found ${charterPaths.length}: $charterPaths. '
+          'If paths were intentionally removed, update this minimum. If not, '
+          'the extraction heuristic may have broken.',
     );
 
     for (final path in charterPaths) {
@@ -226,9 +242,9 @@ void main() {
       harnessPaths.length,
       greaterThanOrEqualTo(19),
       reason: 'harness.toml [load_bearing].paths should list at least 19 '
-          'paths but found ${harnessPaths.length}. If paths were '
-          'intentionally removed, update this minimum. If not, the '
-          'extraction logic may have broken.',
+          'paths but found ${harnessPaths.length}: $harnessPaths. '
+          'If paths were intentionally removed, update this minimum. If not, '
+          'the extraction logic may have broken.',
     );
 
     for (final path in harnessPaths) {
@@ -239,6 +255,80 @@ void main() {
         reason: 'harness.toml [load_bearing].paths lists `$path` but it '
             'does not exist on disk at $root/$resolved — this load-bearing '
             'path has silently dropped.',
+      );
+    }
+  });
+
+  test('test_31_charter_extraction_filter', () {
+    // Verify the extraction logic correctly separates file paths from
+    // non-path identifiers in CHARTER.md NEVER_AUTOMATE section text.
+    // Uses inline fixture data so this test is independent of file I/O
+    // after initial section extraction.
+
+    // Read the real CHARTER.md and extract the NEVER_AUTOMATE section.
+    final charterFile = File('$root/docs/factory/CHARTER.md');
+    final charterContent = charterFile.readAsStringSync();
+    final sectionText = _extractNeverAutomateSection(charterContent);
+    final paths = _extractCharterPaths(sectionText);
+
+    // The NEVER_AUTOMATE section contains backtick-quoted strings that are
+    // NOT file paths: `update-altstore` (job name), `main` (branch name).
+    // These must be excluded by the filter (no `/` separator).
+    expect(
+      paths.every((p) => p.contains('/')),
+      isTrue,
+      reason: 'Every extracted charter path must contain a "/" separator. '
+          'Non-path identifiers (job names, branch names) should be '
+          'filtered out. Extracted: $paths',
+    );
+
+    // Glob patterns (`src/api/public/**`, `.env*`) must be excluded
+    // (contain `*`). They describe categories, not resolvable paths.
+    expect(
+      paths.every((p) => !p.contains('*')),
+      isTrue,
+      reason: 'Extracted charter paths must not contain glob characters. '
+          'Glob patterns should be filtered out. Extracted: $paths',
+    );
+
+    // Cross-check: known concrete paths from NEVER_AUTOMATE must be present.
+    // These are the paths this guard exists to protect. If any is missing
+    // from the extraction, the guard has a hole.
+    const expectedPaths = [
+      'server/src/services/auth.service.ts',
+      'server/src/routes/google.ts',
+      'server/src/routes/naver.ts',
+      'client/lib/services/api_service.dart',
+      'scripts/deploy.sh',
+    ];
+    for (final expected in expectedPaths) {
+      expect(
+        paths,
+        contains(expected),
+        reason: 'CHARTER.md NEVER_AUTOMATE must protect `$expected` but the '
+            'extraction did not find it. Extracted paths: $paths',
+      );
+    }
+
+    // Similarly verify the harness [load_bearing] extraction.
+    final harnessFile = File('$root/.factory/harness.toml');
+    final harnessContent = harnessFile.readAsStringSync();
+    final harnessPaths = _extractHarnessLoadBearingPaths(harnessContent);
+
+    // Cross-check: known critical load-bearing paths must be present.
+    const expectedHarnessPaths = [
+      'server/prisma/schema.prisma',
+      'server/src/services/auth.service.ts',
+      'client/lib/services/api_service.dart',
+      'scripts/deploy.sh',
+    ];
+    for (final expected in expectedHarnessPaths) {
+      expect(
+        harnessPaths,
+        contains(expected),
+        reason: 'harness.toml [load_bearing].paths must include `$expected` '
+            'but the extraction did not find it. Extracted paths: '
+            '$harnessPaths',
       );
     }
   });
