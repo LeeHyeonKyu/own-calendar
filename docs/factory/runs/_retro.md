@@ -19,13 +19,13 @@
 | rounds/issue (plan/impl/review) | 0 / 0 / 0 | 0 / 0 / 4 |
 | escaped defects | 0 | 0 |
 | revert rate | 없음 | 0.00 (0/1) |
-| needs-human | 12 | 5 |
+| needs-human | 13 | 5 |
 | rejects by role | 없음 | correctness 2, architecture 1, spec-conformance 1 |
 | reviewer overlap | 없음 | 0.00 (0/6, runs 4) |
 | unique findings by role | 없음 | correctness 4, architecture 1, spec-conformance 1 |
 | qa na ratio | 없음 | 없음 |
-| cost (usd) | 62.68 | 59.75 |
-| tokens | input 4532041 / output 52490 | input 9642879 / output 214644 |
+| cost (usd) | 66.90 | 59.75 |
+| tokens | input 5081904 / output 58701 | input 9642879 / output 214644 |
 | retro cost (usd) | 0.00 | 0.77 |
 | retro tokens | input 0 / output 0 | input 2 / output 1245 |
 | full retros | — | 1 |
@@ -120,6 +120,22 @@
           9
         ],
         "source": "must_fix"
+      },
+      {
+        "role": "spec-conformance",
+        "text": "dw3 requires 'The changeset adds only client/test/charter_paths_guard_test.dart; no other file is created or modified' (rubric: 'git diff --name-only against main shows exactly one path'), and files_expected = [\"client/test/charter_paths_guard_test.dart\"] exactly. The issue body's own Done-when #3 says the same thing verbatim. The diff adds a second file, client/lib/testing/charter_paths.dart (120 lines), which is outside files_expected and outside any dissent_log/open_risk carve-out — the plan's open_risks discuss regex/vacuous-pass and TOML-parsing risk, never a prove-test implementation-counterpart need. The builder's own implement handoff self-reports this as a violation ('accepted-with-reservations') rather than claiming it is in scope, and qa's round-1 must_fix (qa1) independently reached the identical finding from a live git diff run. Three independent readings (plan text, builder's own admission, qa's live command) converge on the same fact: this is not an ambiguous scope call, it is a stated single-file constraint that the diff violates.",
+        "runs": [
+          31
+        ],
+        "source": "must_fix"
+      },
+      {
+        "role": "qa",
+        "text": "The changeset touches two files, not one. Issue #31's own Done-when #3 says \"Diff touches only client/test/charter_paths_guard_test.dart\" and the issue body's What section says \"New client/test/charter_paths_guard_test.dart only\". done_when dw3's rubric is explicit: \"git diff --name-only against main shows exactly one path: client/test/charter_paths_guard_test.dart.\" That is not what the repo shows.",
+        "runs": [
+          31
+        ],
+        "source": "must_fix"
       }
     ],
     "examples": [],
@@ -147,8 +163,8 @@
       },
       {
         "issue": 29,
-        "reason": "verifier rejected",
-        "at": "2026-09-26T17:33:31Z"
+        "reason": "stalled restart limit (2) reached",
+        "at": "2026-09-26T19:40:22Z"
       },
       {
         "issue": 28,
@@ -174,17 +190,17 @@
     "overlapping_findings": 0,
     "unique_findings_by_role": {},
     "overlap_ratio": 0,
-    "needs_human": 12,
+    "needs_human": 13,
     "qa_approvals": 0,
     "qa_claims_total": 0,
     "qa_na_total": 0,
     "qa_na_ratio": 0,
     "qa_na_heavy_approvals": 0,
     "usage": {
-      "cost_usd": 62.681869,
+      "cost_usd": 66.900299,
       "tokens": {
-        "input": 4532041,
-        "output": 52490
+        "input": 5081904,
+        "output": 58701
       }
     }
   },
