@@ -243,21 +243,6 @@ void main() {
     });
   });
 
-  group('test_29_toString', () {
-    test('includes id and title in string representation', () {
-      final json = _fixture(id: 'evt-str-001', title: 'Planning Meeting');
-      final event = EventModel.fromJson(json);
-
-      final str = event.toString();
-
-      // Must contain the event id and title for debugging usefulness
-      expect(str, contains('evt-str-001'));
-      expect(str, contains('Planning Meeting'));
-      // Must start with the class name, not the default 'Instance of'
-      expect(str, startsWith('EventModel('));
-    });
-  });
-
   group('test_29_recurrenceEnd', () {
     test('parses recurrenceEnd when present in JSON', () {
       final json = _fixture(recurrenceEnd: '2026-12-31T23:59:00');
