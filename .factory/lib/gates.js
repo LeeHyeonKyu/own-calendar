@@ -6,7 +6,7 @@ import { isQuarantined, recordResult } from "./quarantine.js";
 import { changedFiles } from "./changed-files.js";
 import { matchesAny } from "./glob.js";
 import { classifyFailures } from "./classify-failure.js";
-import { proveTest, repeatNewTests } from "./prove-test.js";
+import { proveTest, repeatNewTests, CHARACTERIZATION } from "./prove-test.js";
 import { runDiffCoverage } from "./diff-coverage.js";
 import { mutationGate } from "./mutation.js";
 import { scrubbedRunner } from "./exec.js";
@@ -585,7 +585,11 @@ export async function runStageGates({ run: injectedRun, cwd, harness, stage, tie
     if (effectiveTier !== "docs" && !ch.sources.length && !ch.tests.length) {
       result.gates["prove-test"] = { status: "SKIPPED", code: null, duration_ms: 0, log: `no source or test files in the diff (${ch.all.length} file(s), none under [test].source_glob/test_glob) — nothing to prove by tests` };
     } else if (effectiveTier !== "docs") {
-      const pt = await proveTest({ run, cwd, harness, base, addedTests: ch.tests, addedFiles: ch.added });
+      // 1.4.9 — 소스는 그대로고 테스트만 늘었으면 특성화 모드(§prove-test.js CHARACTERIZATION): base에서도 통과해야 GREEN.
+      // 1.4.10 (데모 #15): 특성화는 **바뀐 파일이 전부 테스트일 때만**이다. harness.toml·설정 같은 비-소스 파일이 함께 바뀌면
+      // 그 테스트는 그 변경을 증명하려는 것이고(base에서 실패해야 한다), 특성화로 읽으면 정반대 판정이 난다.
+      const mode = ch.tests.length && ch.all.every((f) => ch.tests.includes(f)) ? CHARACTERIZATION : "prove";
+      const pt = await proveTest({ run, cwd, harness, base, addedTests: ch.tests, addedFiles: ch.added, mode });
       result.gates["prove-test"] = { status: pt.misconfigured ? "MISCONFIGURED" : pt.ok ? "GREEN" : "RED", code: null, duration_ms: 0, log: pt.detail };
       /*
        * 감사 M2 — **판정 불가는 판정 결과와 따로 기록된다.** base에서 테스트가 아예 돌지 못한 것은
