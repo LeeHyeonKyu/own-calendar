@@ -136,14 +136,25 @@ function testsPolicy({ harness, issueBody }) {
  * 글롭으로 매치한다(정확한 경로도 글롭의 특수 케이스다). 경로처럼 보이지 않는 토큰(`/`도 `.`도 없는
  * 낱말)은 버린다 — 산문이 실수로 허가로 읽히지 않게.
  */
-export function testsChangedAllowed(body = "") {
+export function testsChangedAllowed(body = "") { return pathListMarker(body, "tests_changed_allowed"); }
+
+/**
+ * 1.4.15 (KTB #53, own-calendar #21) — `fixes_tests:` 표식. "main에서 빨간 기존 테스트를 녹색으로" 이슈의 증명은 새 테스트가
+ * 아니라 **그 테스트들이 base에서 RED, head에서 GREEN**이라는 사실이다. 어느 테스트인지는 사람이 이슈 본문에 적는다
+ * (`tests_changed_allowed:`와 같은 자리·같은 이유). 게이트가 그 목록을 base 워크트리에서 돌려 RED를 확인한다(§prove-test.js proveFixedTests).
+ */
+export function fixesTests(body = "") { return pathListMarker(body, "fixes_tests"); }
+
+/** 이슈 본문의 `<name>:` 경로 목록 표식 — 한 줄 목록과 그 아래 불릿 목록을 모두 받는다(구현은 `testsChangedAllowed` 주석 참조). */
+export function pathListMarker(body = "", name) {
   const lines = String(body || "").split("\n");
   const out = [];
   // 글롭은 살려 둔다(`test/**/*.test.js`) — 벗기는 것은 마크다운·구두점의 **껍질**뿐이다.
   const clean = (x) => x.replace(/^[`"'(\[*]+/, "").replace(/[`"')\]*,.;:]+$/, "").trim();
   const pathsIn = (s) => String(s).split(/[,\s]+/).map(clean).filter((x) => x && /[/.]/.test(x));
+  const head = new RegExp(`^\\s*(?:[-*]\\s+)?\`?${name}\`?\\s*:\\s*(.*)$`, "i");
   for (let i = 0; i < lines.length; i++) {
-    const m = /^\s*(?:[-*]\s+)?`?tests_changed_allowed`?\s*:\s*(.*)$/i.exec(lines[i]);
+    const m = head.exec(lines[i]);
     if (!m) continue;
     out.push(...pathsIn(m[1]));
     for (let j = i + 1; j < lines.length; j++) {
@@ -153,6 +164,68 @@ export function testsChangedAllowed(body = "") {
     }
   }
   return [...new Set(out)];
+}
+
+/**
+ * 1.4.14 (KTB #73, 데모 #15) — **금지는 계약이다.** `done_when`은 plan이 검사로 바꾸지만 "do NOT …" 줄은 아무 표현이
+ * 없어서 검증자도 자기 게이트도 그 위에서 실패할 수 없었다 — 리뷰 2~3라운드의 산문으로만 드러났고, 데모 #15는 그렇게 K=3을
+ * 세 번 소진했다. 이슈 본문의 `must_not:` 표식(`tests_changed_allowed:`와 같은 자리·같은 이유: 이슈 본문은 사람이 쓰거나
+ * 승인하고, PR diff는 그것을 고칠 수 없다)이 기계가 읽는 금지 목록이다:
+ *
+ *     must_not:
+ *     - touch: `.factory/**`, `playwright.config.js`
+ *     - add: `npx playwright test`, `smol-toml`
+ *     - `src/routes/**`            ← 접두사가 없으면 모양으로 가른다: 경로/글롭이면 touch, 아니면 add
+ *
+ * `touch` 글롭에 걸리는 파일이 diff에 있으면 위반, `add` 토큰이 diff의 **추가된 줄**에 나타나면 위반(패키지 의존성 추가도
+ * package.json의 추가된 줄이다). 산문은 읽지 않는다 — 백틱 토큰만이 계약이다. 두 자리에서 같은 함수를 쓴다: implement 게이트
+ * (`must-not`, RED → 자기 게이트가 handoff를 막는다)와 merge의 `policyViolations`(사람 머지).
+ */
+export const MUST_NOT_TOUCH_RULE = /^must-not-touch — /;
+export const MUST_NOT_ADD_RULE = /^must-not-add — /;
+export function mustNotContract(body = "") {
+  const lines = String(body || "").split("\n");
+  const touch = [], add = [];
+  const tokensIn = (s) => [...String(s).matchAll(/`([^`]+)`/g)].map((m) => m[1].trim()).filter(Boolean);
+  const place = (kind, s) => {
+    for (const t of tokensIn(s)) {
+      const k = kind || (/[/*]/.test(t) || /^[\w.-]+\.[A-Za-z0-9]+$/.test(t) ? "touch" : "add");
+      const arr = k === "touch" ? touch : add;
+      if (!arr.includes(t)) arr.push(t);
+    }
+  };
+  for (let i = 0; i < lines.length; i++) {
+    const m = /^\s*(?:[-*]\s+)?`?must_not`?\s*:\s*(.*)$/i.exec(lines[i]);
+    if (!m) continue;
+    place(null, m[1]);
+    for (let j = i + 1; j < lines.length; j++) {
+      const item = /^\s*[-*]\s+(.+)$/.exec(lines[j]);
+      if (!item) break;
+      const k = /^(touch|add)\s*:/i.exec(item[1]);
+      place(k ? k[1].toLowerCase() : null, k ? item[1].slice(k[0].length) : item[1]);
+    }
+  }
+  return { touch, add };
+}
+
+/**
+ * `mustNotContract`의 위반. `changed`는 diff의 경로들, `added`는 `addedLines()`의 Map(file → [{text, line}]).
+ * → `[{file, rule, line?}]` — rule은 사람이 읽는 문장이고 어느 계약 줄이 깨졌는지 그대로 적는다.
+ */
+export function mustNotViolations({ contract, changed = [], added = new Map() }) {
+  const out = [];
+  if (!contract) return out;
+  for (const p of changed) {
+    const g = (contract.touch || []).find((x) => matchesAny([x], p));
+    if (g) out.push({ file: p, rule: `must-not-touch — the issue forbids changes under \`${g}\`` });
+  }
+  for (const [file, lines] of added instanceof Map ? added : new Map()) {
+    for (const t of contract.add || []) {
+      const hit = lines.find((l) => l.text.includes(t));
+      if (hit) out.push({ file, line: hit.line, rule: `must-not-add — the issue forbids adding \`${t}\` (line ${hit.line})` });
+    }
+  }
+  return out;
 }
 
 /**
@@ -299,6 +372,21 @@ export async function policyViolations({ run, cwd, base, head = "HEAD", harness,
   }
   // 사라진 lessons는 글롭과 무관하게 센다 — L0가 `policy`로 올린 것과 **같은 판정**이어야 한다.
   for (const e of changed) if (e.deleted) violations.push(...lessonsGone(e.path, true));
+  // 1.4.14 (KTB #73) — 이슈 본문의 `must_not:` 계약. implement 게이트와 **같은 함수**로 센다(둘이 갈라지면 게이트가
+  // GREEN이라 한 PR을 머지가 막거나, 그 반대가 된다). 추가된 줄은 `add` 토큰이 있을 때만 한 번 읽는다.
+  const mn = mustNotContract(issueBody);
+  if (mn.touch.length || mn.add.length) {
+    let added = new Map();
+    if (mn.add.length) {
+      const live = changed.filter((e) => !e.deleted).map((e) => e.path);
+      if (live.length) {
+        const u0a = await run("git", U0(base, head, live), { cwd });
+        if (u0a.code !== 0) return { ok: false, files: [], violations: [], reason: gitReason("git diff -U0 (must_not)", u0a) };
+        added = addedLines(u0a.stdout);
+      }
+    }
+    violations.push(...mustNotViolations({ contract: mn, changed: changed.map((e) => e.path), added }));
+  }
   // M9 — harness.toml의 얼어붙은 섹션도 글롭과 무관하게 센다(L0와 같은 판정). 내용은 워킹 트리가
   // 아니라 revision의 blob으로 읽는다: 이 스테이지는 PR head를 체크아웃한 트리 위에서 돌기 때문에
   // 트리를 읽으면 PR이 자기 판정의 재료를 고르게 된다.
@@ -410,7 +498,7 @@ function fileFor(line, current, pendingOld) {
   return current;
 }
 /** git diff -U0 파싱: "+" 줄마다 신규 파일 기준 줄 번호(line, 1-indexed)를 함께 기록한다 */
-function addedLines(u0) {
+export function addedLines(u0) {
   const m = new Map(); let file = null, pendingOld = null, newLine = 0;
   for (const line of u0.split("\n")) {
     if (line.startsWith("--- ")) { pendingOld = line.startsWith("--- a/") ? line.slice(6) : null; continue; }
