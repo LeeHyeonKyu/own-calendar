@@ -6,6 +6,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { run } from "../lib/exec.js";
 import { makeGh, allChecksGreen, resolveFactoryLogins } from "../lib/gh.js";
 import { loadCharter, loadHarness, loadRoles } from "../lib/config.js";
+import { composeEnv } from "../lib/test-env.js";
 import { loadQuarantine, saveQuarantine as writeQuarantine } from "../lib/quarantine.js";
 import { backPressure } from "../lib/back-pressure.js";
 import { runStageGates, verdictLine, gatesDetailLines, commitStatusState, maxTier } from "../lib/gates.js";
@@ -87,7 +88,7 @@ export function stageClaudeArgs({ root, stage, issue, harness, charter, harnessI
   return args;
 }
 
-export function stageClaudeEnv({ root, stage, harnessIssue = false }) {
+export function stageClaudeEnv({ root, stage, harnessIssue = false, harness = null }) {
   // ADR-023 Task 8b — **이 세션은 스테이지의 세션이다**를 훅에게 말하는 한 글자. `block-dangerous.sh`가
   // 이것으로 브랜치 이동(`git checkout <ref>`·`git switch`)을 막는다: 브랜치 체크아웃은 이제 스테이지의
   // 일이고(§makeCheckoutBranch), 세션 안에서 브랜치가 바뀌면 디스크의 훅 스크립트·settings·CLAUDE.md가
@@ -98,6 +99,10 @@ export function stageClaudeEnv({ root, stage, harnessIssue = false }) {
   // 훅은 `claude -p` 세션의 자식 프로세스라 이 변수를 그대로 물려받는다 — block-dangerous.sh가 이것으로
   // 보호 경로 목록을 좁힌다. 값이 정확히 "1"일 때만 선다(훅 쪽 계약).
   if (harnessIssue) env.FACTORY_HARNESS_ISSUE = "1";
+  // 1.4.7 — INCIDENT 2026-09-27 재발: 1.4.6은 게이트 프로세스에만 `COMPOSE_PROJECT_NAME`을 줬고 이 세션엔 주지 않아,
+  // 빌더가 `server/`에서 직접 돌린 `docker compose`가 디렉터리 기본 프로젝트(= 그 호스트의 프로덕션 스택)를
+  // 잡았다. 격리는 러너가 띄우는 **모든** 프로세스에 걸려야 한다 — 에이전트의 Bash도 이 세션의 자식이다.
+  Object.assign(env, composeEnv(harness, root));
   return env;
 }
 
@@ -1108,6 +1113,23 @@ export async function runStage({ stage, issue, deps, runnerId = "unknown", runAt
      * K는 CHARTER의 hard limit이고 컨텍스트로 실려 온다(`ctx.limits.K`). 값이 없으면(구형 배선·읽기
      * 실패) 예전 동작 그대로 rework이다 — 모르는 한도로 사람을 부르지 않는다.
      */
+    /**
+     * 1.4.9 (own-calendar #28/#29) — **검증자 거부는 재작업 한 번을 받는다.** 예전에는 `verifier.verdict === "rejected"`가
+     * `awaiting-review` 전이 요구조건에서 거부돼 곧장 needs-human이었다 — 빌더는 검증자가 적어 준 결함을 한 번도 받아 보지
+     * 못했다. self-gate와 같은 head-키 1회 재시도 + head-agnostic 백스톱을 쓴다: attempt 1이면 findings를 마커로 남기고
+     * `factory:planned`(implement가 다시 뜬다; rework 라운드가 아니라 K를 태우지 않는다), 그 뒤는 needs-human이다.
+     */
+    if (stage === "implement" && v.data?.verifier?.verdict === "rejected" && d.selfGateRetry) {
+      const findings = (v.data.verifier.findings || []).map((f) => ({ check: "verifier", blocking: true, detail: String(f?.claim ?? f?.detail ?? f).slice(0, 400) }));
+      const summary = findings.map((f) => f.detail.slice(0, 120)).join(" | ") || "verifier rejected";
+      const { attempt, total } = await d.selfGateRetry({ head: v.data.head_sha ?? null, findings });
+      const bounded = attempt >= 2 || (Number.isFinite(total) && total >= SELF_GATE_RETRY_BACKSTOP);
+      const to = bounded ? "factory:needs-human" : "factory:planned";
+      const reason = bounded ? `verifier rejected again after one retry: ${summary}` : `verifier rejected (retry ${attempt}): ${summary}`;
+      const t = await d.transition({ to, reason });
+      record(["verify: ok", `verifier: rejected — attempt ${attempt} → ${to} — ${summary.slice(0, 300)}`, ...refusal(t), ...gatesNote, usage]);
+      return t.ok ? 0 : 2;
+    }
     const maxRounds = ctx?.limits?.K;
     const to = nextState(stage, v.data, { maxRounds });
     const exhausted = stage === "review" && to === "factory:needs-human";
@@ -2402,7 +2424,7 @@ async function main() {
     ensureHarnessIssue: ({ entries, pr }) => ensureHarnessIssue({ gh, issue, entries, pr }),
     claudeP: async (_ctx, { harnessIssue = false } = {}) => {
       const args = stageClaudeArgs({ root, stage, issue, harness, charter, harnessIssue });
-      const r = await run("claude", args, { cwd: root, env: stageClaudeEnv({ root, stage, harnessIssue }) });
+      const r = await run("claude", args, { cwd: root, env: stageClaudeEnv({ root, stage, harnessIssue, harness }) });
       mkdirSync(join(root, ".factory/out"), { recursive: true });     // 파싱에 실패해도 원본 stdout은 남긴다
       writeFileSync(join(root, ".factory/out", `${stage}.json`), r.stdout);
       // envelope을 이름 붙여 한 벌 더 남긴다 — `<stage>.json`은 산출물 추출이 성공하면 그 객체로
