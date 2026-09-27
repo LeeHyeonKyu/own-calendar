@@ -4,6 +4,7 @@ import { authenticate } from '../middleware/auth';
 import { validate } from '../middleware/validate';
 import { updateUserSettingsSchema } from '../schemas/user-settings.schema';
 import { AuthRequest } from '../types';
+import { sendError } from '../lib/send-error';
 
 const router = Router();
 
@@ -24,7 +25,7 @@ router.get('/', async (req: AuthRequest, res: Response) => {
 
     res.json(user);
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    sendError(res, err);
   }
 });
 
@@ -39,7 +40,7 @@ router.put('/', validate(updateUserSettingsSchema), async (req: AuthRequest, res
 
     res.json(user);
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    sendError(res, err);
   }
 });
 

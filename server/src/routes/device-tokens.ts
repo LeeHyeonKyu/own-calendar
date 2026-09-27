@@ -4,6 +4,7 @@ import { authenticate } from '../middleware/auth';
 import { validate } from '../middleware/validate';
 import { registerTokenSchema } from '../schemas/device-token.schema';
 import { AuthRequest } from '../types';
+import { sendError } from '../lib/send-error';
 
 const router = Router();
 
@@ -23,7 +24,7 @@ router.post('/', validate(registerTokenSchema), async (req: AuthRequest, res: Re
 
     res.status(201).json(deviceToken);
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    sendError(res, err);
   }
 });
 
@@ -38,7 +39,7 @@ router.delete('/:token', async (req: AuthRequest, res: Response) => {
 
     res.status(204).send();
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    sendError(res, err);
   }
 });
 

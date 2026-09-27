@@ -4,6 +4,7 @@ import { authenticate } from '../middleware/auth';
 import { validate } from '../middleware/validate';
 import { subscribeHolidaySchema, getHolidaysQuerySchema } from '../schemas/holiday.schema';
 import { AuthRequest } from '../types';
+import { sendError } from '../lib/send-error';
 
 const router = Router();
 
@@ -14,8 +15,7 @@ router.get('/', async (req: AuthRequest, res: Response) => {
     const subscriptions = await holidayService.listSubscriptions(req.userId!);
     res.json(subscriptions);
   } catch (err: any) {
-    const status = err.statusCode || 500;
-    res.status(status).json({ error: err.message });
+    sendError(res, err);
   }
 });
 
@@ -25,8 +25,7 @@ router.post('/subscribe', validate(subscribeHolidaySchema), async (req: AuthRequ
     const result = await holidayService.subscribe(req.userId!, countryCode);
     res.json(result);
   } catch (err: any) {
-    const status = err.statusCode || 500;
-    res.status(status).json({ error: err.message });
+    sendError(res, err);
   }
 });
 
@@ -35,8 +34,7 @@ router.delete('/subscribe/:countryCode', async (req: AuthRequest, res: Response)
     const result = await holidayService.unsubscribe(req.userId!, String(req.params.countryCode));
     res.json(result);
   } catch (err: any) {
-    const status = err.statusCode || 500;
-    res.status(status).json({ error: err.message });
+    sendError(res, err);
   }
 });
 
@@ -51,8 +49,7 @@ router.get('/holidays', async (req: AuthRequest, res: Response) => {
     const holidays = await holidayService.getHolidays(req.userId!, year, month, countryCode);
     res.json(holidays);
   } catch (err: any) {
-    const status = err.statusCode || 500;
-    res.status(status).json({ error: err.message });
+    sendError(res, err);
   }
 });
 
