@@ -1,0 +1,20 @@
+# CI-portable throwaway Postgres for server integration tests.
+# NOT the production compose (server/docker-compose.yml) — that one is coupled to the
+# production network stack and must never be used for automated tests.
+# Usage: docker compose -f server/docker-compose.test.yml up -d --wait
+services:
+  postgres:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: testpass
+      POSTGRES_DB: own_calendar_test
+    ports:
+      - "127.0.0.1:5433:5432"
+    tmpfs:
+      - /var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 2s
+      timeout: 5s
+      retries: 30
