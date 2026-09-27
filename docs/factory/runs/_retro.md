@@ -1,38 +1,47 @@
 # Retro State
 
-- last retro: 2026-09-27T13:58:42.189Z
+- last retro: 2026-09-27T19:26:40.682Z
 - merges since last retro: 0
-- current N: 1
+- current N: 2
 
 ## History (last 5)
 
 | at | yield | n_before | n_after | needs_human_since |
 | --- | --- | --- | --- | --- |
-| 2026-09-27T02:14:34.266Z | 0 | 1 | 1 | 17 |
 | 2026-09-27T02:35:11.352Z | 0 | 1 | 2 | 0 |
 | 2026-09-27T06:00:22.254Z | 0 | 2 | 1 | 3 |
 | 2026-09-27T06:16:18.892Z | 0 | 1 | 2 | 0 |
 | 2026-09-27T13:58:42.189Z | 0 | 2 | 1 | 4 |
+| 2026-09-27T19:26:40.682Z | 0 | 1 | 2 | 0 |
 
 ## Stats
 
 | metric | this window | cumulative |
 | --- | --- | --- |
-| merged | 0 | 8 |
-| review rounds avg | 0 | 1.75 |
-| rounds/issue (plan/impl/review) | 0 / 0 / 0 | 1 / 2.75 / 1.75 |
-| escaped defects | 0 | 6 |
-| revert rate | 없음 | 0.00 (0/8) |
+| merged | 4 | 12 |
+| review rounds avg | 1.75 | 1.75 |
+| rounds/issue (plan/impl/review) | 1 / 3.75 / 1.75 | 1 / 3.08 / 1.75 |
+| escaped defects | 3 (#48×1, #46×1, #45×1) | 9 |
+| revert rate | 0.00 (0/4) | 0.00 (0/12) |
 | needs-human | 0 | 29 |
-| rejects by role | 없음 | correctness 2, architecture 1, spec-conformance 6, qa 1 |
-| reviewer overlap | 없음 | 0.38 (5/13, runs 15) |
-| unique findings by role | 없음 | correctness 4, architecture 1, spec-conformance 3 |
-| qa na ratio | 없음 | 0.00 (0/47 claims, na-heavy 0/6 approvals) |
-| cost (usd) | 17.36 | 311.82 |
-| tokens | input 1598509 / output 14507 | input 30563628 / output 452674 |
-| retro cost (usd) | 0.00 | 8.82 |
-| retro tokens | input 0 / output 0 | input 17 / output 5383 |
-| full retros | — | 6 |
+| rejects by role | spec-conformance 3, qa 1 | correctness 2, architecture 1, spec-conformance 9, qa 2 |
+| reviewer overlap | 0.25 (1/4, runs 7) | 0.35 (6/17, runs 22) |
+| unique findings by role | spec-conformance 2, qa 1 | correctness 4, architecture 1, spec-conformance 5, qa 1 |
+| qa na ratio | 0.07 (3/41 claims, na-heavy 0/4 approvals) | 0.03 (3/88 claims, na-heavy 0/10 approvals) |
+| cost (usd) | 65.01 | 376.83 |
+| tokens | input 6488133 / output 74407 | input 37051761 / output 527081 |
+| retro cost (usd) | 1.53 | 10.35 |
+| retro tokens | input 3 / output 538 | input 20 / output 5921 |
+| full retros | — | 7 |
+
+### Rounds per issue (this window)
+
+| issue | plan | implement | review | escaped |
+| --- | --- | --- | --- | --- |
+| #48 | 1 | 4 | 2 | 1 |
+| #47 | 1 | 3 | 1 | 0 |
+| #46 | 1 | 3 | 2 | 1 |
+| #45 | 1 | 5 | 2 | 1 |
 
 ### Phase-2 gate baseline (this session)
 
@@ -46,11 +55,11 @@
 ```json
 {
   "cursor": {
-    "last_retro_at": "2026-09-27T13:58:42.189Z",
+    "last_retro_at": "2026-09-27T19:26:40.682Z",
     "last_record_offsets": {}
   },
   "merges_since": 0,
-  "n": 1,
+  "n": 2,
   "history": [
     {
       "at": "2026-09-14T16:34:23.746Z",
@@ -461,6 +470,103 @@
       ],
       "n_before": 2,
       "n_after": 1
+    },
+    {
+      "at": "2026-09-27T19:26:40.682Z",
+      "yield": 0,
+      "needs_human_since": 0,
+      "applied": [
+        {
+          "step": "feedback-route",
+          "issues": [
+            48,
+            47,
+            46,
+            45
+          ],
+          "actions": [
+            {
+              "kind": "warning",
+              "step": "feedback-route",
+              "login": "LeeHyeonKyu",
+              "current": "bot-hk",
+              "reason": "current factory identity: bot-hk (machine user/app, viewer); older runs in this window ran under a shared identity (LeeHyeonKyu) — their human decisions are unverifiable, nothing to register"
+            },
+            {
+              "kind": "product",
+              "step": "feedback-route",
+              "issue": 48,
+              "count": 2
+            },
+            {
+              "kind": "product",
+              "step": "feedback-route",
+              "issue": 47,
+              "count": 2
+            },
+            {
+              "kind": "unverifiable-decision",
+              "step": "feedback-route",
+              "issue": 46,
+              "author": "LeeHyeonKyu",
+              "reason": "shared identity — author equals a factory login; cannot distinguish a person from an agent",
+              "detail": "human-decision:v1 (skill=unstick) by @LeeHyeonKyu declares `cause: factory-defect` (ktb_fix: 1.4.26) — REFUSED as evidence: @LeeHyeonKyu is also a factory login"
+            },
+            {
+              "kind": "product",
+              "step": "feedback-route",
+              "issue": 46,
+              "count": 1
+            },
+            {
+              "kind": "unverifiable-decision",
+              "step": "feedback-route",
+              "issue": 45,
+              "author": "LeeHyeonKyu",
+              "reason": "shared identity — author equals a factory login; cannot distinguish a person from an agent",
+              "detail": "human-decision:v1 (skill=unstick) by @LeeHyeonKyu declares `cause: factory-defect` (ktb_fix: 1.4.27) — REFUSED as evidence: @LeeHyeonKyu is also a factory login"
+            },
+            {
+              "kind": "ambiguous-note",
+              "step": "feedback-route",
+              "issue": 45,
+              "fingerprint": "bc3f7c333e1ab367"
+            },
+            {
+              "kind": "ambiguous-summary",
+              "step": "feedback-route",
+              "issue": 45,
+              "count": 1
+            },
+            {
+              "kind": "product",
+              "step": "feedback-route",
+              "issue": 45,
+              "count": 3
+            }
+          ]
+        },
+        {
+          "step": "lessons:factory-builder",
+          "added": [
+            "L-2026-09-27-01"
+          ],
+          "rejected": [],
+          "evicted": [],
+          "cited": []
+        },
+        {
+          "step": "publish-lessons",
+          "pr": 84,
+          "merged": false,
+          "reason": "timeout",
+          "files": [
+            ".factory/lessons/factory-builder.md"
+          ]
+        }
+      ],
+      "n_before": 1,
+      "n_after": 2
     }
   ],
   "candidates": {
@@ -568,6 +674,30 @@
           45
         ],
         "source": "must_fix"
+      },
+      {
+        "role": "spec-conformance",
+        "text": "The diff adds rate-limit/mutation-guard assertions for app.ts's authLimiter/globalLimiter (legacyHeaders/ratelimit-policy headers) inside the required happy-path test for the ICS import route. This is content promised by nothing in plan.done_when, plan.non_goals, or the issue body, and it duplicates work that already has its own dedicated issue (#47) in this repo's own history — it is scope injected from an unrelated mutation-hunting activity, not characterization of the import route.",
+        "runs": [
+          48
+        ],
+        "source": "must_fix"
+      },
+      {
+        "role": "spec-conformance",
+        "text": "The issue's literal ask for the GET /holidays query schema — 'year: integer 1970–2100, month: optional integer 1–12, countryCode optional' — is a single three-field request. The countryCode third of it shipped as dead, misleading validation: it is accepted and schema-validated (malformed values correctly 400), but the handler never reads it (holidays.ts:50 destructures only `{ year, month } = parsed.data`) and holidayService.getHolidays(userId, year, month) has no countryCode parameter at all (holiday.service.ts:36). No done_when (dw1-dw5) exercises this field on the GET side — grep on server/tests/holidays.test.ts shows zero countryCode occurrences outside the POST /subscribe tests — so this literal piece of the issue's stated requirement was implemented, shipped, and never verified by anyone the plan authorized to verify it. This is Lens #6's plan-omission case: the issue asked for the field, the plan's done_when set never gated its behavior, and the diff followed that silence straight into an inert, contract-violating field (a client sending a valid countryCode filter gets zero filtering with no error, i.e., silently wrong data).",
+        "runs": [
+          46
+        ],
+        "source": "must_fix"
+      },
+      {
+        "role": "qa",
+        "text": "GET /holidays accepts and strictly validates an optional `countryCode` query parameter (2-letter upper-case regex) but the value is discarded — the handler destructures only `{ year, month }` from `parsed.data` and calls `holidayService.getHolidays(userId, year, month)`, which has no countryCode parameter at all and always returns holidays for every country the user is subscribed to. A caller who subscribes to both US and KR and requests `?year=2025&countryCode=US` gets a 200 with BOTH countries' holidays, silently unfiltered — no error, no indication the filter was ignored.",
+        "runs": [
+          46
+        ],
+        "source": "must_fix"
       }
     ],
     "examples": [],
@@ -626,81 +756,133 @@
     ]
   },
   "stats": {
-    "merged": 0,
-    "review_rounds_avg": 0,
-    "plan_rounds_avg": 0,
-    "implement_rounds_avg": 0,
-    "rounds_per_issue": [],
-    "escaped_defects": 0,
-    "escaped_defects_detail": [],
+    "merged": 4,
+    "review_rounds_avg": 1.75,
+    "plan_rounds_avg": 1,
+    "implement_rounds_avg": 3.75,
+    "rounds_per_issue": [
+      {
+        "issue": 48,
+        "plan": 1,
+        "implement": 4,
+        "review": 2
+      },
+      {
+        "issue": 47,
+        "plan": 1,
+        "implement": 3,
+        "review": 1
+      },
+      {
+        "issue": 46,
+        "plan": 1,
+        "implement": 3,
+        "review": 2
+      },
+      {
+        "issue": 45,
+        "plan": 1,
+        "implement": 5,
+        "review": 2
+      }
+    ],
+    "escaped_defects": 3,
+    "escaped_defects_detail": [
+      {
+        "issue": 48,
+        "count": 1
+      },
+      {
+        "issue": 46,
+        "count": 1
+      },
+      {
+        "issue": 45,
+        "count": 1
+      }
+    ],
     "reverts": 0,
     "reverted_issues": [],
-    "revert_rate": null,
-    "rejects_by_role": {},
-    "review_runs": 0,
-    "findings_total": 0,
-    "overlapping_findings": 0,
-    "unique_findings_by_role": {},
-    "overlap_ratio": 0,
+    "revert_rate": 0,
+    "rejects_by_role": {
+      "spec-conformance": 3,
+      "qa": 1
+    },
+    "review_runs": 7,
+    "findings_total": 4,
+    "overlapping_findings": 1,
+    "unique_findings_by_role": {
+      "spec-conformance": 2,
+      "qa": 1
+    },
+    "overlap_ratio": 0.25,
     "needs_human": 0,
-    "qa_approvals": 0,
-    "qa_claims_total": 0,
-    "qa_na_total": 0,
-    "qa_na_ratio": 0,
+    "qa_approvals": 4,
+    "qa_claims_total": 38,
+    "qa_na_total": 3,
+    "qa_na_ratio": 0.07,
     "qa_na_heavy_approvals": 0,
     "usage": {
-      "cost_usd": 17.361169,
+      "cost_usd": 65.010562,
       "tokens": {
-        "input": 1598509,
-        "output": 14507
+        "input": 6488133,
+        "output": 74407
+      }
+    },
+    "retro_usage": {
+      "cost_usd": 1.528296,
+      "tokens": {
+        "input": 3,
+        "output": 538
       }
     }
   },
   "stats_total": {
-    "merged": 8,
+    "merged": 12,
     "review_rounds_avg": 1.75,
     "plan_rounds_avg": 1,
-    "implement_rounds_avg": 2.75,
-    "escaped_defects": 6,
+    "implement_rounds_avg": 3.08,
+    "escaped_defects": 9,
     "reverts": 0,
     "reverted_issues": [],
     "revert_rate": 0,
     "rejects_by_role": {
       "correctness": 2,
       "architecture": 1,
-      "spec-conformance": 6,
-      "qa": 1
+      "spec-conformance": 9,
+      "qa": 2
     },
-    "review_runs": 15,
-    "findings_total": 13,
-    "overlapping_findings": 5,
+    "review_runs": 22,
+    "findings_total": 17,
+    "overlapping_findings": 6,
     "unique_findings_by_role": {
       "correctness": 4,
       "architecture": 1,
-      "spec-conformance": 3
+      "spec-conformance": 5,
+      "qa": 1
     },
-    "overlap_ratio": 0.38,
+    "overlap_ratio": 0.35,
     "needs_human": 29,
-    "qa_approvals": 6,
-    "qa_claims_total": 47,
-    "qa_na_total": 0,
-    "qa_na_ratio": 0,
+    "qa_approvals": 10,
+    "qa_claims_total": 85,
+    "qa_na_total": 3,
+    "qa_na_ratio": 0.03,
     "qa_na_heavy_approvals": 0,
     "usage": {
-      "cost_usd": 311.821281,
+      "cost_usd": 376.831843,
       "tokens": {
-        "input": 30563628,
-        "output": 452674
+        "input": 37051761,
+        "output": 527081
       }
     },
     "retro_usage": {
-      "cost_usd": 8.821845,
+      "cost_usd": 10.350141,
       "tokens": {
-        "input": 17,
-        "output": 5383
+        "input": 20,
+        "output": 5921
       }
     },
-    "retros": 6
+    "retros": 7
   },
   "deferred_proposals": [],
   "deletion_candidates": []
