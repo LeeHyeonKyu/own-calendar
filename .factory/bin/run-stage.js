@@ -38,6 +38,7 @@ import { transition } from "../lib/transition.js";
 import { appendRunRecord, appendRunRecordLine, reviewEvidenceLine, parseReviewEvidence, runIdOfRunner } from "../lib/run-record.js";
 import { parseHeartbeatComment } from "../lib/board.js";
 import { syncRecords, hydrateRecord, readRecordsDetailed } from "../lib/records-branch.js";
+import { budgetCheck, budgetLine } from "../lib/budget.js";
 import { trustWorkspace } from "./trust-workspace.js";
 import { runMergeStage } from "../lib/merge-stage.js";
 import { HARNESS_OPENS } from "../lib/protected-paths.js";
@@ -204,6 +205,27 @@ export async function runStage({ stage, issue, deps, runnerId = "unknown", runAt
     const h = await d.hydrateRecord?.();
     if (h && !h.ok) record([`hydrate: ${h.reason || "failed"}`]);
   } catch (e) { record([`hydrate: aborted — ${e?.message || e}`]); }
+  /**
+   * 1.4.16 (KTB #44) — **평생 예산.** hydrate 직후, 락을 잡기 전에 본다(§lib/budget.js). back-pressure와 다른 점: 거부가
+   * "물러나 다시 시도"가 아니라 **사람의 결정**이다 — 재큐와 리트라이를 가로질러 이 이슈가 태운 돈이 CHARTER의 캡을 넘었으면
+   * 다음 sweep이 같은 벽에 또 밀어 봐야 같은 답이다. 그래서 needs-human으로 세우고 exit 2다(ADR-020 KTB-28: 거부된 시작은
+   * 시끄럽다). merge는 에이전트를 부르지 않으므로 보지 않는다 — 이미 GREEN인 PR을 돈 때문에 안 닫을 이유는 없다.
+   */
+  if (stage !== "merge" && d.lifetimeBudget) {
+    try {
+      const b = await d.lifetimeBudget();
+      record([budgetLine(b)]);
+      if (!b.ok) {
+        const t = await d.transition({ to: "factory:needs-human", reason: b.reason });
+        record([...refusal(t)]);
+        try { await d.comment?.(issue, `<!-- factory-budget:v1 issue=${issue} usd=${b.usd} cap=${b.cap} runs=${b.runs} -->\n**budget**: ${b.reason}`); } catch { /* 코멘트 실패는 판정을 바꾸지 않는다 */ }
+        return 2;
+      }
+    } catch (e) {
+      // 예산을 못 읽은 것은 흐름 제어의 고장이지 안전 게이트가 아니다 — 흔적을 남기고 진행한다.
+      record([`budget: check failed — ${e?.message || e}`]);
+    }
+  }
   // 공장이 감당할 수 있는 만큼만 물린다. 거부는 실패가 아니다 — 라벨을 건드리지 않고 물러나
   // 다음 sweeper/이벤트에서 다시 시도한다. 그래서 락을 잡기도 전에 본다.
   if (stage === "implement" && d.backPressure) {
@@ -304,6 +326,12 @@ export async function runStage({ stage, issue, deps, runnerId = "unknown", runAt
     // KTB-20: 같은 라벨 조회에서 `factory:harness`도 읽는다 — implement 스테이지만, 그리고 라벨을
     // 실제로 읽었을 때만 선다(조회 실패 → false → 평범한 이슈로 취급: 더 좁은 쪽이 기본값이다).
     let harnessIssue = false;
+    /**
+     * 1.4.21 (L22, own-calendar #9) — **리뷰도 하네스 이슈를 안다.** `harnessIssue`는 implement 전용이다(빌더의 settings·env가
+     * 달라진다). 그런데 overlay는 review에서도 돌고, 하네스 라벨을 모르면 브랜치의 `.factory/harness.toml`(= 리뷰 대상)을
+     * main의 것으로 덮어 "worktree dirty after review"로 세운다 — #9의 3라운드 리뷰가 그렇게 죽었다. 라벨 사실은 따로 든다.
+     */
+    let harnessLabeled = false;
     if (d.issueLabels) {
       const expected = ENTRY_LABELS[stage] || [];
       let labels = null;
@@ -333,7 +361,8 @@ export async function runStage({ stage, issue, deps, runnerId = "unknown", runAt
           return 1;
         }
         entryLabel = found[0];
-        harnessIssue = stage === "implement" && labels.includes(HARNESS_LABEL);
+        harnessLabeled = labels.includes(HARNESS_LABEL);
+        harnessIssue = stage === "implement" && harnessLabeled;
         if (expected.length && !expected.includes(entryLabel)) {
           record([`entry state ${entryLabel ?? "none"} != expected ${expected.join("|")} — nothing to do`]);
           return 0;
@@ -456,6 +485,8 @@ export async function runStage({ stage, issue, deps, runnerId = "unknown", runAt
         return 2;
       }
       checkoutSha = co.sha;
+      // 1.4.21 (L22) — 하네스 이슈의 리뷰는 브랜치의 harness.toml로 게이트를 돈다(implement의 1.4.3 규칙과 같다).
+      if (stage === "review" && harnessLabeled && d.reloadHarness) record([harnessReloadLine(await d.reloadHarness(), "after the review checkout")]);
     }
     // ADR-023 Task 8b — implement의 브랜치 체크아웃은 **스테이지의 일이다**. 예전에는 빌더가 세션 안에서
     // 자기 브랜치를 체크아웃했고, 그 순간 디스크의 훅 스크립트·settings·CLAUDE.md가 PR의 것으로 갈렸다
@@ -482,7 +513,7 @@ export async function runStage({ stage, issue, deps, runnerId = "unknown", runAt
     if (OVERLAY_STAGES.has(stage) && d.overlayFactoryConfig) {
       // harness 이슈의 implement만 `HARNESS_OPENS`를 브랜치에 남긴다(§overlayPathspecs) — 그 이슈가
       // 하려는 일이 바로 그 파일들의 편집이고, `harnessIssue`는 implement에서만 선다(§316행).
-      const ov = await d.overlayFactoryConfig(harnessIssue);
+      const ov = await d.overlayFactoryConfig(harnessIssue || (stage === "review" && harnessLabeled));
       if (!ov.ok) {
         // 판정 불가다(GREEN도 RED도 아니다) — 이 저장소의 그 자리는 언제나 factory:blocked이고,
         // 원인은 대개 러너 쪽이라 재시도로 풀린다.
@@ -2300,6 +2331,11 @@ async function main() {
       return true;
     },
     backPressure: () => backPressure({ gh, charter, quarantine: loadQuarantine(root), thresholds: harness.gates.thresholds }),
+    // 1.4.16 (KTB #44) — 하이드레이트된 이 이슈의 run 기록(`docs/factory/runs/<n>.md`)이 평생 비용의 출처다.
+    lifetimeBudget: () => {
+      const p = join(root, "docs/factory/runs", `${issue}.md`);
+      return budgetCheck({ charter, recordText: existsSync(p) ? readFileSync(p, "utf8") : null });
+    },
     trustWorkspace: () => trustWorkspace({ root }),
     claim: () => claim({ run, cwd: root, issue, stage, runnerId }),
     // KTB-44 (r2 nf-2): 로컬 진입도 다른 네 생산자와 **같은** 검사기를 지난다.
