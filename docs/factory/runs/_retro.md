@@ -1,7 +1,7 @@
 # Retro State
 
 - last retro: 2026-09-27T19:26:40.682Z
-- merges since last retro: 0
+- merges since last retro: 1
 - current N: 2
 
 ## History (last 5)
@@ -18,21 +18,27 @@
 
 | metric | this window | cumulative |
 | --- | --- | --- |
-| merged | 0 | 12 |
-| review rounds avg | 0 | 1.75 |
-| rounds/issue (plan/impl/review) | 0 / 0 / 0 | 1 / 3.08 / 1.75 |
+| merged | 1 | 12 |
+| review rounds avg | 1 | 1.75 |
+| rounds/issue (plan/impl/review) | 1 / 1 / 1 | 1 / 3.08 / 1.75 |
 | escaped defects | 0 | 9 |
-| revert rate | 없음 | 0.00 (0/12) |
-| needs-human | 0 | 29 |
+| revert rate | 0.00 (0/1) | 0.00 (0/12) |
+| needs-human | 3 | 29 |
 | rejects by role | 없음 | correctness 2, architecture 1, spec-conformance 9, qa 2 |
 | reviewer overlap | 없음 | 0.35 (6/17, runs 22) |
 | unique findings by role | 없음 | correctness 4, architecture 1, spec-conformance 5, qa 1 |
-| qa na ratio | 없음 | 0.03 (3/88 claims, na-heavy 0/10 approvals) |
-| cost (usd) | 7.42 | 376.83 |
-| tokens | input 238979 / output 7809 | input 37051761 / output 527081 |
+| qa na ratio | 0.00 (0/19 claims, na-heavy 0/2 approvals) | 0.03 (3/88 claims, na-heavy 0/10 approvals) |
+| cost (usd) | 45.32 | 376.83 |
+| tokens | input 3869301 / output 51686 | input 37051761 / output 527081 |
 | retro cost (usd) | 0.00 | 10.35 |
 | retro tokens | input 0 / output 0 | input 20 / output 5921 |
 | full retros | — | 7 |
+
+### Rounds per issue (this window)
+
+| issue | plan | implement | review | escaped |
+| --- | --- | --- | --- | --- |
+| #50 | 1 | 1 | 1 | 0 |
 
 ### Phase-2 gate baseline (this session)
 
@@ -49,7 +55,7 @@
     "last_retro_at": "2026-09-27T19:26:40.682Z",
     "last_record_offsets": {}
   },
-  "merges_since": 0,
+  "merges_since": 1,
   "n": 2,
   "history": [
     {
@@ -689,6 +695,14 @@
           46
         ],
         "source": "must_fix"
+      },
+      {
+        "role": "spec-conformance",
+        "text": "dw2's text says the endpoint 'returns B's public events from a PUBLIC-visibility calendar' -- i.e. the contract is that events are scoped to the specific followee (ownerId), not merely 'any PUBLIC calendar, any isPrivate:false event'. The test never creates this distinction: every fixture event in this block is created by userB, and no other user's PUBLIC-calendar event exists in the suite. `follow.service.ts` getFolloweePublicEvents filters on three predicates jointly -- `isPrivate:false`, `calendar.visibility:'PUBLIC'`, `calendar.ownerId:followeeId` -- but the test's assertions (`toContain`/`not.toContain` on titles) only exercise the first two. A regression that dropped or weakened the `calendar.ownerId: followeeId` clause (e.g. returning every PUBLIC calendar's events system-wide, leaking user C's events to A when A follows B) would still produce a response containing 'Visible Public Event' and omitting the two hidden-by-name events -- this test would keep passing while the authorization property the issue's own 'Why' section names as the point of this route ('which other users' events a person can see') silently breaks.",
+        "runs": [
+          49
+        ],
+        "source": "must_fix"
       }
     ],
     "examples": [],
@@ -743,37 +757,59 @@
         "issue": 46,
         "reason": "stage artifact missing or invalid: dissent without done_when: d1, d2",
         "at": "2026-09-27T11:46:58Z"
+      },
+      {
+        "issue": 52,
+        "reason": "stage artifact missing or invalid: gates MISCONFIGURED: failing=none misconfigured=prove-test",
+        "at": "2026-09-27T22:23:35Z"
+      },
+      {
+        "issue": 51,
+        "reason": "stage artifact missing or invalid: gates MISCONFIGURED: failing=none misconfigured=prove-test",
+        "at": "2026-09-27T22:08:29Z"
+      },
+      {
+        "issue": 49,
+        "reason": "gates file status is RED",
+        "at": "2026-09-27T23:05:03Z"
       }
     ]
   },
   "stats": {
-    "merged": 0,
-    "review_rounds_avg": 0,
-    "plan_rounds_avg": 0,
-    "implement_rounds_avg": 0,
-    "rounds_per_issue": [],
+    "merged": 1,
+    "review_rounds_avg": 1,
+    "plan_rounds_avg": 1,
+    "implement_rounds_avg": 1,
+    "rounds_per_issue": [
+      {
+        "issue": 50,
+        "plan": 1,
+        "implement": 1,
+        "review": 1
+      }
+    ],
     "escaped_defects": 0,
     "escaped_defects_detail": [],
     "reverts": 0,
     "reverted_issues": [],
-    "revert_rate": null,
+    "revert_rate": 0,
     "rejects_by_role": {},
-    "review_runs": 0,
+    "review_runs": 1,
     "findings_total": 0,
     "overlapping_findings": 0,
     "unique_findings_by_role": {},
     "overlap_ratio": 0,
-    "needs_human": 0,
-    "qa_approvals": 0,
-    "qa_claims_total": 0,
+    "needs_human": 3,
+    "qa_approvals": 2,
+    "qa_claims_total": 19,
     "qa_na_total": 0,
     "qa_na_ratio": 0,
     "qa_na_heavy_approvals": 0,
     "usage": {
-      "cost_usd": 7.424231,
+      "cost_usd": 45.316575,
       "tokens": {
-        "input": 238979,
-        "output": 7809
+        "input": 3869301,
+        "output": 51686
       }
     }
   },
