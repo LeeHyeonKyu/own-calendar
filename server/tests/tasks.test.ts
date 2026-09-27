@@ -249,5 +249,35 @@ describe('Tasks API', () => {
       expect(listRes.headers['x-ratelimit-remaining']).toBeUndefined();
       expect(listRes.headers['x-ratelimit-reset']).toBeUndefined();
     });
+
+    it('test_47_ratelimit_headers_exact_set', async () => {
+      const user = await createTestUser(app);
+      const calendarId = await getUserCalendarId(user.accessToken);
+
+      // Hit the task API through the full middleware stack to observe the
+      // rate-limiter's header policy configured in app.ts.
+      const res = await createTask(user.accessToken, calendarId, { title: 'RL Set Check' });
+      expect(res.status).toBe(201);
+
+      // Collect every rate-limit-related header present in the response.
+      // With standardHeaders: 'draft-7' and legacyHeaders: false the
+      // response must contain exactly 'ratelimit' and 'ratelimit-policy'.
+      // Mutating legacyHeaders to true adds x-ratelimit-limit,
+      // x-ratelimit-remaining, and x-ratelimit-reset — this assertion
+      // catches that by comparing the full sorted set.
+      const rlHeaders = Object.keys(res.headers)
+        .filter((h) => h.includes('ratelimit'))
+        .sort();
+
+      expect(rlHeaders).toEqual(['ratelimit', 'ratelimit-policy']);
+
+      // Positive format assertions for the standard draft-7 headers.
+      // ratelimit-policy is "<limit>;w=<windowSec>" per RFC 9110 / draft-7.
+      expect(res.headers['ratelimit-policy']).toMatch(/^\d+;w=\d+$/);
+      // ratelimit is "limit=<n>, remaining=<n>, reset=<n>" per draft-7.
+      expect(res.headers['ratelimit']).toMatch(
+        /^limit=\d+, remaining=\d+, reset=\d+$/,
+      );
+    });
   });
 });
