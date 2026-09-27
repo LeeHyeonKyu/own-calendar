@@ -222,4 +222,32 @@ describe('Tasks API', () => {
       expect(task.title).toBe('Private Task');
     });
   });
+
+  // --- mutation guard: boolean in app.ts (globalLimiter legacyHeaders: false) ---
+  describe('Response headers', () => {
+    it('test_47_no_legacy_ratelimit_headers', async () => {
+      const user = await createTestUser(app);
+      const calendarId = await getUserCalendarId(user.accessToken);
+
+      // Exercise the task API through the full middleware stack (app.ts).
+      const createRes = await createTask(user.accessToken, calendarId, { title: 'Header Check' });
+      expect(createRes.status).toBe(201);
+
+      // The global rate limiter in app.ts is configured with legacyHeaders: false.
+      // When that boolean is mutated to true, X-RateLimit-* headers appear in every
+      // response. These assertions guard the configured header policy.
+      expect(createRes.headers['x-ratelimit-limit']).toBeUndefined();
+      expect(createRes.headers['x-ratelimit-remaining']).toBeUndefined();
+      expect(createRes.headers['x-ratelimit-reset']).toBeUndefined();
+
+      // Also verify a GET response carries the same header policy.
+      const listRes = await request(app)
+        .get('/api/tasks')
+        .set('Authorization', `Bearer ${user.accessToken}`);
+      expect(listRes.status).toBe(200);
+      expect(listRes.headers['x-ratelimit-limit']).toBeUndefined();
+      expect(listRes.headers['x-ratelimit-remaining']).toBeUndefined();
+      expect(listRes.headers['x-ratelimit-reset']).toBeUndefined();
+    });
+  });
 });
