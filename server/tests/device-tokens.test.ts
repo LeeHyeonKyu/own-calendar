@@ -16,6 +16,9 @@ describe('Device Tokens API', () => {
       expect(res.body).toHaveProperty('token', 'fcm-token-abc123');
       expect(res.body).toHaveProperty('platform', 'IOS');
       expect(res.body).toHaveProperty('userId');
+      // Guard: global rate limiter's legacyHeaders must be false (app.ts boolean).
+      // If the boolean is mutated to true, legacy X-RateLimit-* headers appear.
+      expect(res.headers).not.toHaveProperty('x-ratelimit-limit');
     });
 
     it('second identical POST also returns 201 (upsert idempotency)', async () => {
@@ -94,6 +97,8 @@ describe('Device Tokens API', () => {
         .set('Authorization', `Bearer ${user.accessToken}`);
 
       expect(res.status).toBe(204);
+      // Guard: legacyHeaders: false in app.ts globalLimiter — same check on DELETE path
+      expect(res.headers).not.toHaveProperty('x-ratelimit-limit');
     });
 
     it('repeated DELETE of the same token returns 204', async () => {
@@ -176,6 +181,8 @@ describe('Device Tokens API', () => {
         .send({ token: 'fcm-token-unauth', platform: 'IOS' });
 
       expect(res.status).toBe(401);
+      expect(res.body).toHaveProperty('error');
+      expect(typeof res.body.error).toBe('string');
     });
 
     it('DELETE without Authorization header returns 401', async () => {
@@ -183,6 +190,8 @@ describe('Device Tokens API', () => {
         .delete('/api/device-tokens/fcm-token-unauth');
 
       expect(res.status).toBe(401);
+      expect(res.body).toHaveProperty('error');
+      expect(typeof res.body.error).toBe('string');
     });
   });
 });
