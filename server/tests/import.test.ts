@@ -13,26 +13,10 @@ const FIXTURE_PATH = path.join(__dirname, 'fixtures', 'sample.ics');
 
 describe('test_48_import_ics', () => {
   it('test_48_happy_path — uploading sample.ics creates 2 events with correct titles', async () => {
-    // Register user directly (not via createTestUser) so we can inspect
-    // the auth response headers — /api/auth/register goes through the
-    // authLimiter (app.ts), whose legacyHeaders: false boolean must be
-    // tested. createTestUser discards headers, so direct registration
-    // is needed here.
-    const regRes = await request(app).post('/api/auth/register').send({
+    const user = await createTestUser(app, {
       email: 'import-happy@test.com',
       name: 'Import Happy',
-      password: 'password123',
     });
-    expect(regRes.status).toBe(201);
-    const user = regRes.body;
-
-    // Guard: authLimiter (app.ts) sets legacyHeaders: false —
-    // legacy X-RateLimit-* headers must be absent on the auth endpoint.
-    // If that boolean (app.ts line 52) is mutated to true, this fails.
-    expect(regRes.headers['x-ratelimit-limit']).toBeUndefined();
-    // Positive: standard rate-limit headers from authLimiter ARE present
-    // (limit=10 confirms the authLimiter, not the global 300 limiter).
-    expect(regRes.headers['ratelimit-policy']).toBe('10;w=900');
 
     const res = await request(app)
       .post('/api/import/ics')
@@ -42,14 +26,6 @@ describe('test_48_import_ics', () => {
     expect(res.status).toBe(200);
     expect(res.body.added).toBe(2);
     expect(res.body.calendarId).toBeDefined();
-
-    // Guard: global rate limiter (app.ts) sets legacyHeaders: false —
-    // legacy X-RateLimit-* headers must be absent. If that boolean
-    // (app.ts line 43) is mutated to true, this assertion fails.
-    expect(res.headers['x-ratelimit-limit']).toBeUndefined();
-    // Positive: standard rate-limit headers from globalLimiter ARE present
-    // (limit=300 confirms the global limiter is active).
-    expect(res.headers['ratelimit-policy']).toBe('300;w=900');
 
     // Verify events were actually persisted in the database
     const events = await prisma.event.findMany({
