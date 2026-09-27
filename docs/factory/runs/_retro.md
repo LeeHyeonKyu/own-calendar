@@ -1,8 +1,8 @@
 # Retro State
 
-- last retro: 2026-09-27T02:14:34.266Z
+- last retro: 2026-09-27T02:35:11.352Z
 - merges since last retro: 0
-- current N: 1
+- current N: 2
 
 ## History (last 5)
 
@@ -10,32 +10,33 @@
 | --- | --- | --- | --- | --- |
 | 2026-09-14T16:34:23.746Z | 1 | 1 | 1 | 5 |
 | 2026-09-27T02:14:34.266Z | 0 | 1 | 1 | 17 |
+| 2026-09-27T02:35:11.352Z | 0 | 1 | 2 | 0 |
 
 ## Stats
 
 | metric | this window | cumulative |
 | --- | --- | --- |
-| merged | 1 | 2 |
-| review rounds avg | 1 | 2.5 |
-| rounds/issue (plan/impl/review) | 1 / 1 / 1 | 0.5 / 0.5 / 2.5 |
+| merged | 1 | 3 |
+| review rounds avg | 1 | 2 |
+| rounds/issue (plan/impl/review) | 1 / 4 / 1 | 0.67 / 1.67 / 2 |
 | escaped defects | 0 | 0 |
-| revert rate | 0.00 (0/1) | 0.00 (0/2) |
-| needs-human | 17 | 22 |
+| revert rate | 0.00 (0/1) | 0.00 (0/3) |
+| needs-human | 0 | 22 |
 | rejects by role | 없음 | correctness 2, architecture 1, spec-conformance 1 |
-| reviewer overlap | 없음 | 0.00 (0/6, runs 5) |
+| reviewer overlap | 없음 | 0.00 (0/6, runs 6) |
 | unique findings by role | 없음 | correctness 4, architecture 1, spec-conformance 1 |
-| qa na ratio | 0.00 (0/19 claims, na-heavy 0/2 approvals) | 0.00 (0/19 claims, na-heavy 0/2 approvals) |
-| cost (usd) | 144.34 | 204.09 |
-| tokens | input 10737761 / output 127421 | input 20380640 / output 342065 |
-| retro cost (usd) | 1.87 | 2.64 |
-| retro tokens | input 3 / output 1084 | input 5 / output 2329 |
-| full retros | — | 2 |
+| qa na ratio | 없음 | 0.00 (0/19 claims, na-heavy 0/2 approvals) |
+| cost (usd) | 0.00 | 204.09 |
+| tokens | input 0 / output 0 | input 20380640 / output 342065 |
+| retro cost (usd) | 1.28 | 3.92 |
+| retro tokens | input 3 / output 621 | input 8 / output 2950 |
+| full retros | — | 3 |
 
 ### Rounds per issue (this window)
 
 | issue | plan | implement | review | escaped |
 | --- | --- | --- | --- | --- |
-| #30 | 1 | 1 | 1 | 0 |
+| #29 | 1 | 4 | 1 | 0 |
 
 ### Phase-2 gate baseline (this session)
 
@@ -49,11 +50,11 @@
 ```json
 {
   "cursor": {
-    "last_retro_at": "2026-09-27T02:14:34.266Z",
+    "last_retro_at": "2026-09-27T02:35:11.352Z",
     "last_record_offsets": {}
   },
   "merges_since": 0,
-  "n": 1,
+  "n": 2,
   "history": [
     {
       "at": "2026-09-14T16:34:23.746Z",
@@ -140,6 +141,70 @@
       ],
       "n_before": 1,
       "n_after": 1
+    },
+    {
+      "at": "2026-09-27T02:35:11.352Z",
+      "yield": 0,
+      "needs_human_since": 0,
+      "applied": [
+        {
+          "step": "feedback-route",
+          "issues": [
+            29
+          ],
+          "actions": [
+            {
+              "kind": "warning",
+              "step": "feedback-route",
+              "login": "LeeHyeonKyu",
+              "current": "bot-hk",
+              "reason": "current factory identity: bot-hk (machine user/app, viewer); older runs in this window ran under a shared identity (LeeHyeonKyu) — their human decisions are unverifiable, nothing to register"
+            },
+            {
+              "kind": "unverifiable-decision",
+              "step": "feedback-route",
+              "issue": 29,
+              "author": "LeeHyeonKyu",
+              "reason": "shared identity — author equals a factory login; cannot distinguish a person from an agent",
+              "detail": "human-decision:v1 (skill=unstick) by @LeeHyeonKyu declares `cause: factory-defect` (ktb_fix: 1.4.9) — REFUSED as evidence: @LeeHyeonKyu is also a factory login"
+            },
+            {
+              "kind": "unverifiable-decision",
+              "step": "feedback-route",
+              "issue": 29,
+              "author": "LeeHyeonKyu",
+              "reason": "shared identity — author equals a factory login; cannot distinguish a person from an agent",
+              "detail": "human-decision:v1 (skill=unstick) by @LeeHyeonKyu declares `cause: factory-defect` (ktb_fix: 1.4.12) — REFUSED as evidence: @LeeHyeonKyu is also a factory login"
+            }
+          ]
+        },
+        {
+          "step": "lessons:factory-builder",
+          "added": [
+            "L-2026-09-27-01",
+            "L-2026-09-27-02"
+          ],
+          "rejected": [],
+          "evicted": [],
+          "cited": []
+        },
+        {
+          "step": "publish-lessons",
+          "pr": 63,
+          "merged": false,
+          "reason": "timeout",
+          "files": [
+            ".factory/lessons/factory-builder.md"
+          ]
+        },
+        {
+          "step": "harness",
+          "title": "harness: promote to M2 — HTTP route surface present (express/fastify/hono/koa/next dependency, or routes-style files) but harness maturity is M1 or below",
+          "skipped": "duplicate"
+        }
+      ],
+      "n_before": 1,
+      "n_after": 2
     }
   ],
   "candidates": {
@@ -269,12 +334,12 @@
     "merged": 1,
     "review_rounds_avg": 1,
     "plan_rounds_avg": 1,
-    "implement_rounds_avg": 1,
+    "implement_rounds_avg": 4,
     "rounds_per_issue": [
       {
-        "issue": 30,
+        "issue": 29,
         "plan": 1,
-        "implement": 1,
+        "implement": 4,
         "review": 1
       }
     ],
@@ -289,32 +354,32 @@
     "overlapping_findings": 0,
     "unique_findings_by_role": {},
     "overlap_ratio": 0,
-    "needs_human": 17,
-    "qa_approvals": 2,
-    "qa_claims_total": 19,
+    "needs_human": 0,
+    "qa_approvals": 0,
+    "qa_claims_total": 0,
     "qa_na_total": 0,
     "qa_na_ratio": 0,
     "qa_na_heavy_approvals": 0,
     "usage": {
-      "cost_usd": 144.344804,
+      "cost_usd": 0,
       "tokens": {
-        "input": 10737761,
-        "output": 127421
+        "input": 0,
+        "output": 0
       }
     },
     "retro_usage": {
-      "cost_usd": 1.871327,
+      "cost_usd": 1.281896,
       "tokens": {
         "input": 3,
-        "output": 1084
+        "output": 621
       }
     }
   },
   "stats_total": {
-    "merged": 2,
-    "review_rounds_avg": 2.5,
-    "plan_rounds_avg": 0.5,
-    "implement_rounds_avg": 0.5,
+    "merged": 3,
+    "review_rounds_avg": 2,
+    "plan_rounds_avg": 0.67,
+    "implement_rounds_avg": 1.67,
     "escaped_defects": 0,
     "reverts": 0,
     "reverted_issues": [],
@@ -324,7 +389,7 @@
       "architecture": 1,
       "spec-conformance": 1
     },
-    "review_runs": 5,
+    "review_runs": 6,
     "findings_total": 6,
     "overlapping_findings": 0,
     "unique_findings_by_role": {
@@ -347,13 +412,13 @@
       }
     },
     "retro_usage": {
-      "cost_usd": 2.641283,
+      "cost_usd": 3.923179,
       "tokens": {
-        "input": 5,
-        "output": 2329
+        "input": 8,
+        "output": 2950
       }
     },
-    "retros": 2
+    "retros": 3
   },
   "deferred_proposals": [],
   "deletion_candidates": []
