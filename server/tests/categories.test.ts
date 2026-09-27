@@ -14,6 +14,10 @@ describe('test_43_categories_suite', () => {
       expect(res.status).toBe(200);
       expect(Array.isArray(res.body)).toBe(true);
       expect(res.body).toHaveLength(0);
+      // app.ts globalLimiter sets legacyHeaders: false — legacy rate-limit headers must be absent
+      expect(res.headers['x-ratelimit-limit']).toBeUndefined();
+      // Content-type must be JSON (relies on express.json() + res.json() chain through app.ts)
+      expect(res.headers['content-type']).toMatch(/application\/json/);
     });
   });
 
@@ -31,6 +35,8 @@ describe('test_43_categories_suite', () => {
       expect(res.body.color).toBe('#FF5733');
       expect(res.body.id).toBeDefined();
       expect(res.body.userId).toBeDefined();
+      // app.ts globalLimiter sets legacyHeaders: false — verify no legacy headers leak through
+      expect(res.headers['x-ratelimit-limit']).toBeUndefined();
     });
 
     it('test_43_create_400_no_name: POST without name returns 400 with validate.ts error shape', async () => {
