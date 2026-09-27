@@ -13,13 +13,21 @@ describe('User Settings API', () => {
 
       expect(res.status).toBe(200);
       // Prisma schema default is @default(10)
-      expect(res.body.defaultReminderMinutes).toBe(10);
+      expect(res.body).toEqual({ defaultReminderMinutes: 10 });
+      // app.ts globalLimiter sets legacyHeaders: false — legacy rate-limit
+      // headers must be absent; flipping that boolean to true adds them.
+      expect(res.headers).not.toHaveProperty('x-ratelimit-limit');
+      expect(res.headers).not.toHaveProperty('x-ratelimit-remaining');
+      expect(res.headers).not.toHaveProperty('x-ratelimit-reset');
     });
 
     it('test_44_unauthenticated_get: returns 401 without auth', async () => {
       const res = await request(app).get('/api/user-settings');
 
       expect(res.status).toBe(401);
+      expect(res.body).toHaveProperty('error');
+      // app.ts globalLimiter legacyHeaders: false — no legacy headers
+      expect(res.headers).not.toHaveProperty('x-ratelimit-limit');
     });
   });
 
@@ -33,7 +41,9 @@ describe('User Settings API', () => {
         .send({ defaultReminderMinutes: 30 });
 
       expect(res.status).toBe(200);
-      expect(res.body.defaultReminderMinutes).toBe(30);
+      expect(res.body).toEqual({ defaultReminderMinutes: 30 });
+      // app.ts globalLimiter legacyHeaders: false — no legacy headers
+      expect(res.headers).not.toHaveProperty('x-ratelimit-limit');
     });
 
     it('test_44_get_after_put: GET reflects the previously PUT value', async () => {
@@ -51,7 +61,7 @@ describe('User Settings API', () => {
         .set('Authorization', `Bearer ${user.accessToken}`);
 
       expect(res.status).toBe(200);
-      expect(res.body.defaultReminderMinutes).toBe(45);
+      expect(res.body).toEqual({ defaultReminderMinutes: 45 });
     });
 
     it('test_44_validate_400_shape: PUT with invalid field type returns 400 with validate.ts shape', async () => {
