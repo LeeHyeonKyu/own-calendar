@@ -1,6 +1,8 @@
 import { Router, Response } from 'express';
 import { holidayService } from '../services/holiday.service';
 import { authenticate } from '../middleware/auth';
+import { validate } from '../middleware/validate';
+import { subscribeHolidaySchema, getHolidaysQuerySchema } from '../schemas/holiday.schema';
 import { AuthRequest } from '../types';
 
 const router = Router();
@@ -17,13 +19,9 @@ router.get('/', async (req: AuthRequest, res: Response) => {
   }
 });
 
-router.post('/subscribe', async (req: AuthRequest, res: Response) => {
+router.post('/subscribe', validate(subscribeHolidaySchema), async (req: AuthRequest, res: Response) => {
   try {
     const { countryCode } = req.body;
-    if (!countryCode) {
-      res.status(400).json({ error: '국가 코드를 입력해주세요' });
-      return;
-    }
     const result = await holidayService.subscribe(req.userId!, countryCode);
     res.json(result);
   } catch (err: any) {
@@ -44,9 +42,13 @@ router.delete('/subscribe/:countryCode', async (req: AuthRequest, res: Response)
 
 router.get('/holidays', async (req: AuthRequest, res: Response) => {
   try {
-    const year = parseInt(String(req.query.year)) || new Date().getFullYear();
-    const month = req.query.month ? parseInt(String(req.query.month)) : undefined;
-    const holidays = await holidayService.getHolidays(req.userId!, year, month);
+    const parsed = getHolidaysQuerySchema.safeParse(req.query);
+    if (!parsed.success) {
+      res.status(400).json({ error: 'Validation failed', details: parsed.error.flatten() });
+      return;
+    }
+    const { year, month, countryCode } = parsed.data;
+    const holidays = await holidayService.getHolidays(req.userId!, year, month, countryCode);
     res.json(holidays);
   } catch (err: any) {
     const status = err.statusCode || 500;
