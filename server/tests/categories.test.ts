@@ -7,6 +7,10 @@ describe('test_43_categories_suite', () => {
     it('test_43_list_empty: returns empty array for a new user', async () => {
       const user = await createTestUser(app);
 
+      // Verify the test user was registered with the expected default identity
+      // (setup.ts createTestUser defaults — mutation of that default must be caught)
+      expect(user.user.email).toBe('test@example.com');
+
       const res = await request(app)
         .get('/api/categories')
         .set('Authorization', `Bearer ${user.accessToken}`);
