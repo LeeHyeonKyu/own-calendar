@@ -1,6 +1,6 @@
 import request from 'supertest';
 import app from '../src/app';
-import { createTestUser, prisma } from './setup';
+import { createTestUser } from './setup';
 
 describe('Follows API', () => {
   let userA: any;
@@ -160,6 +160,26 @@ describe('Follows API', () => {
           isPrivate: false,
         });
 
+      // Create userC with a public event on C's default PUBLIC calendar.
+      // This exercises the ownerId scoping: A follows B (not C), so C's
+      // public events must NOT appear when A views B's followed events.
+      const userC = await createTestUser(app, { email: 'userc@example.com', name: 'User C' });
+      const calCRes = await request(app)
+        .get('/api/calendars')
+        .set('Authorization', `Bearer ${userC.accessToken}`);
+      const userCCalendarId = calCRes.body[0].id;
+
+      await request(app)
+        .post('/api/events')
+        .set('Authorization', `Bearer ${userC.accessToken}`)
+        .send({
+          title: 'User C Public Event',
+          startTime: '2026-06-15T16:00:00.000Z',
+          endTime: '2026-06-15T17:00:00.000Z',
+          calendarId: userCCalendarId,
+          isPrivate: false,
+        });
+
       // A views B's events
       const eventsRes = await request(app)
         .get(`/api/follows/${userB.user.id}/events`)
@@ -173,6 +193,8 @@ describe('Follows API', () => {
       expect(titles).not.toContain('Hidden Private Event');
       // Event on PRIVATE calendar should be excluded
       expect(titles).not.toContain('Private Calendar Event');
+      // User C's public event must NOT leak — proves ownerId scoping
+      expect(titles).not.toContain('User C Public Event');
     });
   });
 
