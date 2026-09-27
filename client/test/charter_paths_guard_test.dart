@@ -16,13 +16,12 @@
 // no ordering between tests, no mutable shared state — so the suite is
 // deterministic under parallel repeats.
 //
-// prove-test note: this test guards pre-existing state (paths that exist on
-// main today) and its diff is a single test file with no implementation
-// counterpart. prove-test requires the new test to fail on the base commit,
-// but the paths it checks are identical on base and HEAD. The issue body
-// explicitly states: "The test passes on main today (the paths exist) — that
-// is the expected outcome." A prove-test exemption for test-only guard issues
-// is tracked via harness_needed.
+// prove-test note: this is a test-only diff (single test file, no
+// implementation counterpart), so prove-test runs in *characterization*
+// mode — the new test must PASS on main, and that is the proof. The paths
+// this test guards exist identically on base and HEAD by design. The issue
+// body states: "The test passes on main today (the paths exist) — that is
+// the expected outcome."
 
 import 'dart:io';
 
