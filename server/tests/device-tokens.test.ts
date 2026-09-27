@@ -5,7 +5,38 @@ import { createTestUser, prisma } from './setup';
 describe('Device Tokens API', () => {
   describe('test_45_register_token', () => {
     it('POST with valid body returns 201 and persists the token', async () => {
-      const user = await createTestUser(app);
+      // Register two users directly so we can inspect auth-path rate-limit headers.
+      // /api/auth/register passes through both the globalLimiter AND the authLimiter
+      // (app.ts lines 39-44 and 48-54). Guard both legacyHeaders: false booleans
+      // and the skipSuccessfulRequests: true boolean.
+      const authRes1 = await request(app)
+        .post('/api/auth/register')
+        .send({ email: 'dt-guard1@example.com', name: 'DT Guard1', password: 'password123' });
+      expect(authRes1.status).toBe(201);
+
+      const authRes2 = await request(app)
+        .post('/api/auth/register')
+        .send({ email: 'dt-guard2@example.com', name: 'DT Guard2', password: 'password123' });
+      expect(authRes2.status).toBe(201);
+
+      // Guard: authLimiter's legacyHeaders must be false (app.ts line 52).
+      // If mutated to true, the auth path response includes X-RateLimit-* legacy headers.
+      // authLimiter runs AFTER globalLimiter, so its headers overwrite — we see authLimiter's config.
+      expect(authRes2.headers).not.toHaveProperty('x-ratelimit-limit');
+      expect(authRes2.headers).not.toHaveProperty('x-ratelimit-remaining');
+      expect(authRes2.headers).not.toHaveProperty('x-ratelimit-reset');
+
+      // Guard: authLimiter's skipSuccessfulRequests must be true (app.ts line 53).
+      // With true, successful register requests are uncounted after the response finishes,
+      // so the ratelimit remaining value stays the same between consecutive registrations.
+      // If mutated to false, each successful request decrements remaining.
+      const remaining1 = authRes1.headers['ratelimit']?.match(/remaining=(\d+)/)?.[1];
+      const remaining2 = authRes2.headers['ratelimit']?.match(/remaining=(\d+)/)?.[1];
+      expect(remaining1).toBeDefined();
+      expect(remaining2).toBeDefined();
+      expect(remaining2).toBe(remaining1);
+
+      const user = { ...authRes2.body, password: 'password123' };
 
       const res = await request(app)
         .post('/api/device-tokens')
@@ -16,9 +47,13 @@ describe('Device Tokens API', () => {
       expect(res.body).toHaveProperty('token', 'fcm-token-abc123');
       expect(res.body).toHaveProperty('platform', 'IOS');
       expect(res.body).toHaveProperty('userId');
-      // Guard: global rate limiter's legacyHeaders must be false (app.ts boolean).
+      // Guard: global rate limiter's legacyHeaders must be false (app.ts line 43).
       // If the boolean is mutated to true, legacy X-RateLimit-* headers appear.
       expect(res.headers).not.toHaveProperty('x-ratelimit-limit');
+      // Positive guard: draft-7 standard headers must be present.
+      // If standardHeaders config is removed, these disappear.
+      expect(res.headers).toHaveProperty('ratelimit-policy');
+      expect(res.headers).toHaveProperty('ratelimit');
     });
 
     it('second identical POST also returns 201 (upsert idempotency)', async () => {
@@ -99,6 +134,9 @@ describe('Device Tokens API', () => {
       expect(res.status).toBe(204);
       // Guard: legacyHeaders: false in app.ts globalLimiter — same check on DELETE path
       expect(res.headers).not.toHaveProperty('x-ratelimit-limit');
+      // Positive guard: draft-7 standard headers present on DELETE path too
+      expect(res.headers).toHaveProperty('ratelimit-policy');
+      expect(res.headers).toHaveProperty('ratelimit');
     });
 
     it('repeated DELETE of the same token returns 204', async () => {
