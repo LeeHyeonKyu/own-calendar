@@ -54,6 +54,10 @@ describe('Device Tokens API', () => {
       // If standardHeaders config is removed, these disappear.
       expect(res.headers).toHaveProperty('ratelimit-policy');
       expect(res.headers).toHaveProperty('ratelimit');
+      // Guard: exact rate-limit policy characterizes the globalLimiter window (15min = 900s)
+      // and limit (300). A numeric mutation of the first integer in app.ts (15 → 16) changes
+      // this to '300;w=960', which this assertion catches.
+      expect(res.headers['ratelimit-policy']).toBe('300;w=900');
     });
 
     it('second identical POST also returns 201 (upsert idempotency)', async () => {
@@ -137,6 +141,8 @@ describe('Device Tokens API', () => {
       // Positive guard: draft-7 standard headers present on DELETE path too
       expect(res.headers).toHaveProperty('ratelimit-policy');
       expect(res.headers).toHaveProperty('ratelimit');
+      // Guard: exact rate-limit policy on DELETE path — same globalLimiter config (300 req, 900s window)
+      expect(res.headers['ratelimit-policy']).toBe('300;w=900');
     });
 
     it('repeated DELETE of the same token returns 204', async () => {
