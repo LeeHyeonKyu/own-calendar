@@ -1,8 +1,8 @@
 # Retro State
 
-- last retro: 2026-09-27T06:00:22.254Z
+- last retro: 2026-09-27T06:16:18.892Z
 - merges since last retro: 0
-- current N: 1
+- current N: 2
 
 ## History (last 5)
 
@@ -12,33 +12,33 @@
 | 2026-09-27T02:14:34.266Z | 0 | 1 | 1 | 17 |
 | 2026-09-27T02:35:11.352Z | 0 | 1 | 2 | 0 |
 | 2026-09-27T06:00:22.254Z | 0 | 2 | 1 | 3 |
+| 2026-09-27T06:16:18.892Z | 0 | 1 | 2 | 0 |
 
 ## Stats
 
 | metric | this window | cumulative |
 | --- | --- | --- |
-| merged | 2 | 5 |
-| review rounds avg | 1.5 | 1.8 |
-| rounds/issue (plan/impl/review) | 1.5 / 4 / 1.5 | 1 / 2.6 / 1.8 |
-| escaped defects | 3 (#31×3) | 3 |
-| revert rate | 0.00 (0/2) | 0.00 (0/5) |
-| needs-human | 3 | 25 |
-| rejects by role | spec-conformance 2, qa 1 | correctness 2, architecture 1, spec-conformance 3, qa 1 |
-| reviewer overlap | 0.67 (2/3, runs 4) | 0.22 (2/9, runs 10) |
-| unique findings by role | spec-conformance 1 | correctness 4, architecture 1, spec-conformance 2 |
-| qa na ratio | 0.00 (0/16 claims, na-heavy 0/2 approvals) | 0.00 (0/35 claims, na-heavy 0/4 approvals) |
-| cost (usd) | 40.08 | 244.17 |
-| tokens | input 3953095 / output 57847 | input 24333735 / output 399912 |
-| retro cost (usd) | 1.52 | 5.45 |
-| retro tokens | input 3 / output 731 | input 11 / output 3681 |
-| full retros | — | 4 |
+| merged | 1 | 6 |
+| review rounds avg | 3 | 2 |
+| rounds/issue (plan/impl/review) | 1 / 3 / 3 | 1 / 2.67 / 2 |
+| escaped defects | 3 (#9×3) | 6 |
+| revert rate | 0.00 (0/1) | 0.00 (0/6) |
+| needs-human | 0 | 25 |
+| rejects by role | spec-conformance 3 | correctness 2, architecture 1, spec-conformance 6, qa 1 |
+| reviewer overlap | 0.75 (3/4, runs 3) | 0.38 (5/13, runs 13) |
+| unique findings by role | spec-conformance 1 | correctness 4, architecture 1, spec-conformance 3 |
+| qa na ratio | 없음 | 0.00 (0/35 claims, na-heavy 0/4 approvals) |
+| cost (usd) | 0.00 | 244.17 |
+| tokens | input 0 / output 0 | input 24333735 / output 399912 |
+| retro cost (usd) | 1.51 | 6.96 |
+| retro tokens | input 3 / output 688 | input 14 / output 4369 |
+| full retros | — | 5 |
 
 ### Rounds per issue (this window)
 
 | issue | plan | implement | review | escaped |
 | --- | --- | --- | --- | --- |
-| #31 | 2 | 5 | 2 | 3 |
-| #28 | 1 | 3 | 1 | 0 |
+| #9 | 1 | 3 | 3 | 3 |
 
 ### Phase-2 gate baseline (this session)
 
@@ -52,11 +52,11 @@
 ```json
 {
   "cursor": {
-    "last_retro_at": "2026-09-27T06:00:22.254Z",
+    "last_retro_at": "2026-09-27T06:16:18.892Z",
     "last_record_offsets": {}
   },
   "merges_since": 0,
-  "n": 1,
+  "n": 2,
   "history": [
     {
       "at": "2026-09-14T16:34:23.746Z",
@@ -310,6 +310,96 @@
       ],
       "n_before": 2,
       "n_after": 1
+    },
+    {
+      "at": "2026-09-27T06:16:18.892Z",
+      "yield": 0,
+      "needs_human_since": 0,
+      "applied": [
+        {
+          "step": "feedback-route",
+          "issues": [
+            9
+          ],
+          "actions": [
+            {
+              "kind": "warning",
+              "step": "feedback-route",
+              "login": "LeeHyeonKyu",
+              "current": "bot-hk",
+              "reason": "current factory identity: bot-hk (machine user/app, viewer); older runs in this window ran under a shared identity (LeeHyeonKyu) — their human decisions are unverifiable, nothing to register"
+            },
+            {
+              "kind": "unverifiable-decision",
+              "step": "feedback-route",
+              "issue": 9,
+              "author": "LeeHyeonKyu",
+              "reason": "shared identity — author equals a factory login; cannot distinguish a person from an agent",
+              "detail": "human-decision:v1 (skill=unstick) by @LeeHyeonKyu declares `cause: factory-defect` — REFUSED as evidence: @LeeHyeonKyu is also a factory login"
+            },
+            {
+              "kind": "unverifiable-decision",
+              "step": "feedback-route",
+              "issue": 9,
+              "author": "LeeHyeonKyu",
+              "reason": "shared identity — author equals a factory login; cannot distinguish a person from an agent",
+              "detail": "human-decision:v1 (skill=unstick) by @LeeHyeonKyu declares `cause: factory-defect` (ktb_fix: 1.4.12) — REFUSED as evidence: @LeeHyeonKyu is also a factory login"
+            },
+            {
+              "kind": "unverifiable-decision",
+              "step": "feedback-route",
+              "issue": 9,
+              "author": "LeeHyeonKyu",
+              "reason": "shared identity — author equals a factory login; cannot distinguish a person from an agent",
+              "detail": "human-decision:v1 (skill=unstick) by @LeeHyeonKyu declares `cause: factory-defect` (ktb_fix: 1.4.21) — REFUSED as evidence: @LeeHyeonKyu is also a factory login"
+            },
+            {
+              "kind": "unverifiable-decision",
+              "step": "feedback-route",
+              "issue": 9,
+              "author": "LeeHyeonKyu",
+              "reason": "shared identity — author equals a factory login; cannot distinguish a person from an agent",
+              "detail": "human-decision:v1 (skill=unstick) by @LeeHyeonKyu declares `cause: factory-defect` (ktb_fix: 1.4.22) — REFUSED as evidence: @LeeHyeonKyu is also a factory login"
+            },
+            {
+              "kind": "harness-issue",
+              "step": "feedback-route",
+              "issue": 9,
+              "harness_issue": 66,
+              "created": true,
+              "appended": 0,
+              "findings": 3
+            },
+            {
+              "kind": "product",
+              "step": "feedback-route",
+              "issue": 9,
+              "count": 2
+            }
+          ]
+        },
+        {
+          "step": "lessons:factory-builder",
+          "added": [
+            "L-2026-09-27-01",
+            "L-2026-09-27-02"
+          ],
+          "rejected": [],
+          "evicted": [],
+          "cited": []
+        },
+        {
+          "step": "publish-lessons",
+          "pr": 67,
+          "merged": false,
+          "reason": "timeout",
+          "files": [
+            ".factory/lessons/factory-builder.md"
+          ]
+        }
+      ],
+      "n_before": 1,
+      "n_after": 2
     }
   ],
   "candidates": {
@@ -452,28 +542,22 @@
     ]
   },
   "stats": {
-    "merged": 2,
-    "review_rounds_avg": 1.5,
-    "plan_rounds_avg": 1.5,
-    "implement_rounds_avg": 4,
+    "merged": 1,
+    "review_rounds_avg": 3,
+    "plan_rounds_avg": 1,
+    "implement_rounds_avg": 3,
     "rounds_per_issue": [
       {
-        "issue": 31,
-        "plan": 2,
-        "implement": 5,
-        "review": 2
-      },
-      {
-        "issue": 28,
+        "issue": 9,
         "plan": 1,
         "implement": 3,
-        "review": 1
+        "review": 3
       }
     ],
     "escaped_defects": 3,
     "escaped_defects_detail": [
       {
-        "issue": 31,
+        "issue": 9,
         "count": 3
       }
     ],
@@ -481,61 +565,60 @@
     "reverted_issues": [],
     "revert_rate": 0,
     "rejects_by_role": {
-      "spec-conformance": 2,
-      "qa": 1
+      "spec-conformance": 3
     },
-    "review_runs": 4,
-    "findings_total": 3,
-    "overlapping_findings": 2,
+    "review_runs": 3,
+    "findings_total": 4,
+    "overlapping_findings": 3,
     "unique_findings_by_role": {
       "spec-conformance": 1
     },
-    "overlap_ratio": 0.67,
-    "needs_human": 3,
-    "qa_approvals": 2,
-    "qa_claims_total": 16,
+    "overlap_ratio": 0.75,
+    "needs_human": 0,
+    "qa_approvals": 0,
+    "qa_claims_total": 0,
     "qa_na_total": 0,
     "qa_na_ratio": 0,
     "qa_na_heavy_approvals": 0,
     "usage": {
-      "cost_usd": 40.082325,
+      "cost_usd": 0,
       "tokens": {
-        "input": 3953095,
-        "output": 57847
+        "input": 0,
+        "output": 0
       }
     },
     "retro_usage": {
-      "cost_usd": 1.523081,
+      "cost_usd": 1.513572,
       "tokens": {
         "input": 3,
-        "output": 731
+        "output": 688
       }
     }
   },
   "stats_total": {
-    "merged": 5,
-    "review_rounds_avg": 1.8,
+    "merged": 6,
+    "review_rounds_avg": 2,
     "plan_rounds_avg": 1,
-    "implement_rounds_avg": 2.6,
-    "escaped_defects": 3,
+    "implement_rounds_avg": 2.67,
+    "escaped_defects": 6,
     "reverts": 0,
     "reverted_issues": [],
     "revert_rate": 0,
     "rejects_by_role": {
       "correctness": 2,
       "architecture": 1,
-      "spec-conformance": 3,
+      "spec-conformance": 6,
       "qa": 1
     },
-    "review_runs": 10,
-    "findings_total": 9,
-    "overlapping_findings": 2,
+    "review_runs": 13,
+    "findings_total": 13,
+    "overlapping_findings": 5,
     "unique_findings_by_role": {
       "correctness": 4,
       "architecture": 1,
-      "spec-conformance": 2
+      "spec-conformance": 3
     },
-    "overlap_ratio": 0.22,
+    "overlap_ratio": 0.38,
     "needs_human": 25,
     "qa_approvals": 4,
     "qa_claims_total": 35,
@@ -550,13 +633,13 @@
       }
     },
     "retro_usage": {
-      "cost_usd": 5.44626,
+      "cost_usd": 6.959832,
       "tokens": {
-        "input": 11,
-        "output": 3681
+        "input": 14,
+        "output": 4369
       }
     },
-    "retros": 4
+    "retros": 5
   },
   "deferred_proposals": [],
   "deletion_candidates": []
