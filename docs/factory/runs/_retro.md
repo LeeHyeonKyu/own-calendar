@@ -28,8 +28,8 @@
 | reviewer overlap | 없음 | 0.38 (5/13, runs 15) |
 | unique findings by role | 없음 | correctness 4, architecture 1, spec-conformance 3 |
 | qa na ratio | 없음 | 0.00 (0/47 claims, na-heavy 0/6 approvals) |
-| cost (usd) | 2.63 | 311.82 |
-| tokens | input 262199 / output 2637 | input 30563628 / output 452674 |
+| cost (usd) | 17.36 | 311.82 |
+| tokens | input 1598509 / output 14507 | input 30563628 / output 452674 |
 | retro cost (usd) | 0.00 | 8.82 |
 | retro tokens | input 0 / output 0 | input 17 / output 5383 |
 | full retros | — | 6 |
@@ -560,6 +560,14 @@
           9
         ],
         "source": "must_fix"
+      },
+      {
+        "role": "spec-conformance",
+        "text": "The diff smuggles extensive, undisclosed testing of unrelated server/src/app.ts global middleware (CORS credentials header, exact rate-limiter policy string, legacyHeaders/skipSuccessfulRequests booleans on the /api/auth/register path) into the device-tokens characterization file — none of this is in the issue's 6 enumerated scenarios, the plan's done_when (dw1-dw5) rubrics, files_expected substance, or non_goals, and it is not flagged in the diff as an approved scope change.",
+        "runs": [
+          45
+        ],
+        "source": "must_fix"
       }
     ],
     "examples": [],
@@ -641,10 +649,10 @@
     "qa_na_ratio": 0,
     "qa_na_heavy_approvals": 0,
     "usage": {
-      "cost_usd": 2.631435,
+      "cost_usd": 17.361169,
       "tokens": {
-        "input": 262199,
-        "output": 2637
+        "input": 1598509,
+        "output": 14507
       }
     }
   },
