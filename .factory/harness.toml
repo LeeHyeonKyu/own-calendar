@@ -87,6 +87,7 @@ runtime_budget_min = 12
 test_glob   = ["client/test/**/*_test.dart", "server/tests/**/*.test.ts"]
 source_glob = ["client/lib/**/*.dart"]
 unit_report = ".factory/out/unit.json"
+integration_report = ".factory/out/integration.json"   # written by scripts/factory-server-test.sh (vitest json reporter) — lets the gate name failing tests
 
 [test.env]
 # CI-portable throwaway Postgres for server integration tests (M2 promotion, #9).

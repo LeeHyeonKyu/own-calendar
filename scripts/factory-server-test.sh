@@ -4,7 +4,8 @@
 # Exit code is the verdict — non-zero means at least one test failed.
 set -euo pipefail
 
-cd "$(dirname "$0")/../server"
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+cd "$ROOT/server"
 
 # Deterministic dependency install (dw5): ensure server/node_modules is provisioned
 # before prisma or vitest are invoked, so a fresh checkout without pre-existing
@@ -27,8 +28,12 @@ npx prisma db push --skip-generate --accept-data-loss
 args=()
 for a in "$@"; do args+=("${a#server/}"); done
 
+# Full-suite runs also write a JSON report for the factory's integration gate ([test].integration_report):
+# without it the gate cannot name failing tests, so a flaky existing test (tests/family.test.ts, #45) can
+# neither be classified nor excluded and every retry goes RED. File-scoped runs (test_files) skip it.
+mkdir -p "$ROOT/.factory/out"
 if [ ${#args[@]} -eq 0 ]; then
-  exec npx vitest run
+  exec npx vitest run --reporter=default --reporter=json --outputFile="$ROOT/.factory/out/integration.json"
 else
   exec npx vitest run "${args[@]}"
 fi

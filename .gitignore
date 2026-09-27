@@ -23,3 +23,6 @@ docs/factory/runs/
 test-results/
 coverage/
 .nyc_output/
+
+# Node tool caches at the repo root (vitest writes node_modules/.vite when run from here — #44 review parked on it)
+node_modules/
