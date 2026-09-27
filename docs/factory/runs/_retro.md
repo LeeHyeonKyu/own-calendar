@@ -1,43 +1,44 @@
 # Retro State
 
-- last retro: 2026-09-27T06:16:18.892Z
-- merges since last retro: 1
-- current N: 2
+- last retro: 2026-09-27T13:58:42.189Z
+- merges since last retro: 0
+- current N: 1
 
 ## History (last 5)
 
 | at | yield | n_before | n_after | needs_human_since |
 | --- | --- | --- | --- | --- |
-| 2026-09-14T16:34:23.746Z | 1 | 1 | 1 | 5 |
 | 2026-09-27T02:14:34.266Z | 0 | 1 | 1 | 17 |
 | 2026-09-27T02:35:11.352Z | 0 | 1 | 2 | 0 |
 | 2026-09-27T06:00:22.254Z | 0 | 2 | 1 | 3 |
 | 2026-09-27T06:16:18.892Z | 0 | 1 | 2 | 0 |
+| 2026-09-27T13:58:42.189Z | 0 | 2 | 1 | 4 |
 
 ## Stats
 
 | metric | this window | cumulative |
 | --- | --- | --- |
-| merged | 1 | 6 |
-| review rounds avg | 1 | 2 |
-| rounds/issue (plan/impl/review) | 1 / 3 / 1 | 1 / 2.67 / 2 |
+| merged | 2 | 8 |
+| review rounds avg | 1 | 1.75 |
+| rounds/issue (plan/impl/review) | 1 / 3 / 1 | 1 / 2.75 / 1.75 |
 | escaped defects | 0 | 6 |
-| revert rate | 0.00 (0/1) | 0.00 (0/6) |
-| needs-human | 4 | 25 |
+| revert rate | 0.00 (0/2) | 0.00 (0/8) |
+| needs-human | 4 | 29 |
 | rejects by role | 없음 | correctness 2, architecture 1, spec-conformance 6, qa 1 |
-| reviewer overlap | 없음 | 0.38 (5/13, runs 13) |
+| reviewer overlap | 없음 | 0.38 (5/13, runs 15) |
 | unique findings by role | 없음 | correctness 4, architecture 1, spec-conformance 3 |
-| qa na ratio | 0.00 (0/12 claims, na-heavy 0/2 approvals) | 0.00 (0/35 claims, na-heavy 0/4 approvals) |
-| cost (usd) | 54.79 | 244.17 |
-| tokens | input 4944194 / output 39978 | input 24333735 / output 399912 |
-| retro cost (usd) | 0.00 | 6.96 |
-| retro tokens | input 0 / output 0 | input 14 / output 4369 |
-| full retros | — | 5 |
+| qa na ratio | 0.00 (0/12 claims, na-heavy 0/2 approvals) | 0.00 (0/47 claims, na-heavy 0/6 approvals) |
+| cost (usd) | 67.65 | 311.82 |
+| tokens | input 6229893 / output 52762 | input 30563628 / output 452674 |
+| retro cost (usd) | 1.86 | 8.82 |
+| retro tokens | input 3 / output 1014 | input 17 / output 5383 |
+| full retros | — | 6 |
 
 ### Rounds per issue (this window)
 
 | issue | plan | implement | review | escaped |
 | --- | --- | --- | --- | --- |
+| #44 | 1 | 3 | 1 | 0 |
 | #43 | 1 | 3 | 1 | 0 |
 
 ### Phase-2 gate baseline (this session)
@@ -52,11 +53,11 @@
 ```json
 {
   "cursor": {
-    "last_retro_at": "2026-09-27T06:16:18.892Z",
+    "last_retro_at": "2026-09-27T13:58:42.189Z",
     "last_record_offsets": {}
   },
-  "merges_since": 1,
-  "n": 2,
+  "merges_since": 0,
+  "n": 1,
   "history": [
     {
       "at": "2026-09-14T16:34:23.746Z",
@@ -400,6 +401,73 @@
       ],
       "n_before": 1,
       "n_after": 2
+    },
+    {
+      "at": "2026-09-27T13:58:42.189Z",
+      "yield": 0,
+      "needs_human_since": 4,
+      "applied": [
+        {
+          "step": "feedback-route",
+          "issues": [
+            44,
+            43
+          ],
+          "actions": [
+            {
+              "kind": "warning",
+              "step": "feedback-route",
+              "login": "LeeHyeonKyu",
+              "current": "bot-hk",
+              "reason": "current factory identity: bot-hk (machine user/app, viewer); older runs in this window ran under a shared identity (LeeHyeonKyu) — their human decisions are unverifiable, nothing to register"
+            },
+            {
+              "kind": "product",
+              "step": "feedback-route",
+              "issue": 44,
+              "count": 2
+            },
+            {
+              "kind": "product",
+              "step": "feedback-route",
+              "issue": 43,
+              "count": 2
+            }
+          ]
+        },
+        {
+          "step": "lessons:factory-builder",
+          "added": [
+            "L-2026-09-27-01"
+          ],
+          "rejected": [],
+          "evicted": [],
+          "cited": []
+        },
+        {
+          "step": "role:factory-builder",
+          "added": [
+            {
+              "section": "### 나쁜 발견",
+              "text": "위치: implement handoff (`files_expected = [\"client/test/charter_paths_guard_test.dart\"]`). 주장: 테스트에 공용 헬퍼가 필요해서 `files_expected` 밖의 `client/lib/testing/charter_paths.dart`를 scope-change 사유 없이 추가했다. 근거: plan이 승인하지 않은 파일은 리뷰 범위 밖이다 — spec-conformance가 reject하고 rework 라운드를 소모한다. 필요하면 handoff notes에 'Sc…"
+            }
+          ],
+          "skipped": [],
+          "deferred": []
+        },
+        {
+          "step": "publish-lessons",
+          "pr": 82,
+          "merged": false,
+          "reason": "timeout",
+          "files": [
+            ".factory/lessons/factory-builder.md",
+            ".claude/agents/factory-builder.md"
+          ]
+        }
+      ],
+      "n_before": 2,
+      "n_after": 1
     }
   ],
   "candidates": {
@@ -557,11 +625,17 @@
     ]
   },
   "stats": {
-    "merged": 1,
+    "merged": 2,
     "review_rounds_avg": 1,
     "plan_rounds_avg": 1,
     "implement_rounds_avg": 3,
     "rounds_per_issue": [
+      {
+        "issue": 44,
+        "plan": 1,
+        "implement": 3,
+        "review": 1
+      },
       {
         "issue": 43,
         "plan": 1,
@@ -575,7 +649,7 @@
     "reverted_issues": [],
     "revert_rate": 0,
     "rejects_by_role": {},
-    "review_runs": 1,
+    "review_runs": 2,
     "findings_total": 0,
     "overlapping_findings": 0,
     "unique_findings_by_role": {},
@@ -587,18 +661,25 @@
     "qa_na_ratio": 0,
     "qa_na_heavy_approvals": 0,
     "usage": {
-      "cost_usd": 54.788082,
+      "cost_usd": 67.646699,
       "tokens": {
-        "input": 4944194,
-        "output": 39978
+        "input": 6229893,
+        "output": 52762
+      }
+    },
+    "retro_usage": {
+      "cost_usd": 1.862013,
+      "tokens": {
+        "input": 3,
+        "output": 1014
       }
     }
   },
   "stats_total": {
-    "merged": 6,
-    "review_rounds_avg": 2,
+    "merged": 8,
+    "review_rounds_avg": 1.75,
     "plan_rounds_avg": 1,
-    "implement_rounds_avg": 2.67,
+    "implement_rounds_avg": 2.75,
     "escaped_defects": 6,
     "reverts": 0,
     "reverted_issues": [],
@@ -609,7 +690,7 @@
       "spec-conformance": 6,
       "qa": 1
     },
-    "review_runs": 13,
+    "review_runs": 15,
     "findings_total": 13,
     "overlapping_findings": 5,
     "unique_findings_by_role": {
@@ -618,27 +699,27 @@
       "spec-conformance": 3
     },
     "overlap_ratio": 0.38,
-    "needs_human": 25,
-    "qa_approvals": 4,
-    "qa_claims_total": 35,
+    "needs_human": 29,
+    "qa_approvals": 6,
+    "qa_claims_total": 47,
     "qa_na_total": 0,
     "qa_na_ratio": 0,
     "qa_na_heavy_approvals": 0,
     "usage": {
-      "cost_usd": 244.174582,
+      "cost_usd": 311.821281,
       "tokens": {
-        "input": 24333735,
-        "output": 399912
+        "input": 30563628,
+        "output": 452674
       }
     },
     "retro_usage": {
-      "cost_usd": 6.959832,
+      "cost_usd": 8.821845,
       "tokens": {
-        "input": 14,
-        "output": 4369
+        "input": 17,
+        "output": 5383
       }
     },
-    "retros": 5
+    "retros": 6
   },
   "deferred_proposals": [],
   "deletion_candidates": []
