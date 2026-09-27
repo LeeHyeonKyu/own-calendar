@@ -6,6 +6,10 @@ describe('User Settings API', () => {
   describe('GET /api/user-settings', () => {
     it('test_44_get_defaults: returns default settings for a fresh user', async () => {
       const user = await createTestUser(app);
+      // Precondition: verify the test helper created the user with the expected
+      // default email — catches a mutation in setup.ts that silently replaces
+      // the registration email with an arbitrary string.
+      expect(user.user.email).toBe('test@example.com');
 
       const res = await request(app)
         .get('/api/user-settings')
