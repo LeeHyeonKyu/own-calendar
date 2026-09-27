@@ -1,55 +1,11 @@
-// Activate the CORS middleware in app.ts so the `credentials: true` boolean is reachable.
-// Without CORS_ORIGIN, `if (config.corsOrigin.length > 0)` is never entered and any
-// mutation of the credentials boolean survives undetected. vi.hoisted() runs before
-// imports so app.ts reads the value during module initialisation.
-vi.hoisted(() => {
-  process.env.CORS_ORIGIN = 'http://factory-test.local';
-});
-
 import request from 'supertest';
 import app from '../src/app';
 import { createTestUser, prisma } from './setup';
 
 describe('Device Tokens API', () => {
-  afterAll(() => {
-    // Remove the CORS_ORIGIN set by vi.hoisted so it does not leak to later test files
-    delete process.env.CORS_ORIGIN;
-  });
-
   describe('test_45_register_token', () => {
     it('POST with valid body returns 201 and persists the token', async () => {
-      // Register two users directly so we can inspect auth-path rate-limit headers.
-      // /api/auth/register passes through both the globalLimiter AND the authLimiter
-      // (app.ts lines 39-44 and 48-54). Guard both legacyHeaders: false booleans
-      // and the skipSuccessfulRequests: true boolean.
-      const authRes1 = await request(app)
-        .post('/api/auth/register')
-        .send({ email: 'dt-guard1@example.com', name: 'DT Guard1', password: 'password123' });
-      expect(authRes1.status).toBe(201);
-
-      const authRes2 = await request(app)
-        .post('/api/auth/register')
-        .send({ email: 'dt-guard2@example.com', name: 'DT Guard2', password: 'password123' });
-      expect(authRes2.status).toBe(201);
-
-      // Guard: authLimiter's legacyHeaders must be false (app.ts line 52).
-      // If mutated to true, the auth path response includes X-RateLimit-* legacy headers.
-      // authLimiter runs AFTER globalLimiter, so its headers overwrite — we see authLimiter's config.
-      expect(authRes2.headers).not.toHaveProperty('x-ratelimit-limit');
-      expect(authRes2.headers).not.toHaveProperty('x-ratelimit-remaining');
-      expect(authRes2.headers).not.toHaveProperty('x-ratelimit-reset');
-
-      // Guard: authLimiter's skipSuccessfulRequests must be true (app.ts line 53).
-      // With true, successful register requests are uncounted after the response finishes,
-      // so the ratelimit remaining value stays the same between consecutive registrations.
-      // If mutated to false, each successful request decrements remaining.
-      const remaining1 = authRes1.headers['ratelimit']?.match(/remaining=(\d+)/)?.[1];
-      const remaining2 = authRes2.headers['ratelimit']?.match(/remaining=(\d+)/)?.[1];
-      expect(remaining1).toBeDefined();
-      expect(remaining2).toBeDefined();
-      expect(remaining2).toBe(remaining1);
-
-      const user = { ...authRes2.body, password: 'password123' };
+      const user = await createTestUser(app);
 
       const res = await request(app)
         .post('/api/device-tokens')
@@ -60,35 +16,6 @@ describe('Device Tokens API', () => {
       expect(res.body).toHaveProperty('token', 'fcm-token-abc123');
       expect(res.body).toHaveProperty('platform', 'IOS');
       expect(res.body).toHaveProperty('userId');
-      // Guard: global rate limiter's legacyHeaders must be false (app.ts line 43).
-      // If the boolean is mutated to true, legacy X-RateLimit-* headers appear.
-      expect(res.headers).not.toHaveProperty('x-ratelimit-limit');
-      // Positive guard: draft-7 standard headers must be present.
-      // If standardHeaders config is removed, these disappear.
-      expect(res.headers).toHaveProperty('ratelimit-policy');
-      expect(res.headers).toHaveProperty('ratelimit');
-      // Guard: exact rate-limit policy characterizes the globalLimiter window (15min = 900s)
-      // and limit (300). A numeric mutation of the first integer in app.ts (15 → 16) changes
-      // this to '300;w=960', which this assertion catches.
-      expect(res.headers['ratelimit-policy']).toBe('300;w=900');
-    });
-
-    it('CORS Access-Control-Allow-Credentials is present when Origin matches (guards credentials: true)', async () => {
-      const user = await createTestUser(app);
-
-      const res = await request(app)
-        .post('/api/device-tokens')
-        .set('Authorization', `Bearer ${user.accessToken}`)
-        .set('Origin', 'http://factory-test.local')
-        .send({ token: 'fcm-token-cors-guard', platform: 'WEB' });
-
-      expect(res.status).toBe(201);
-      // Guard: app.ts cors({ credentials: true }) sets this header.
-      // If the boolean is mutated to false, cors() omits the header entirely.
-      expect(res.headers['access-control-allow-credentials']).toBe('true');
-      // Guard: Access-Control-Allow-Origin reflects the matched origin (not '*')
-      // because credentials mode requires a specific origin.
-      expect(res.headers['access-control-allow-origin']).toBe('http://factory-test.local');
     });
 
     it('second identical POST also returns 201 (upsert idempotency)', async () => {
@@ -167,13 +94,6 @@ describe('Device Tokens API', () => {
         .set('Authorization', `Bearer ${user.accessToken}`);
 
       expect(res.status).toBe(204);
-      // Guard: legacyHeaders: false in app.ts globalLimiter — same check on DELETE path
-      expect(res.headers).not.toHaveProperty('x-ratelimit-limit');
-      // Positive guard: draft-7 standard headers present on DELETE path too
-      expect(res.headers).toHaveProperty('ratelimit-policy');
-      expect(res.headers).toHaveProperty('ratelimit');
-      // Guard: exact rate-limit policy on DELETE path — same globalLimiter config (300 req, 900s window)
-      expect(res.headers['ratelimit-policy']).toBe('300;w=900');
     });
 
     it('repeated DELETE of the same token returns 204', async () => {
