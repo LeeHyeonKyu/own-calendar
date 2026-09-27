@@ -18,30 +18,21 @@
 
 | metric | this window | cumulative |
 | --- | --- | --- |
-| merged | 4 | 12 |
-| review rounds avg | 1.75 | 1.75 |
-| rounds/issue (plan/impl/review) | 1 / 3.75 / 1.75 | 1 / 3.08 / 1.75 |
-| escaped defects | 3 (#48×1, #46×1, #45×1) | 9 |
-| revert rate | 0.00 (0/4) | 0.00 (0/12) |
+| merged | 0 | 12 |
+| review rounds avg | 0 | 1.75 |
+| rounds/issue (plan/impl/review) | 0 / 0 / 0 | 1 / 3.08 / 1.75 |
+| escaped defects | 0 | 9 |
+| revert rate | 없음 | 0.00 (0/12) |
 | needs-human | 0 | 29 |
-| rejects by role | spec-conformance 3, qa 1 | correctness 2, architecture 1, spec-conformance 9, qa 2 |
-| reviewer overlap | 0.25 (1/4, runs 7) | 0.35 (6/17, runs 22) |
-| unique findings by role | spec-conformance 2, qa 1 | correctness 4, architecture 1, spec-conformance 5, qa 1 |
-| qa na ratio | 0.07 (3/41 claims, na-heavy 0/4 approvals) | 0.03 (3/88 claims, na-heavy 0/10 approvals) |
-| cost (usd) | 65.01 | 376.83 |
-| tokens | input 6488133 / output 74407 | input 37051761 / output 527081 |
-| retro cost (usd) | 1.53 | 10.35 |
-| retro tokens | input 3 / output 538 | input 20 / output 5921 |
+| rejects by role | 없음 | correctness 2, architecture 1, spec-conformance 9, qa 2 |
+| reviewer overlap | 없음 | 0.35 (6/17, runs 22) |
+| unique findings by role | 없음 | correctness 4, architecture 1, spec-conformance 5, qa 1 |
+| qa na ratio | 없음 | 0.03 (3/88 claims, na-heavy 0/10 approvals) |
+| cost (usd) | 7.42 | 376.83 |
+| tokens | input 238979 / output 7809 | input 37051761 / output 527081 |
+| retro cost (usd) | 0.00 | 10.35 |
+| retro tokens | input 0 / output 0 | input 20 / output 5921 |
 | full retros | — | 7 |
-
-### Rounds per issue (this window)
-
-| issue | plan | implement | review | escaped |
-| --- | --- | --- | --- | --- |
-| #48 | 1 | 4 | 2 | 1 |
-| #47 | 1 | 3 | 1 | 0 |
-| #46 | 1 | 3 | 2 | 1 |
-| #45 | 1 | 5 | 2 | 1 |
 
 ### Phase-2 gate baseline (this session)
 
@@ -756,84 +747,33 @@
     ]
   },
   "stats": {
-    "merged": 4,
-    "review_rounds_avg": 1.75,
-    "plan_rounds_avg": 1,
-    "implement_rounds_avg": 3.75,
-    "rounds_per_issue": [
-      {
-        "issue": 48,
-        "plan": 1,
-        "implement": 4,
-        "review": 2
-      },
-      {
-        "issue": 47,
-        "plan": 1,
-        "implement": 3,
-        "review": 1
-      },
-      {
-        "issue": 46,
-        "plan": 1,
-        "implement": 3,
-        "review": 2
-      },
-      {
-        "issue": 45,
-        "plan": 1,
-        "implement": 5,
-        "review": 2
-      }
-    ],
-    "escaped_defects": 3,
-    "escaped_defects_detail": [
-      {
-        "issue": 48,
-        "count": 1
-      },
-      {
-        "issue": 46,
-        "count": 1
-      },
-      {
-        "issue": 45,
-        "count": 1
-      }
-    ],
+    "merged": 0,
+    "review_rounds_avg": 0,
+    "plan_rounds_avg": 0,
+    "implement_rounds_avg": 0,
+    "rounds_per_issue": [],
+    "escaped_defects": 0,
+    "escaped_defects_detail": [],
     "reverts": 0,
     "reverted_issues": [],
-    "revert_rate": 0,
-    "rejects_by_role": {
-      "spec-conformance": 3,
-      "qa": 1
-    },
-    "review_runs": 7,
-    "findings_total": 4,
-    "overlapping_findings": 1,
-    "unique_findings_by_role": {
-      "spec-conformance": 2,
-      "qa": 1
-    },
-    "overlap_ratio": 0.25,
+    "revert_rate": null,
+    "rejects_by_role": {},
+    "review_runs": 0,
+    "findings_total": 0,
+    "overlapping_findings": 0,
+    "unique_findings_by_role": {},
+    "overlap_ratio": 0,
     "needs_human": 0,
-    "qa_approvals": 4,
-    "qa_claims_total": 38,
-    "qa_na_total": 3,
-    "qa_na_ratio": 0.07,
+    "qa_approvals": 0,
+    "qa_claims_total": 0,
+    "qa_na_total": 0,
+    "qa_na_ratio": 0,
     "qa_na_heavy_approvals": 0,
     "usage": {
-      "cost_usd": 65.010562,
+      "cost_usd": 7.424231,
       "tokens": {
-        "input": 6488133,
-        "output": 74407
-      }
-    },
-    "retro_usage": {
-      "cost_usd": 1.528296,
-      "tokens": {
-        "input": 3,
-        "output": 538
+        "input": 238979,
+        "output": 7809
       }
     }
   },
