@@ -1,8 +1,8 @@
 # Retro State
 
-- last retro: 2026-09-27T02:35:11.352Z
-- merges since last retro: 1
-- current N: 2
+- last retro: 2026-09-27T06:00:22.254Z
+- merges since last retro: 0
+- current N: 1
 
 ## History (last 5)
 
@@ -11,31 +11,33 @@
 | 2026-09-14T16:34:23.746Z | 1 | 1 | 1 | 5 |
 | 2026-09-27T02:14:34.266Z | 0 | 1 | 1 | 17 |
 | 2026-09-27T02:35:11.352Z | 0 | 1 | 2 | 0 |
+| 2026-09-27T06:00:22.254Z | 0 | 2 | 1 | 3 |
 
 ## Stats
 
 | metric | this window | cumulative |
 | --- | --- | --- |
-| merged | 1 | 3 |
-| review rounds avg | 1 | 2 |
-| rounds/issue (plan/impl/review) | 1 / 3 / 1 | 0.67 / 1.67 / 2 |
-| escaped defects | 0 | 0 |
-| revert rate | 0.00 (0/1) | 0.00 (0/3) |
-| needs-human | 2 | 22 |
-| rejects by role | 없음 | correctness 2, architecture 1, spec-conformance 1 |
-| reviewer overlap | 없음 | 0.00 (0/6, runs 6) |
-| unique findings by role | 없음 | correctness 4, architecture 1, spec-conformance 1 |
-| qa na ratio | 0.00 (0/7 claims, na-heavy 0/1 approvals) | 0.00 (0/19 claims, na-heavy 0/2 approvals) |
-| cost (usd) | 16.35 | 204.09 |
-| tokens | input 1737771 / output 36204 | input 20380640 / output 342065 |
-| retro cost (usd) | 0.00 | 3.92 |
-| retro tokens | input 0 / output 0 | input 8 / output 2950 |
-| full retros | — | 3 |
+| merged | 2 | 5 |
+| review rounds avg | 1.5 | 1.8 |
+| rounds/issue (plan/impl/review) | 1.5 / 4 / 1.5 | 1 / 2.6 / 1.8 |
+| escaped defects | 3 (#31×3) | 3 |
+| revert rate | 0.00 (0/2) | 0.00 (0/5) |
+| needs-human | 3 | 25 |
+| rejects by role | spec-conformance 2, qa 1 | correctness 2, architecture 1, spec-conformance 3, qa 1 |
+| reviewer overlap | 0.67 (2/3, runs 4) | 0.22 (2/9, runs 10) |
+| unique findings by role | spec-conformance 1 | correctness 4, architecture 1, spec-conformance 2 |
+| qa na ratio | 0.00 (0/16 claims, na-heavy 0/2 approvals) | 0.00 (0/35 claims, na-heavy 0/4 approvals) |
+| cost (usd) | 40.08 | 244.17 |
+| tokens | input 3953095 / output 57847 | input 24333735 / output 399912 |
+| retro cost (usd) | 1.52 | 5.45 |
+| retro tokens | input 3 / output 731 | input 11 / output 3681 |
+| full retros | — | 4 |
 
 ### Rounds per issue (this window)
 
 | issue | plan | implement | review | escaped |
 | --- | --- | --- | --- | --- |
+| #31 | 2 | 5 | 2 | 3 |
 | #28 | 1 | 3 | 1 | 0 |
 
 ### Phase-2 gate baseline (this session)
@@ -50,11 +52,11 @@
 ```json
 {
   "cursor": {
-    "last_retro_at": "2026-09-27T02:35:11.352Z",
+    "last_retro_at": "2026-09-27T06:00:22.254Z",
     "last_record_offsets": {}
   },
-  "merges_since": 1,
-  "n": 2,
+  "merges_since": 0,
+  "n": 1,
   "history": [
     {
       "at": "2026-09-14T16:34:23.746Z",
@@ -205,6 +207,109 @@
       ],
       "n_before": 1,
       "n_after": 2
+    },
+    {
+      "at": "2026-09-27T06:00:22.254Z",
+      "yield": 0,
+      "needs_human_since": 3,
+      "applied": [
+        {
+          "step": "feedback-route",
+          "issues": [
+            31,
+            28
+          ],
+          "actions": [
+            {
+              "kind": "warning",
+              "step": "feedback-route",
+              "login": "LeeHyeonKyu",
+              "current": "bot-hk",
+              "reason": "current factory identity: bot-hk (machine user/app, viewer); older runs in this window ran under a shared identity (LeeHyeonKyu) — their human decisions are unverifiable, nothing to register"
+            },
+            {
+              "kind": "unverifiable-decision",
+              "step": "feedback-route",
+              "issue": 31,
+              "author": "LeeHyeonKyu",
+              "reason": "shared identity — author equals a factory login; cannot distinguish a person from an agent",
+              "detail": "human-decision:v1 (skill=unstick) by @LeeHyeonKyu declares `cause: factory-defect` (ktb_fix: 1.4.14) — REFUSED as evidence: @LeeHyeonKyu is also a factory login"
+            },
+            {
+              "kind": "unverifiable-decision",
+              "step": "feedback-route",
+              "issue": 31,
+              "author": "LeeHyeonKyu",
+              "reason": "shared identity — author equals a factory login; cannot distinguish a person from an agent",
+              "detail": "human-decision:v1 (skill=unstick) by @LeeHyeonKyu declares `cause: factory-defect` (ktb_fix: 1.4.21) — REFUSED as evidence: @LeeHyeonKyu is also a factory login"
+            },
+            {
+              "kind": "unverifiable-decision",
+              "step": "feedback-route",
+              "issue": 31,
+              "author": "LeeHyeonKyu",
+              "reason": "shared identity — author equals a factory login; cannot distinguish a person from an agent",
+              "detail": "human-decision:v1 (skill=unstick) by @LeeHyeonKyu declares `cause: factory-defect` (ktb_fix: 1.4.22) — REFUSED as evidence: @LeeHyeonKyu is also a factory login"
+            },
+            {
+              "kind": "product",
+              "step": "feedback-route",
+              "issue": 31,
+              "count": 1
+            },
+            {
+              "kind": "unverifiable-decision",
+              "step": "feedback-route",
+              "issue": 28,
+              "author": "LeeHyeonKyu",
+              "reason": "shared identity — author equals a factory login; cannot distinguish a person from an agent",
+              "detail": "human-decision:v1 (skill=unstick) by @LeeHyeonKyu declares `cause: factory-defect` (ktb_fix: 1.4.9) — REFUSED as evidence: @LeeHyeonKyu is also a factory login"
+            },
+            {
+              "kind": "unverifiable-decision",
+              "step": "feedback-route",
+              "issue": 28,
+              "author": "LeeHyeonKyu",
+              "reason": "shared identity — author equals a factory login; cannot distinguish a person from an agent",
+              "detail": "human-decision:v1 (skill=unstick) by @LeeHyeonKyu declares `cause: factory-defect` (ktb_fix: 1.4.12) — REFUSED as evidence: @LeeHyeonKyu is also a factory login"
+            },
+            {
+              "kind": "unverifiable-decision",
+              "step": "feedback-route",
+              "issue": 28,
+              "author": "LeeHyeonKyu",
+              "reason": "shared identity — author equals a factory login; cannot distinguish a person from an agent",
+              "detail": "human-decision:v1 (skill=unstick) by @LeeHyeonKyu declares `cause: factory-defect` (ktb_fix: 1.4.21) — REFUSED as evidence: @LeeHyeonKyu is also a factory login"
+            }
+          ]
+        },
+        {
+          "step": "lessons:factory-builder",
+          "added": [
+            "L-2026-09-27-01",
+            "L-2026-09-27-02"
+          ],
+          "rejected": [],
+          "evicted": [],
+          "cited": []
+        },
+        {
+          "step": "publish-lessons",
+          "pr": 65,
+          "merged": false,
+          "reason": "timeout",
+          "files": [
+            ".factory/lessons/factory-builder.md"
+          ]
+        },
+        {
+          "step": "harness",
+          "title": "harness: promote to M2 — HTTP route surface present (express/fastify/hono/koa/next dependency, or routes-style files) but harness maturity is M1 or below",
+          "skipped": "duplicate"
+        }
+      ],
+      "n_before": 2,
+      "n_after": 1
     }
   ],
   "candidates": {
@@ -288,6 +393,22 @@
           9
         ],
         "source": "must_fix"
+      },
+      {
+        "role": "spec-conformance",
+        "text": "dw2's text ('When any path listed in either source file is renamed or removed...') and dw4's text ('The test exits non-zero if either source file (CHARTER.md NEVER_AUTOMATE or harness.toml [load_bearing].paths) yields zero extractable paths') both make a universal claim about BOTH source files, but every piece of failure-injection evidence collected for both ids exercises the CHARTER.md-side code path only. The harness.toml-side failure machinery has never been triggered and observed to fail correctly by anyone.",
+        "runs": [
+          31
+        ],
+        "source": "must_fix"
+      },
+      {
+        "role": "spec-conformance",
+        "text": "This diff adds a file outside files_expected (files_expected = [server/docker-compose.test.yml, scripts/factory-server-test.sh, .factory/harness.toml]) with no in-diff 'Scope change' disclosure, unlike the other two out-of-scope files in this same commit which each carry one. Lens 2 requires reject for silently-widened diffs, and re-verification this round confirms the asymmetry is real and unchanged.",
+        "runs": [
+          9
+        ],
+        "source": "must_fix"
       }
     ],
     "examples": [],
@@ -300,8 +421,8 @@
       },
       {
         "issue": 9,
-        "reason": "worktree dirty after review (no-write stage): .factory/harness.toml",
-        "at": "2026-09-27T03:23:32Z"
+        "reason": "review rounds exhausted (K=3): 1 must_fix remain",
+        "at": "2026-09-27T04:55:14Z"
       },
       {
         "issue": 21,
@@ -331,11 +452,17 @@
     ]
   },
   "stats": {
-    "merged": 1,
-    "review_rounds_avg": 1,
-    "plan_rounds_avg": 1,
-    "implement_rounds_avg": 3,
+    "merged": 2,
+    "review_rounds_avg": 1.5,
+    "plan_rounds_avg": 1.5,
+    "implement_rounds_avg": 4,
     "rounds_per_issue": [
+      {
+        "issue": 31,
+        "plan": 2,
+        "implement": 5,
+        "review": 2
+      },
       {
         "issue": 28,
         "plan": 1,
@@ -343,75 +470,93 @@
         "review": 1
       }
     ],
-    "escaped_defects": 0,
-    "escaped_defects_detail": [],
+    "escaped_defects": 3,
+    "escaped_defects_detail": [
+      {
+        "issue": 31,
+        "count": 3
+      }
+    ],
     "reverts": 0,
     "reverted_issues": [],
     "revert_rate": 0,
-    "rejects_by_role": {},
-    "review_runs": 1,
-    "findings_total": 0,
-    "overlapping_findings": 0,
-    "unique_findings_by_role": {},
-    "overlap_ratio": 0,
-    "needs_human": 2,
-    "qa_approvals": 1,
-    "qa_claims_total": 7,
+    "rejects_by_role": {
+      "spec-conformance": 2,
+      "qa": 1
+    },
+    "review_runs": 4,
+    "findings_total": 3,
+    "overlapping_findings": 2,
+    "unique_findings_by_role": {
+      "spec-conformance": 1
+    },
+    "overlap_ratio": 0.67,
+    "needs_human": 3,
+    "qa_approvals": 2,
+    "qa_claims_total": 16,
     "qa_na_total": 0,
     "qa_na_ratio": 0,
     "qa_na_heavy_approvals": 0,
     "usage": {
-      "cost_usd": 16.348253,
+      "cost_usd": 40.082325,
       "tokens": {
-        "input": 1737771,
-        "output": 36204
+        "input": 3953095,
+        "output": 57847
+      }
+    },
+    "retro_usage": {
+      "cost_usd": 1.523081,
+      "tokens": {
+        "input": 3,
+        "output": 731
       }
     }
   },
   "stats_total": {
-    "merged": 3,
-    "review_rounds_avg": 2,
-    "plan_rounds_avg": 0.67,
-    "implement_rounds_avg": 1.67,
-    "escaped_defects": 0,
+    "merged": 5,
+    "review_rounds_avg": 1.8,
+    "plan_rounds_avg": 1,
+    "implement_rounds_avg": 2.6,
+    "escaped_defects": 3,
     "reverts": 0,
     "reverted_issues": [],
     "revert_rate": 0,
     "rejects_by_role": {
       "correctness": 2,
       "architecture": 1,
-      "spec-conformance": 1
+      "spec-conformance": 3,
+      "qa": 1
     },
-    "review_runs": 6,
-    "findings_total": 6,
-    "overlapping_findings": 0,
+    "review_runs": 10,
+    "findings_total": 9,
+    "overlapping_findings": 2,
     "unique_findings_by_role": {
       "correctness": 4,
       "architecture": 1,
-      "spec-conformance": 1
+      "spec-conformance": 2
     },
-    "overlap_ratio": 0,
-    "needs_human": 22,
-    "qa_approvals": 2,
-    "qa_claims_total": 19,
+    "overlap_ratio": 0.22,
+    "needs_human": 25,
+    "qa_approvals": 4,
+    "qa_claims_total": 35,
     "qa_na_total": 0,
     "qa_na_ratio": 0,
     "qa_na_heavy_approvals": 0,
     "usage": {
-      "cost_usd": 204.092257,
+      "cost_usd": 244.174582,
       "tokens": {
-        "input": 20380640,
-        "output": 342065
+        "input": 24333735,
+        "output": 399912
       }
     },
     "retro_usage": {
-      "cost_usd": 3.923179,
+      "cost_usd": 5.44626,
       "tokens": {
-        "input": 8,
-        "output": 2950
+        "input": 11,
+        "output": 3681
       }
     },
-    "retros": 3
+    "retros": 4
   },
   "deferred_proposals": [],
   "deletion_candidates": []
