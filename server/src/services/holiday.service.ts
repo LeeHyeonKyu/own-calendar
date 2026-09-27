@@ -33,14 +33,20 @@ export const holidayService = {
     });
   },
 
-  async getHolidays(userId: string, year: number, month?: number) {
+  async getHolidays(userId: string, year: number, month?: number, countryCode?: string) {
     const subscriptions = await prisma.holidaySubscription.findMany({
       where: { userId },
     });
 
     if (subscriptions.length === 0) return [];
 
-    const countryCodes = subscriptions.map((s) => s.countryCode);
+    let countryCodes = subscriptions.map((s) => s.countryCode);
+
+    // If countryCode filter is provided, narrow to only that country (must be subscribed)
+    if (countryCode) {
+      countryCodes = countryCodes.filter((c) => c === countryCode);
+      if (countryCodes.length === 0) return [];
+    }
 
     // Ensure holidays are cached for requested year
     for (const code of countryCodes) {

@@ -165,4 +165,104 @@ describe('test_46_holidays_validation', () => {
       expect(Array.isArray(res.body)).toBe(true);
     });
   });
+
+  describe('test_46_get_holidays_country_filter', () => {
+    beforeEach(() => {
+      // Mock refreshHolidays to avoid external HTTP calls (dissent-2)
+      vi.spyOn(holidayService, 'refreshHolidays').mockResolvedValue(undefined);
+    });
+
+    afterEach(() => {
+      vi.restoreAllMocks();
+    });
+
+    it('GET /holidays?countryCode=US returns only US holidays when subscribed to US and KR', async () => {
+      const user = await createTestUser(app);
+
+      // Subscribe to both US and KR via API (refreshHolidays is mocked)
+      await request(app)
+        .post('/api/holidays/subscribe')
+        .set('Authorization', `Bearer ${user.accessToken}`)
+        .send({ countryCode: 'US' });
+      await request(app)
+        .post('/api/holidays/subscribe')
+        .set('Authorization', `Bearer ${user.accessToken}`)
+        .send({ countryCode: 'KR' });
+
+      // Seed Holiday rows for both countries
+      await prisma.holiday.create({
+        data: { countryCode: 'US', date: new Date(2025, 6, 4), name: 'Independence Day', year: 2025 },
+      });
+      await prisma.holiday.create({
+        data: { countryCode: 'KR', date: new Date(2025, 7, 15), name: 'Liberation Day', year: 2025 },
+      });
+
+      const res = await request(app)
+        .get('/api/holidays/holidays?year=2025&countryCode=US')
+        .set('Authorization', `Bearer ${user.accessToken}`);
+
+      expect(res.status).toBe(200);
+      expect(Array.isArray(res.body)).toBe(true);
+      expect(res.body.length).toBe(1);
+      // Every returned holiday must be for the requested country
+      expect(res.body.every((h: any) => h.countryCode === 'US')).toBe(true);
+      expect(res.body[0].name).toBe('Independence Day');
+    });
+
+    it('GET /holidays without countryCode returns holidays for all subscribed countries', async () => {
+      const user = await createTestUser(app);
+
+      // Subscribe to both US and KR via API (refreshHolidays is mocked)
+      await request(app)
+        .post('/api/holidays/subscribe')
+        .set('Authorization', `Bearer ${user.accessToken}`)
+        .send({ countryCode: 'US' });
+      await request(app)
+        .post('/api/holidays/subscribe')
+        .set('Authorization', `Bearer ${user.accessToken}`)
+        .send({ countryCode: 'KR' });
+
+      // Seed Holiday rows for both countries
+      await prisma.holiday.create({
+        data: { countryCode: 'US', date: new Date(2025, 6, 4), name: 'Independence Day', year: 2025 },
+      });
+      await prisma.holiday.create({
+        data: { countryCode: 'KR', date: new Date(2025, 7, 15), name: 'Liberation Day', year: 2025 },
+      });
+
+      const res = await request(app)
+        .get('/api/holidays/holidays?year=2025')
+        .set('Authorization', `Bearer ${user.accessToken}`);
+
+      expect(res.status).toBe(200);
+      expect(Array.isArray(res.body)).toBe(true);
+      expect(res.body.length).toBe(2);
+      const countryCodes = res.body.map((h: any) => h.countryCode);
+      expect(countryCodes).toContain('US');
+      expect(countryCodes).toContain('KR');
+    });
+
+    it('GET /holidays?countryCode=JP returns empty when not subscribed to JP', async () => {
+      const user = await createTestUser(app);
+
+      // Subscribe to US only via API (refreshHolidays is mocked)
+      await request(app)
+        .post('/api/holidays/subscribe')
+        .set('Authorization', `Bearer ${user.accessToken}`)
+        .send({ countryCode: 'US' });
+
+      // Seed a US holiday
+      await prisma.holiday.create({
+        data: { countryCode: 'US', date: new Date(2025, 6, 4), name: 'Independence Day', year: 2025 },
+      });
+
+      const res = await request(app)
+        .get('/api/holidays/holidays?year=2025&countryCode=JP')
+        .set('Authorization', `Bearer ${user.accessToken}`);
+
+      expect(res.status).toBe(200);
+      expect(Array.isArray(res.body)).toBe(true);
+      expect(res.body.length).toBe(0);
+    });
+  });
 });

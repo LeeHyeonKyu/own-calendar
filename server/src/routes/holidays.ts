@@ -47,8 +47,8 @@ router.get('/holidays', async (req: AuthRequest, res: Response) => {
       res.status(400).json({ error: 'Validation failed', details: parsed.error.flatten() });
       return;
     }
-    const { year, month } = parsed.data;
-    const holidays = await holidayService.getHolidays(req.userId!, year, month);
+    const { year, month, countryCode } = parsed.data;
+    const holidays = await holidayService.getHolidays(req.userId!, year, month, countryCode);
     res.json(holidays);
   } catch (err: any) {
     const status = err.statusCode || 500;
