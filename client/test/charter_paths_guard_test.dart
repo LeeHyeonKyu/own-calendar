@@ -331,4 +331,121 @@ void main() {
       );
     }
   });
+
+  // ---------------------------------------------------------------------------
+  // spec1 rework: Structurally exercise the harness.toml extraction machinery.
+  //
+  // spec-conformance spec1 identified that every piece of failure-injection
+  // evidence for dw2 and dw4 exercised only the CHARTER.md side. The tests
+  // below call the private extraction functions directly with fabricated TOML
+  // input to prove the harness-side StateError guard (dw4), empty-path guard
+  // (dw4), and correct extraction/section-stop logic all work independently
+  // of CHARTER.md assertions.
+  // ---------------------------------------------------------------------------
+
+  test('test_31_harness_extraction_guards', () {
+    // 1. Missing [load_bearing] section -> StateError (dw4 harness-side).
+    //    If the section heading is renamed or removed, the extraction must
+    //    throw rather than silently returning an empty list.
+    const noSection = '[project]\nname = "test"\n';
+    expect(
+      () => _extractHarnessLoadBearingPaths(noSection),
+      throwsStateError,
+      reason: 'Missing [load_bearing] section must throw StateError, '
+          'not silently yield zero paths (dw4 harness-side guard).',
+    );
+
+    // 2. Section exists but paths array is empty -> empty list.
+    //    Combined with the isNotEmpty guard in test_31_charter_paths_pass,
+    //    this exercises the vacuous-pass protection for the harness side.
+    const emptyPaths = '[load_bearing]\npaths = []\n';
+    expect(
+      _extractHarnessLoadBearingPaths(emptyPaths),
+      isEmpty,
+      reason: 'Empty paths array must yield an empty list, which the '
+          'isNotEmpty guard in the main test then catches.',
+    );
+
+    // 3. Section exists but quoted-string regex matches nothing -> empty list.
+    //    This simulates a formatting change that breaks the regex.
+    const noPaths = '[load_bearing]\n# only comments\npaths = [\n]\n';
+    expect(
+      _extractHarnessLoadBearingPaths(noPaths),
+      isEmpty,
+      reason: 'Paths array with no quoted strings must yield an empty list.',
+    );
+
+    // 4. Valid section with paths, followed by another TOML section ->
+    //    correct extraction and section stop.
+    const validToml = '[load_bearing]\n'
+        '# Irreversible paths\n'
+        'paths = [\n'
+        '  "server/prisma/schema.prisma",\n'
+        '  "scripts/deploy.sh",\n'
+        ']\n'
+        '\n'
+        '[evidence]\n'
+        'qa_artifacts = ".factory/out/qa/**"\n';
+    final extracted = _extractHarnessLoadBearingPaths(validToml);
+    expect(
+      extracted,
+      equals(['server/prisma/schema.prisma', 'scripts/deploy.sh']),
+      reason: 'Must extract exactly the quoted strings from the paths array '
+          'and stop at the next section header [evidence].',
+    );
+
+    // 5. Verify the real harness.toml produces harness-only paths.
+    //    This confirms the extraction function operates correctly on the
+    //    actual file, not just fabricated input.
+    final harnessFile = File('$root/.factory/harness.toml');
+    final realPaths = _extractHarnessLoadBearingPaths(
+      harnessFile.readAsStringSync(),
+    );
+    expect(
+      realPaths,
+      isNotEmpty,
+      reason: 'Real harness.toml [load_bearing].paths must be non-empty.',
+    );
+    // auth_provider.dart is in harness.toml [load_bearing].paths but NOT in
+    // CHARTER.md NEVER_AUTOMATE — a true harness-only path.
+    expect(
+      realPaths,
+      contains('client/lib/providers/auth_provider.dart'),
+      reason: 'harness.toml must include client/lib/providers/auth_provider.dart '
+          '— a harness-only path not in CHARTER.md NEVER_AUTOMATE.',
+    );
+    // google-sync is another harness-only path.
+    expect(
+      realPaths,
+      contains('server/src/services/google-sync.service.ts'),
+      reason: 'harness.toml must include google-sync.service.ts '
+          '— a harness-only path not in CHARTER.md NEVER_AUTOMATE.',
+    );
+  });
+
+  test('test_31_charter_extraction_state_error', () {
+    // Symmetry test: verify the CHARTER-side StateError guard also fires.
+    // While the CHARTER side was already observed to work in dw4-1.log,
+    // this exercises the function in isolation with fabricated input.
+    const noSection = '# CHARTER\n\n## Definition of Done\nSome content.\n';
+    expect(
+      () => _extractNeverAutomateSection(noSection),
+      throwsStateError,
+      reason: 'Missing ## NEVER_AUTOMATE section must throw StateError.',
+    );
+
+    // Verify correct extraction stops at the next ## heading.
+    const withSection = '## NEVER_AUTOMATE\n'
+        '- `server/src/services/auth.service.ts` is protected\n'
+        '- `main` is the branch\n'
+        '\n'
+        '## Definition of Done\n'
+        'Not part of NEVER_AUTOMATE.\n';
+    final section = _extractNeverAutomateSection(withSection);
+    expect(section, isNot(contains('Definition of Done')),
+        reason: 'Extraction must stop at the next ## heading.');
+    final paths = _extractCharterPaths(section);
+    expect(paths, equals(['server/src/services/auth.service.ts']),
+        reason: 'Must extract the path with / and exclude `main` (no /).');
+  });
 }
