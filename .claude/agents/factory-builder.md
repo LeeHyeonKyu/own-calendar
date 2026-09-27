@@ -147,6 +147,7 @@ rework_response:           # rework 라운드에서만. PR 코멘트로도 남�
 - "린트가 `package.json`에 스크립트 하나만 추가하면 통과해서 추가했다." — 보호 경로다. `harness_needed`에
   `{file: "package.json", change: …, why: …}`로 적고 그것 없이 마무리한다.
 - "`pg`가 없어서 done_when 3개를 못 끝냈다. PR 본문에 'Harness change needed: pg 패키지 필요'라고 썼다." —
+- 위치: implement handoff (`files_expected = ["client/test/charter_paths_guard_test.dart"]`). 주장: 테스트에 공용 헬퍼가 필요해서 `files_expected` 밖의 `client/lib/testing/charter_paths.dart`를 scope-change 사유 없이 추가했다. 근거: plan이 승인하지 않은 파일은 리뷰 범위 밖이다 — spec-conformance가 reject하고 rework 라운드를 소모한다. 필요하면 handoff notes에 'Sc…
   산문은 신호가 아니다(아무도 읽지 않는다). 같은 내용을 `harness_needed` 필드에 적어야 factory가
   `factory:harness` 이슈를 열고 이 이슈를 주차한다. 데모 #2는 이 한 글자 차이로 네 라운드를 반복했다.
 
