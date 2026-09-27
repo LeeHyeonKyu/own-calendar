@@ -1,8 +1,21 @@
+// Activate the CORS middleware in app.ts so the `credentials: true` boolean is reachable.
+// Without CORS_ORIGIN, `if (config.corsOrigin.length > 0)` is never entered and any
+// mutation of the credentials boolean survives undetected. vi.hoisted() runs before
+// imports so app.ts reads the value during module initialisation.
+vi.hoisted(() => {
+  process.env.CORS_ORIGIN = 'http://factory-test.local';
+});
+
 import request from 'supertest';
 import app from '../src/app';
 import { createTestUser, prisma } from './setup';
 
 describe('Device Tokens API', () => {
+  afterAll(() => {
+    // Remove the CORS_ORIGIN set by vi.hoisted so it does not leak to later test files
+    delete process.env.CORS_ORIGIN;
+  });
+
   describe('test_45_register_token', () => {
     it('POST with valid body returns 201 and persists the token', async () => {
       // Register two users directly so we can inspect auth-path rate-limit headers.
@@ -58,6 +71,24 @@ describe('Device Tokens API', () => {
       // and limit (300). A numeric mutation of the first integer in app.ts (15 → 16) changes
       // this to '300;w=960', which this assertion catches.
       expect(res.headers['ratelimit-policy']).toBe('300;w=900');
+    });
+
+    it('CORS Access-Control-Allow-Credentials is present when Origin matches (guards credentials: true)', async () => {
+      const user = await createTestUser(app);
+
+      const res = await request(app)
+        .post('/api/device-tokens')
+        .set('Authorization', `Bearer ${user.accessToken}`)
+        .set('Origin', 'http://factory-test.local')
+        .send({ token: 'fcm-token-cors-guard', platform: 'WEB' });
+
+      expect(res.status).toBe(201);
+      // Guard: app.ts cors({ credentials: true }) sets this header.
+      // If the boolean is mutated to false, cors() omits the header entirely.
+      expect(res.headers['access-control-allow-credentials']).toBe('true');
+      // Guard: Access-Control-Allow-Origin reflects the matched origin (not '*')
+      // because credentials mode requires a specific origin.
+      expect(res.headers['access-control-allow-origin']).toBe('http://factory-test.local');
     });
 
     it('second identical POST also returns 201 (upsert idempotency)', async () => {
