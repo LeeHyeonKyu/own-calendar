@@ -29,6 +29,13 @@ describe('test_46_holidays_validation', () => {
 
       expect(res.status).toBe(400);
       expect(res.body).toHaveProperty('error');
+      // app.ts globalLimiter sets legacyHeaders: false — legacy rate-limit headers must be absent
+      expect(res.headers).not.toHaveProperty('x-ratelimit-limit');
+      // Content-type must be JSON (relies on express.json() + res.json() chain through app.ts)
+      expect(res.headers['content-type']).toMatch(/application\/json/);
+      // Validation error body must include the specific error message and details from validate middleware
+      expect(res.body.error).toBe('Validation failed');
+      expect(res.body).toHaveProperty('details');
     });
 
     it('rejects 3-letter countryCode with 400', async () => {
@@ -53,6 +60,8 @@ describe('test_46_holidays_validation', () => {
 
       expect(res.status).toBe(400);
       expect(res.body).toHaveProperty('error');
+      expect(res.body.error).toBe('Validation failed');
+      expect(res.body).toHaveProperty('details');
     });
   });
 
@@ -66,6 +75,11 @@ describe('test_46_holidays_validation', () => {
 
       expect(res.status).toBe(400);
       expect(res.body).toHaveProperty('error');
+      // app.ts globalLimiter sets legacyHeaders: false — legacy rate-limit headers must be absent
+      expect(res.headers).not.toHaveProperty('x-ratelimit-limit');
+      expect(res.headers['content-type']).toMatch(/application\/json/);
+      expect(res.body.error).toBe('Validation failed');
+      expect(res.body).toHaveProperty('details');
     });
   });
 
@@ -79,6 +93,11 @@ describe('test_46_holidays_validation', () => {
 
       expect(res.status).toBe(400);
       expect(res.body).toHaveProperty('error');
+      // app.ts globalLimiter sets legacyHeaders: false — legacy rate-limit headers must be absent
+      expect(res.headers).not.toHaveProperty('x-ratelimit-limit');
+      expect(res.headers['content-type']).toMatch(/application\/json/);
+      expect(res.body.error).toBe('Validation failed');
+      expect(res.body).toHaveProperty('details');
     });
 
     it('rejects year=3000 with 400', async () => {
@@ -90,6 +109,8 @@ describe('test_46_holidays_validation', () => {
 
       expect(res.status).toBe(400);
       expect(res.body).toHaveProperty('error');
+      expect(res.body.error).toBe('Validation failed');
+      expect(res.body).toHaveProperty('details');
     });
   });
 
@@ -114,6 +135,9 @@ describe('test_46_holidays_validation', () => {
       expect([200, 201]).toContain(res.status);
       expect(res.body).toHaveProperty('countryCode', 'US');
       expect(res.body).toHaveProperty('userId');
+      // app.ts globalLimiter sets legacyHeaders: false — legacy rate-limit headers must be absent
+      expect(res.headers).not.toHaveProperty('x-ratelimit-limit');
+      expect(res.headers['content-type']).toMatch(/application\/json/);
     });
 
     it('GET /holidays with valid year returns 200 and an array', async () => {
@@ -125,6 +149,9 @@ describe('test_46_holidays_validation', () => {
 
       expect(res.status).toBe(200);
       expect(Array.isArray(res.body)).toBe(true);
+      // app.ts globalLimiter sets legacyHeaders: false — legacy rate-limit headers must be absent
+      expect(res.headers).not.toHaveProperty('x-ratelimit-limit');
+      expect(res.headers['content-type']).toMatch(/application\/json/);
     });
 
     it('GET /holidays with valid year and month returns 200 and an array', async () => {
