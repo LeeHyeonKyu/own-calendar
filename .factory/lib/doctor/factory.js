@@ -128,7 +128,42 @@ export function checkCharter({ root, loadCharter }) {
     ...checkHumanGate(charter),
     // 외부 감사 M1 — 같은 모양의 CHARTER-only 선언. gh를 필요로 하지 않는다.
     ...checkTriageDefault(charter),
+    // 1.4.13 (데모 #76) — 어떤 글롭이 실제로 벽인지, 그리고 그 벽에 산문 한정어가 붙어 있는지를 매 실행에서 말한다.
+    ...checkNeverAutomate(charter),
+    // 1.4.16 (KTB #44) — 평생 예산은 CHARTER-only 선언이다; 없으면 이슈 하나가 얼마를 태우든 아무것도 멈추지 않는다.
+    ...checkBudgetPerIssue(charter),
   ];
+}
+
+/**
+ * 1.4.16 (KTB #44) — `[budget].usd_per_issue`. `merge.human_gate`와 같은 규칙으로 기본값을 채우지 않는다:
+ *  - 양수 → PASS `charter.budget-per-issue`(캡을 그대로 말한다).
+ *  - 없음/0 → WARN `charter.budget-per-issue-unset`: K·M은 마지막 큐 진입 이후만 세므로 재큐된 이슈의 평생 비용은 아무도 세지
+ *    않는다(데모 #18: README 이슈 하나가 38런·$212). FAIL이 아닌 이유: 예산은 안전 게이트가 아니라 흐름 제어다.
+ */
+export function checkBudgetPerIssue(charter) {
+  const v = Number(charter?.budget?.usd_per_issue);
+  if (Number.isFinite(v) && v > 0) return [c("charter.budget-per-issue", "PASS", `budget.usd_per_issue: $${v} — a stage refuses to start (needs-human) once an issue's lifetime cost, summed from the runner-written usage lines across re-queues, exceeds it (KTB #44)`)];
+  return [c("charter.budget-per-issue-unset", "WARN", "CHARTER declares no `budget.usd_per_issue` — nothing caps what one issue can burn across re-queues and retries (demo #18: 38 runs, $212 for a README issue). Add `budget: { usd_per_issue: 60 }` (or the number you mean) to the CHARTER frontmatter; the check spans re-queues on purpose (KTB #44)")];
+}
+
+/**
+ * 1.4.13 (데모 #76, L14) — **NEVER_AUTOMATE의 글롭은 한정어 없이 절대적으로 집행된다**는 사실을 소리 낸다.
+ *  - 글롭 목록 → PASS `charter.never-automate`에 그대로 나열(어느 경로를 스치면 wont-do인지 사람이 목록에서 본다).
+ *  - 글롭 항목에 한정어("breaking change" 등)가 붙어 있으면 WARN `charter.never-automate-qualified`: 스크립트는 한정어를
+ *    읽지 않으므로 그 항목은 적힌 것보다 넓게 집행된다. 넓게 막을 뜻이면 한정어를 빼고, 한정어가 뜻이면 백틱을 빼라
+ *    (백틱 없는 경로는 에이전트만 읽는 지침이 된다).
+ */
+export function checkNeverAutomate(charter) {
+  const globs = charter?.never_automate || [];
+  const qualified = charter?.never_automate_qualified || [];
+  const out = [globs.length
+    ? c("charter.never-automate", "PASS", `${globs.length} path glob(s) enforced by script on every touch: ${globs.join(", ")} — a triage impact_path under any of these forces wont-do regardless of the agent's verdict (audit M1)`)
+    : c("charter.never-automate", "PASS", "no path globs in NEVER_AUTOMATE — the list is prose only, read by the triage agent and not re-checked by script")];
+  for (const q of qualified) {
+    out.push(c("charter.never-automate-qualified", "WARN", `NEVER_AUTOMATE item "${q.text.slice(0, 80)}" pairs the glob \`${q.glob}\` with a qualifier the script cannot read — every change touching \`${q.glob}\` is forced to wont-do, not only the qualified kind. Drop the qualifier to block the whole path on purpose, or drop the backticks to keep it as guidance for the triage agent (1.4.13)`));
+  }
+  return out;
 }
 
 /**

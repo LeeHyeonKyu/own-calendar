@@ -6,7 +6,8 @@ import { isQuarantined, recordResult } from "./quarantine.js";
 import { changedFiles } from "./changed-files.js";
 import { matchesAny } from "./glob.js";
 import { classifyFailures } from "./classify-failure.js";
-import { proveTest, repeatNewTests, CHARACTERIZATION } from "./prove-test.js";
+import { mustNotContract, mustNotViolations, addedLines, fixesTests } from "./integrity.js";
+import { proveTest, repeatNewTests, proveModeFor, selfReferentialTests, proveFixedTests } from "./prove-test.js";
 import { runDiffCoverage } from "./diff-coverage.js";
 import { mutationGate } from "./mutation.js";
 import { scrubbedRunner } from "./exec.js";
@@ -232,6 +233,25 @@ export function gatesDetailLines(result, { runId = null, runnerId = null, round 
   try {
     const out = [];
     const secrets = secretsFrom();
+    /**
+     * 1.4.18 (KTB #38) — **test-env re-up 실패도 이 채널로 나간다.** 재-업이 실패하면 게이트는 하나도 돌지 않고
+     * (`status: BLOCKED`, `gates: {}`) run 기록에는 산문 한 줄(`test-env: re-up failed — …`)만 남았다 — 루프의 수확기는
+     * `gates-detail:`만 읽으므로 `[test.env]` 오설정은 분류·지문·집계 어디에도 잡히지 않았다. 같은 한 줄 JSON, 같은
+     * run_id/runner 바인딩으로 `gate: "test-env"`를 싣는다; 수확기는 그것을 `.factory/harness.toml [test.env]`로 보낸다.
+     */
+    const reup = result?.test_env_reup;
+    if (reup?.ran && reup.ok === false) {
+      const detail = String(reup.detail ?? "");
+      out.push(GATES_DETAIL_PREFIX + JSON.stringify({
+        gate: "test-env",
+        run_id: runId ?? null,
+        runner: runnerId ?? null,
+        ...(Number.isInteger(round) ? { round } : {}),
+        failing: [],
+        reason: scrubOne(`test-env re-up failed — ${detail.split("\n")[0]}`, secrets, DETAIL_MAX_REASON),
+        snippet: scrubText(detail.split("\n").slice(-DETAIL_TAIL_LINES).join("\n"), { secrets }).text.slice(-DETAIL_MAX_CHARS),
+      }));
+    }
     for (const [name, g] of Object.entries(result?.gates || {})) {
       if (!g || g.status !== "RED") continue;
       const d = g.detail || gateDetail({ gate: name, stdout: g.log ?? "" });
@@ -362,7 +382,17 @@ export async function runGates({ run, cwd, harness, level, quarantine, touchedFi
     if (unhandled) gates[name].reason = unhandledReason(r.code);
     if (TEST_GATES.has(name)) { gates[name].parsed = reportParsed; gates[name].failing_ids = failing_ids || []; }
     // Task 1 — RED의 뿌리를 게이트 엔트리에 붙인다(판정 뒤, 판정과 무관하게: additive 필드다).
-    if (status === "RED") gates[name].detail = gateDetail({ gate: name, stdout: r.stdout, stderr: r.stderr });
+    if (status === "RED") {
+      gates[name].detail = gateDetail({ gate: name, stdout: r.stdout, stderr: r.stderr });
+      // 1.4.17 (KTB #40) — **파싱한 리포트가 stdout 파서보다 정확하다.** `vitest --reporter=json --outputFile=…`의 stdout은
+      // "JSON report written to …" 한 줄뿐이라 이름 파서는 빈 목록을 냈고, 실제 실패 2건이 있는 리포트 옆에서 `gates-detail`은
+      // `failing: []`을 남겼다(KTB #36 run 35555844401). 리포트를 읽었으면 그 id(`file::name`)가 이 게이트의 실패 이름이다;
+      // 격리로 제외된 것은 실패가 아니므로 남은 것만 싣는다. 리포트가 없을 때만 stdout 파서의 답을 쓴다.
+      // stdout 파서가 이름을 찾았으면 그대로 둔다(analyze·retro가 그 이름 모양에 기대 있다); 비었을 때만 리포트 id로 채운다.
+      if (TEST_GATES.has(name) && reportParsed && !gates[name].detail.failing?.length && Array.isArray(tests?.failing) && tests.failing.length) {
+        gates[name].detail.failing = tests.failing.map((f) => f.id);
+      }
+    }
   }
   const result = { schema: "factory.gates.v1", level, requested_level, downgraded_from: level === requested_level ? null : requested_level, status: null, gates, passed: 0, failed: 0, failing: [], skipped: [], misconfigured: [], tests, quarantine_applied: quarantineApplied, quarantine_refused: quarantineRefused, ran_at: now };
   return recomputeStatus(result, harness);
@@ -578,19 +608,56 @@ export async function runStageGates({ run: injectedRun, cwd, harness, stage, tie
 
   if (stage === "implement") {
     const ch = await changedOnce();
+    // 1.4.14 (KTB #73) — 이슈 본문의 `must_not:` 계약을 diff에 댄다(§integrity.js mustNotContract). 계약이 없으면 게이트도
+    // 없다(required 판정에 끼지 않는다); 있으면 GREEN/RED로 남고, RED는 자기 게이트가 handoff를 막는 이유가 된다 —
+    // "do NOT"이 리뷰 산문이 아니라 러너의 판정이 되는 자리다. 본문을 못 읽으면 계약이 없는 것으로 친다(이유는 남긴다).
+    let issueBody = "";
+    if (issue && gh?.issue) { try { issueBody = (await gh.issue(issue))?.body ?? ""; } catch (e) { result.must_not_body_error = e?.message || String(e); } }
+    const contract = mustNotContract(issueBody);
+    if (contract.touch.length || contract.add.length) {
+      let added = new Map();
+      if (contract.add.length) {
+        const u0 = await run("git", ["diff", "--no-renames", "-U0", `${base}...HEAD`], { cwd });
+        if (u0.code === 0) added = addedLines(u0.stdout);
+        else result.must_not_diff_error = String(u0.stderr || "").trim().slice(0, 200);
+      }
+      const v = mustNotViolations({ contract, changed: ch.all, added });
+      result.gates["must-not"] = v.length
+        ? { status: "RED", code: null, duration_ms: 0, log: `issue must_not contract violated: ${v.map((x) => `${x.file}: ${x.rule}`).join("; ")}` }
+        : { status: "GREEN", code: null, duration_ms: 0, log: `issue must_not contract holds (touch: ${contract.touch.join(", ") || "-"}; add: ${contract.add.join(", ") || "-"})` };
+    }
     // 새로 추가된 테스트만이 아니라 **수정된 테스트 파일**도 증명 대상이다 — 기존 파일에 추가된
     // 케이스도 base에서는 실패해야 한다. 면제는 **실효 tier**로 판단한다(자기 신고 docs로 빠져나갈 수 없게).
     // 1.4.8 (데모 #57 Dependabot 설정): source_glob·test_glob 어디에도 없는 파일만 바뀐 diff에는 테스트로 증명할 것이
     // 없다 — "새 테스트가 없다"는 RED가 아니라 "증명할 대상이 없다"는 SKIPPED다(required에 없으면 판정을 막지 않는다).
+    // 1.4.15 (KTB #53) — 이슈 본문 `fixes_tests:`: 기존 테스트를 고친 변경의 증명은 "그 테스트가 base에서 RED, head에서 GREEN"이다
+    // (§prove-test.js proveFixedTests). 목록이 있으면 새 테스트가 없어도 prove-test는 RED가 아니다; 새 테스트도 있으면 둘 다 성립해야 GREEN.
+    const fixed = fixesTests(issueBody);
     if (effectiveTier !== "docs" && !ch.sources.length && !ch.tests.length) {
       result.gates["prove-test"] = { status: "SKIPPED", code: null, duration_ms: 0, log: `no source or test files in the diff (${ch.all.length} file(s), none under [test].source_glob/test_glob) — nothing to prove by tests` };
+    } else if (effectiveTier !== "docs" && fixed.length && !ch.tests.length) {
+      const pf = await proveFixedTests({ run, cwd, harness, base, tests: fixed });
+      result.gates["prove-test"] = { status: pf.misconfigured ? "MISCONFIGURED" : pf.ok ? "GREEN" : "RED", code: null, duration_ms: 0, log: pf.detail };
+      if (pf.inconclusive?.length) result.prove_test = { inconclusive: [...pf.inconclusive] };
     } else if (effectiveTier !== "docs") {
       // 1.4.9 — 소스는 그대로고 테스트만 늘었으면 특성화 모드(§prove-test.js CHARACTERIZATION): base에서도 통과해야 GREEN.
       // 1.4.10 (데모 #15): 특성화는 **바뀐 파일이 전부 테스트일 때만**이다. harness.toml·설정 같은 비-소스 파일이 함께 바뀌면
       // 그 테스트는 그 변경을 증명하려는 것이고(base에서 실패해야 한다), 특성화로 읽으면 정반대 판정이 난다.
-      const mode = ch.tests.length && ch.all.every((f) => ch.tests.includes(f)) ? CHARACTERIZATION : "prove";
-      const pt = await proveTest({ run, cwd, harness, base, addedTests: ch.tests, addedFiles: ch.added, mode });
+      const mode = proveModeFor(ch);
+      // 1.4.13 (own-calendar #31) — 자기 경로를 단언하는 새 테스트는 prove-test를 돌리기 전에 RED다(§prove-test.js selfReferentialTests):
+      // 그런 테스트가 base에서 실패하는 것은 메커니즘의 부산물이지 이 변경의 증명이 아니다.
+      const selfRef = selfReferentialTests(ch.added.filter((f) => ch.tests.includes(f)), (f) => readFileSync(join(cwd, f), "utf8"));
+      const pt = selfRef.length
+        ? { ok: false, detail: `self-referential test: ${selfRef.map((h) => `${h.file} mentions its own path (\`${h.hit}\`)`).join("; ")} — a test must assert about the product, not about its own file (existence, git tracking, mtime); such assertions fail on the base worktree by construction and prove nothing` }
+        : await proveTest({ run, cwd, harness, base, addedTests: ch.tests, addedFiles: ch.added, mode });
       result.gates["prove-test"] = { status: pt.misconfigured ? "MISCONFIGURED" : pt.ok ? "GREEN" : "RED", code: null, duration_ms: 0, log: pt.detail };
+      // 새 테스트와 fixes_tests가 함께 있으면 둘 다 성립해야 한다 — 고친 테스트의 RED→GREEN도 같은 게이트에 합산된다.
+      if (fixed.length && !pt.misconfigured) {
+        const pf = await proveFixedTests({ run, cwd, harness, base, tests: fixed });
+        const g = result.gates["prove-test"];
+        result.gates["prove-test"] = { ...g, status: pf.misconfigured ? "MISCONFIGURED" : g.status === "GREEN" && pf.ok ? "GREEN" : "RED", log: `${g.log}; ${pf.detail}` };
+        if (pf.inconclusive?.length) result.prove_test = { inconclusive: [...(result.prove_test?.inconclusive || []), ...pf.inconclusive] };
+      }
       /*
        * 감사 M2 — **판정 불가는 판정 결과와 따로 기록된다.** base에서 테스트가 아예 돌지 못한 것은
        * GREEN(증명됨)도 RED(증명 실패)도 아니라 "이 게이트가 무엇을 말하는지 모른다"이고,
