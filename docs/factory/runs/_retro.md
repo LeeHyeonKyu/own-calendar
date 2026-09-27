@@ -23,13 +23,13 @@
 | rounds/issue (plan/impl/review) | 1 / 3 / 1 | 1 / 2.67 / 2 |
 | escaped defects | 0 | 6 |
 | revert rate | 0.00 (0/1) | 0.00 (0/6) |
-| needs-human | 3 | 25 |
+| needs-human | 4 | 25 |
 | rejects by role | 없음 | correctness 2, architecture 1, spec-conformance 6, qa 1 |
 | reviewer overlap | 없음 | 0.38 (5/13, runs 13) |
 | unique findings by role | 없음 | correctness 4, architecture 1, spec-conformance 3 |
 | qa na ratio | 0.00 (0/12 claims, na-heavy 0/2 approvals) | 0.00 (0/35 claims, na-heavy 0/4 approvals) |
-| cost (usd) | 51.31 | 244.17 |
-| tokens | input 4679213 / output 38570 | input 24333735 / output 399912 |
+| cost (usd) | 54.79 | 244.17 |
+| tokens | input 4944194 / output 39978 | input 24333735 / output 399912 |
 | retro cost (usd) | 0.00 | 6.96 |
 | retro tokens | input 0 / output 0 | input 14 / output 4369 |
 | full retros | — | 5 |
@@ -541,8 +541,8 @@
       },
       {
         "issue": 45,
-        "reason": "self-gate: not converging after 3 retries",
-        "at": "2026-09-27T11:28:33Z"
+        "reason": "self-gate: not converging after 4 retries",
+        "at": "2026-09-27T12:26:27Z"
       },
       {
         "issue": 44,
@@ -580,17 +580,17 @@
     "overlapping_findings": 0,
     "unique_findings_by_role": {},
     "overlap_ratio": 0,
-    "needs_human": 3,
+    "needs_human": 4,
     "qa_approvals": 2,
     "qa_claims_total": 12,
     "qa_na_total": 0,
     "qa_na_ratio": 0,
     "qa_na_heavy_approvals": 0,
     "usage": {
-      "cost_usd": 51.309257,
+      "cost_usd": 54.788082,
       "tokens": {
-        "input": 4679213,
-        "output": 38570
+        "input": 4944194,
+        "output": 39978
       }
     }
   },
