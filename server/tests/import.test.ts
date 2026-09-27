@@ -27,6 +27,11 @@ describe('test_48_import_ics', () => {
     expect(res.body.added).toBe(2);
     expect(res.body.calendarId).toBeDefined();
 
+    // Guard: global rate limiter (app.ts) sets legacyHeaders: false —
+    // legacy X-RateLimit-* headers must be absent. If that boolean is
+    // mutated to true, this assertion fails.
+    expect(res.headers['x-ratelimit-limit']).toBeUndefined();
+
     // Verify events were actually persisted in the database
     const events = await prisma.event.findMany({
       where: { calendarId: res.body.calendarId },
@@ -88,6 +93,6 @@ describe('test_48_import_ics', () => {
       .attach('file', FIXTURE_PATH);
 
     expect(res.status).toBe(401);
-    expect(res.body.error).toBeDefined();
+    expect(res.body.error).toBe('Missing or invalid authorization header');
   });
 });
