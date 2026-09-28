@@ -1,8 +1,11 @@
 name: Build Native Apps
 
+# Owner decision 2026-09-28: hosted macOS/ubuntu runners are billed on this private repo and every push to main
+# failed at the `version` job. Native builds now run only for release tags — and ALWAYS on demand through
+# workflow_dispatch (the bypass when GitHub's hosted-runner quota or billing blocks a build).
 on:
   push:
-    branches: [main]
+    tags: ['v*']
   workflow_dispatch:
 
 # Cancel in-progress runs for the same branch
