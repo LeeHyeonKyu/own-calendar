@@ -23,13 +23,13 @@
 | rounds/issue (plan/impl/review) | 1 / 1 / 1 | 1 / 3.08 / 1.75 |
 | escaped defects | 0 | 9 |
 | revert rate | 0.00 (0/1) | 0.00 (0/12) |
-| needs-human | 6 | 29 |
+| needs-human | 7 | 29 |
 | rejects by role | 없음 | correctness 2, architecture 1, spec-conformance 9, qa 2 |
 | reviewer overlap | 없음 | 0.35 (6/17, runs 22) |
 | unique findings by role | 없음 | correctness 4, architecture 1, spec-conformance 5, qa 1 |
 | qa na ratio | 0.00 (0/19 claims, na-heavy 0/2 approvals) | 0.03 (3/88 claims, na-heavy 0/10 approvals) |
-| cost (usd) | 69.34 | 376.83 |
-| tokens | input 5084367 / output 69831 | input 37051761 / output 527081 |
+| cost (usd) | 83.66 | 376.83 |
+| tokens | input 5179730 / output 76536 | input 37051761 / output 527081 |
 | retro cost (usd) | 0.00 | 10.35 |
 | retro tokens | input 0 / output 0 | input 20 / output 5921 |
 | full retros | — | 7 |
@@ -783,8 +783,8 @@
       },
       {
         "issue": 90,
-        "reason": "stage artifact missing or invalid: dissent without done_when: d2, d3 — give every dissent_log entry an \"id\" and a \"severity\"; for each medium/high (or severity-less) entry either add its id to the \"covers\" of the done_when that mitigates it, or set \"severity\": \"low\" if it is not a risk worth pinning",
-        "at": "2026-09-28T02:42:00Z"
+        "reason": "stage artifact missing or invalid: dissent without done_when: d3, d4 — give every dissent_log entry an \"id\" and a \"severity\"; for each medium/high (or severity-less) entry either add its id to the \"covers\" of the done_when that mitigates it, or set \"severity\": \"low\" if it is not a risk worth pinning [validator saw — uncovered: d3 (no id — named by position): severity missing; d4 (no id — named by position): severity missing; done_when.covers: d1, d2]",
+        "at": "2026-09-28T06:08:10Z"
       },
       {
         "issue": 91,
@@ -817,17 +817,17 @@
     "overlapping_findings": 0,
     "unique_findings_by_role": {},
     "overlap_ratio": 0,
-    "needs_human": 6,
+    "needs_human": 7,
     "qa_approvals": 2,
     "qa_claims_total": 19,
     "qa_na_total": 0,
     "qa_na_ratio": 0,
     "qa_na_heavy_approvals": 0,
     "usage": {
-      "cost_usd": 69.34083,
+      "cost_usd": 83.662956,
       "tokens": {
-        "input": 5084367,
-        "output": 69831
+        "input": 5179730,
+        "output": 76536
       }
     }
   },
