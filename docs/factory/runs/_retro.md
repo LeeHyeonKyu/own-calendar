@@ -27,9 +27,9 @@
 | rejects by role | 없음 | correctness 2, architecture 1, spec-conformance 9, qa 2 |
 | reviewer overlap | 없음 | 0.35 (6/17, runs 22) |
 | unique findings by role | 없음 | correctness 4, architecture 1, spec-conformance 5, qa 1 |
-| qa na ratio | 0.00 (0/19 claims, na-heavy 0/2 approvals) | 0.03 (3/88 claims, na-heavy 0/10 approvals) |
-| cost (usd) | 83.66 | 376.83 |
-| tokens | input 5179730 / output 76536 | input 37051761 / output 527081 |
+| qa na ratio | 0.00 (0/26 claims, na-heavy 0/3 approvals) | 0.03 (3/88 claims, na-heavy 0/10 approvals) |
+| cost (usd) | 111.96 | 376.83 |
+| tokens | input 7277058 / output 95422 | input 37051761 / output 527081 |
 | retro cost (usd) | 0.00 | 10.35 |
 | retro tokens | input 0 / output 0 | input 20 / output 5921 |
 | full retros | — | 7 |
@@ -818,16 +818,16 @@
     "unique_findings_by_role": {},
     "overlap_ratio": 0,
     "needs_human": 7,
-    "qa_approvals": 2,
-    "qa_claims_total": 19,
+    "qa_approvals": 3,
+    "qa_claims_total": 26,
     "qa_na_total": 0,
     "qa_na_ratio": 0,
     "qa_na_heavy_approvals": 0,
     "usage": {
-      "cost_usd": 83.662956,
+      "cost_usd": 111.961636,
       "tokens": {
-        "input": 5179730,
-        "output": 76536
+        "input": 7277058,
+        "output": 95422
       }
     }
   },
