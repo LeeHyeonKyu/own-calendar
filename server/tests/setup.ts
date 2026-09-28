@@ -32,6 +32,11 @@ export async function createTestUser(
     password: overrides?.password || 'password123',
   };
   const res = await request(app).post('/api/auth/register').send(userData);
+  if (res.status !== 201) {
+    throw new Error(
+      `createTestUser failed for ${userData.email}: expected 201, got ${res.status} — ${JSON.stringify(res.body)}`,
+    );
+  }
   return { ...res.body, password: userData.password };
 }
 

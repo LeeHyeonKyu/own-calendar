@@ -36,9 +36,12 @@ if (config.corsOrigin.length > 0) {
 app.use(express.json({ limit: '100kb' }));
 
 // Global rate limiter — everyone hitting the API.
+// In test mode the limit is raised so the ~350 supertest requests across the full
+// suite do not cross the threshold and cause 429s (root cause of #91 flakiness).
+// Production/development keep the original 300-request budget.
 const globalLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  limit: 300,
+  limit: config.nodeEnv === 'test' ? 10000 : 300,
   standardHeaders: 'draft-7',
   legacyHeaders: false,
 });
