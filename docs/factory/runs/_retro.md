@@ -23,13 +23,13 @@
 | rounds/issue (plan/impl/review) | 1 / 1 / 1 | 1 / 3.08 / 1.75 |
 | escaped defects | 0 | 9 |
 | revert rate | 0.00 (0/1) | 0.00 (0/12) |
-| needs-human | 3 | 29 |
+| needs-human | 4 | 29 |
 | rejects by role | 없음 | correctness 2, architecture 1, spec-conformance 9, qa 2 |
 | reviewer overlap | 없음 | 0.35 (6/17, runs 22) |
 | unique findings by role | 없음 | correctness 4, architecture 1, spec-conformance 5, qa 1 |
 | qa na ratio | 0.00 (0/19 claims, na-heavy 0/2 approvals) | 0.03 (3/88 claims, na-heavy 0/10 approvals) |
-| cost (usd) | 45.32 | 376.83 |
-| tokens | input 3869301 / output 51686 | input 37051761 / output 527081 |
+| cost (usd) | 65.17 | 376.83 |
+| tokens | input 4594897 / output 64945 | input 37051761 / output 527081 |
 | retro cost (usd) | 0.00 | 10.35 |
 | retro tokens | input 0 / output 0 | input 20 / output 5921 |
 | full retros | — | 7 |
@@ -703,6 +703,14 @@
           49
         ],
         "source": "must_fix"
+      },
+      {
+        "role": "qa",
+        "text": "The new characterization suite calls POST /api/follows/:followId/accept exactly three times (follows.test.ts:27, 71, and inside followAndAccept reused by dw2/dw3), and in every call the bearer token belongs to the actual followee. No test in follows.test.ts, nor anywhere else in server/tests/ (repo-wide grep for `accept` confirms this), ever calls accept as an unrelated third party or as the original follower. The one authorization check that decides who may flip a PENDING follow into ACCEPTED -- and therefore who may unilaterally grant a requester visibility into someone else's events -- is completely unexercised by the shipped suite. Issue #49's own stated purpose is exactly this: 'follows.ts + follow.service.ts decide which other users' events a person can see and has no test file. It is a load-bearing path.' The accept step is the single gate that establishes every follow relationship the rest of the suite depends on, and it is the one branch of that gate nobody, including this new suite, has ever called with the wrong caller. The guard is not broken today (I confirmed it live, see evidence) -- this is a coverage gap on a security-relevant branch, not a live vulnerability -- but a future refactor could silently drop or invert this check and all 10 existing tests would stay green. Adding this case is additive to server/tests/follows.test.ts only and does not touch server/src/** or server/prisma/**, so it does not conflict with the issue's must_not constraint.",
+        "runs": [
+          49
+        ],
+        "source": "must_fix"
       }
     ],
     "examples": [],
@@ -772,6 +780,11 @@
         "issue": 49,
         "reason": "gates file status is RED",
         "at": "2026-09-27T23:05:03Z"
+      },
+      {
+        "issue": 90,
+        "reason": "stage artifact missing or invalid: dissent without done_when: d2, d3 — give every dissent_log entry an \"id\" and a \"severity\"; for each medium/high (or severity-less) entry either add its id to the \"covers\" of the done_when that mitigates it, or set \"severity\": \"low\" if it is not a risk worth pinning",
+        "at": "2026-09-28T02:42:00Z"
       }
     ]
   },
@@ -799,17 +812,17 @@
     "overlapping_findings": 0,
     "unique_findings_by_role": {},
     "overlap_ratio": 0,
-    "needs_human": 3,
+    "needs_human": 4,
     "qa_approvals": 2,
     "qa_claims_total": 19,
     "qa_na_total": 0,
     "qa_na_ratio": 0,
     "qa_na_heavy_approvals": 0,
     "usage": {
-      "cost_usd": 45.316575,
+      "cost_usd": 65.173462,
       "tokens": {
-        "input": 3869301,
-        "output": 51686
+        "input": 4594897,
+        "output": 64945
       }
     }
   },
