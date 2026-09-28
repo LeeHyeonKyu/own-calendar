@@ -1,6 +1,7 @@
 import { initializeApp, cert, type App } from 'firebase-admin/app';
 import { getMessaging, type Messaging } from 'firebase-admin/messaging';
 import { config } from '../config';
+import { logger } from '../lib/logger';
 
 let firebaseApp: App | null = null;
 let messaging: Messaging | null = null;
@@ -10,7 +11,7 @@ function initializeFirebase(): boolean {
 
   const json = config.firebase.serviceAccountJson;
   if (!json) {
-    console.warn('[FCM] FIREBASE_SERVICE_ACCOUNT_JSON not set — push notifications disabled');
+    logger.warn('[FCM] FIREBASE_SERVICE_ACCOUNT_JSON not set — push notifications disabled');
     return false;
   }
 
@@ -20,10 +21,10 @@ function initializeFirebase(): boolean {
       credential: cert(serviceAccount),
     });
     messaging = getMessaging(firebaseApp);
-    console.log('[FCM] Firebase Admin SDK initialized');
+    logger.info('[FCM] Firebase Admin SDK initialized');
     return true;
   } catch (err) {
-    console.error('[FCM] Failed to initialize Firebase Admin SDK:', err);
+    logger.error('[FCM] Failed to initialize Firebase Admin SDK:', err);
     return false;
   }
 }
@@ -70,10 +71,10 @@ export const fcmService = {
         err.code === 'messaging/registration-token-not-registered' ||
         err.code === 'messaging/invalid-registration-token'
       ) {
-        console.warn(`[FCM] Invalid token: ${token.substring(0, 20)}...`);
+        logger.warn(`[FCM] Invalid token: ${token.substring(0, 20)}...`);
         return false;
       }
-      console.error('[FCM] Failed to send notification:', err.message);
+      logger.error('[FCM] Failed to send notification:', err.message);
       return false;
     }
   },

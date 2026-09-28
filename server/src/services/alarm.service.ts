@@ -1,5 +1,6 @@
 import prisma from '../lib/prisma';
 import { fcmService } from './fcm.service';
+import { logger } from '../lib/logger';
 
 const CHECK_INTERVAL_MS = 60 * 1000; // 60 seconds
 const WINDOW_MS = 90 * 1000; // 90-second lookahead to avoid missing events between checks
@@ -107,7 +108,7 @@ async function checkUpcomingAlarms() {
       sentNotifications.add(dedupKey);
     }
   } catch (err) {
-    console.error('[Alarm] Error checking upcoming alarms:', err);
+    logger.error('[Alarm] Error checking upcoming alarms:', err);
   }
 }
 
@@ -117,11 +118,11 @@ let pruneIntervalId: ReturnType<typeof setInterval> | null = null;
 export const alarmService = {
   start() {
     if (!fcmService.isReady()) {
-      console.log('[Alarm] FCM not ready — alarm scheduler disabled');
+      logger.info('[Alarm] FCM not ready — alarm scheduler disabled');
       return;
     }
 
-    console.log('[Alarm] Starting alarm scheduler (check every 60s)');
+    logger.info('[Alarm] Starting alarm scheduler (check every 60s)');
     intervalId = setInterval(checkUpcomingAlarms, CHECK_INTERVAL_MS);
     pruneIntervalId = setInterval(pruneOldNotifications, PRUNE_INTERVAL_MS);
 
