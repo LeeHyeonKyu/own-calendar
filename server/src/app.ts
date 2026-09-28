@@ -35,42 +35,50 @@ if (config.corsOrigin.length > 0) {
 
 app.use(express.json({ limit: '100kb' }));
 
-// FIX(#90): In test environment (NODE_ENV=test), rate-limit budgets are raised
-// to effectively unlimited to eliminate one identified source of non-determinism.
+// FIX(#90): Rate-limit budgets raised to 100,000 in test env (NODE_ENV=test)
+// as a defensive measure against test-environment rate-limiter exhaustion.
 //
-// Mechanism addressed: express-rate-limit uses an in-memory MemoryStore that
-// persists for the lifetime of each module-scoped singleton. Two separate
-// limiters can cause silent failures in tests:
+// Observed symptom: family.test.ts:127-182 ("shows family members public
+// events, hides private events") intermittently failed with "expected [] to
+// include 'Public Event'" in ~3/8 CI runs (#45 x3).
 //
-// (1) Global limiter (limit: 300, applied to ALL routes via app.use): In a
-//     full-suite run (fileParallelism: false shares one Node process), if
-//     vitest's module cache retains the app singleton across files, the
-//     cumulative ~256 requests from 15 test files can exhaust this budget.
-//     POST /api/events then receives 429 directly from globalLimiter. Because
-//     the flaky test (family.test.ts:127-182) did not assert event-creation
-//     HTTP status, the 429 propagated as the misleading downstream error
-//     "expected [] to include 'Public Event'".
+// Identified root cause: the two POST /api/events calls in that test did NOT
+// assert their HTTP response status. Any transient failure — DB connection
+// timeout on the tmpfs-backed test Postgres, rate-limiter rejection (429),
+// or infrastructure-level error (500) — silently left zero events persisted.
+// The real error was masked; only the downstream assertion fired with the
+// misleading message "expected [] to include 'Public Event'".
 //
-// (2) Auth limiter (limit: 10, skipSuccessfulRequests: true, applied only to
-//     /api/auth/register, /api/auth/login, /api/family/join, /api/groups/join):
-//     Under CI load (tmpfs-backed Postgres, connection-pool contention between
-//     the two PrismaClient instances in tests/setup.ts vs src/lib/prisma.ts),
-//     transient DB failures during user registration count against this low
-//     budget. Once exhausted, createTestUser receives 429 on /api/auth/register
-//     and returns no accessToken; subsequent requests with "Bearer undefined"
-//     receive 401 from auth middleware, silently preventing event creation.
+// Primary fix: status assertions on event-creation calls (family.test.ts:160,
+// 172) now surface the actual HTTP error at the causal line.
 //
-// Both pathways produce the same observed symptom: no events are persisted, and
-// the downstream assertion fails with "expected [] to include 'Public Event'".
+// Defensive fix (this code): rate-limiter relaxation in NODE_ENV=test.
+// express-rate-limit's MemoryStore is an in-memory counter scoped to each
+// module-scoped singleton instance. vitest 4.1.2 defaults to isolate:true
+// and pool:'forks' (neither overridden in vitest.config.ts), which resets
+// modules between test files — so the globalLimiter's 300-request counter
+// does NOT accumulate across files. However, relaxing the limits in test env
+// provides headroom against:
+//   (a) The auth limiter's low 10-request budget (skipSuccessfulRequests:true
+//       means only FAILED requests count; under CI DB-connection contention,
+//       transient registration failures can exhaust this budget within a
+//       single file, causing subsequent createTestUser calls to receive 429).
+//   (b) Any future test file or regression test that makes >300 within-file
+//       requests (e.g. test_90_rate_limiter_headroom sends 301 to prove the
+//       guard works).
+//   (c) Configuration changes (e.g. isolate:false) that would re-enable
+//       cross-file counter accumulation.
 //
-// Scope of this fix: this change eliminates the rate-limiter exhaustion pathway.
-// It does NOT address infrastructure-level failures that produce a different
-// signature (500s, MODULE_NOT_FOUND, Worker exited unexpectedly) — those arise
-// from concurrent processes (e.g. parallel npm ci) corrupting node_modules on a
-// shared runner, and require harness-level serialisation to fix.
-// The deterministic regression test (test_90_rate_limiter_headroom) proves the
-// rate-limiter mechanism by exhausting the base 300-request budget and asserting
-// that event creation still returns 201, not 429.
+// The regression test (test_90_rate_limiter_headroom) proves the guard is
+// mechanically necessary: without isTestEnv, 301 requests within one file
+// exhaust the 300-request budget and event creation returns 429 instead of
+// 201. This is a deterministic proof of the guard, not a reproduction of
+// the original flake's exact conditions.
+//
+// What this fix does NOT address: infrastructure-level failures (500s,
+// MODULE_NOT_FOUND, Worker exited unexpectedly) that arise from concurrent
+// processes (e.g. parallel npm ci) corrupting node_modules on a shared
+// runner. Those require harness-level serialisation.
 //
 // Production and development rate limits are UNCHANGED: the elevated limits
 // apply only when NODE_ENV=test (set by scripts/factory-server-test.sh:17).

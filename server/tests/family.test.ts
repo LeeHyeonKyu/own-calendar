@@ -251,29 +251,23 @@ describe('Family API', () => {
   });
 
   describe('Rate-limiter headroom (regression #90)', () => {
-    // FIX(#90): This test deterministically proves that the test-env
-    // rate-limiter relaxation in server/src/app.ts is necessary for the
-    // rate-limiter exhaustion pathway specifically.
+    // FIX(#90): Deterministic proof that the isTestEnv rate-limiter guard in
+    // server/src/app.ts is mechanically necessary.
     //
-    // One identified cause of the flaky failure "expected [] to include
-    // 'Public Event'": the globalLimiter (express-rate-limit, limit:
-    // 300/15min) is a module-scoped singleton. In a full-suite run
-    // (fileParallelism: false, one Node process), cumulative requests from
-    // earlier test files can exhaust the 300-request budget before
-    // family.test.ts runs. POST /api/events then silently receives 429;
-    // since the test did not assert event-creation status, the error surfaced
-    // only as the misleading downstream assertion "expected [] to include
-    // 'Public Event'".
+    // This test sends 301 requests within a single file to exceed the base
+    // production limit (globalLimiter: 300 req/15min), then asserts that
+    // event creation still returns 201, not 429. Without the isTestEnv guard
+    // (which raises the limit to 100,000 in NODE_ENV=test), this test always
+    // fails — proving the guard is required.
     //
-    // This test reproduces the exhaustion deterministically by sending 301
-    // requests (exceeding the base limit of 300), then asserting that a
-    // family event-creation flow still succeeds (201, not 429). Without the
-    // isTestEnv guard (limit: 100_000 in NODE_ENV=test), this test always
-    // fails — proving the fix is necessary.
-    //
-    // Note: infrastructure-level failures (concurrent npm ci corrupting
-    // node_modules, producing 500s / MODULE_NOT_FOUND) are a separate
-    // mechanism not addressed by this code fix.
+    // Note: this test creates an artificial exhaustion condition (301 reqs in
+    // one file) rather than reproducing the original flake's exact conditions.
+    // Under vitest 4.1.2's default isolate:true, the globalLimiter resets
+    // between files, so family.test.ts's natural ~51 requests cannot reach
+    // 300. The guard's primary defensive value is against the auth limiter's
+    // low 10-request budget (exhaustible by transient DB failures during
+    // createTestUser) and against future configuration changes. See the
+    // causal comment in server/src/app.ts for the full explanation.
     it('test_90_rate_limiter_headroom', async () => {
       // Send 301 lightweight requests to exceed the base production
       // rate limit (300 req/15min). Each GET /health passes through
