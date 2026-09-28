@@ -147,6 +147,7 @@ rework_response:           # rework 라운드에서만. PR 코멘트로도 남�
 - "린트가 `package.json`에 스크립트 하나만 추가하면 통과해서 추가했다." — 보호 경로다. `harness_needed`에
   `{file: "package.json", change: …, why: …}`로 적고 그것 없이 마무리한다.
 - "`pg`가 없어서 done_when 3개를 못 끝냈다. PR 본문에 'Harness change needed: pg 패키지 필요'라고 썼다." —
+- 위치: implement handoff for #48 (files_expected includes server/tests/import.test.ts). 주장: import route의 happy-path 테스트 안에 authLimiter와 globalLimiter의 rate-limit 헤더(legacyHeaders, ratelimit-policy)를 검증하는 단언을 추가했다 — 파일 이름은 files_expected 안이므로 scope 위반이 아니라고 판단했다. 근거: rate-limit 동작은 plan의 done_when에도, …
   산문은 신호가 아니다(아무도 읽지 않는다). 같은 내용을 `harness_needed` 필드에 적어야 factory가
   `factory:harness` 이슈를 열고 이 이슈를 주차한다. 데모 #2는 이 한 글자 차이로 네 라운드를 반복했다.
 
