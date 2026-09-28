@@ -10,7 +10,7 @@ roster:
 plan_roles:
   docs: [architect, skeptic]
   default: [product-advocate, architect, skeptic, operator]
-plan_rounds: { docs: 2, default: 3 }
+plan_rounds: { docs: 2, default: 2 }   # 2026-09-28: 3 rounds × 5 roles hit the 75-min plan timeout on the self-hosted runner (#91); the SDD cost policy prefers fewer rounds
 back_pressure: { awaiting_review_max: 4 }   # quarantine 상한은 두지 않는다 — harness.toml [gates.thresholds].quarantine_max가 유일한 출처(§5.1, Plan 1b 실행 판결)
 budget: { usd_per_issue: 60 }
 retro: { every_merges: { initial: 1, min: 1, max: 20 }, light_on_merge: true }
