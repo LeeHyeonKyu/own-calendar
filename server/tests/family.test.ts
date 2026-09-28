@@ -249,4 +249,84 @@ describe('Family API', () => {
       expect(res.status).toBe(403);
     });
   });
+
+  describe('Rate-limiter headroom (regression #90)', () => {
+    // FIX(#90): This test deterministically proves that the test-env
+    // rate-limiter relaxation in server/src/app.ts is necessary.
+    //
+    // Root cause of the flaky failure "expected [] to include 'Public Event'":
+    // the globalLimiter (express-rate-limit, limit: 300/15min) is a module-
+    // scoped singleton. In a full-suite run (fileParallelism: false, one Node
+    // process), cumulative requests from earlier test files can exhaust the
+    // 300-request budget before family.test.ts runs. POST /api/events then
+    // silently receives 429; since the test did not assert event-creation
+    // status, the error surfaced only as the misleading downstream assertion
+    // "expected [] to include 'Public Event'".
+    //
+    // This test reproduces the exhaustion deterministically by sending 301
+    // requests (exceeding the base limit of 300), then asserting that a
+    // family event-creation flow still succeeds (201, not 429). Without the
+    // isTestEnv guard (limit: 100_000 in NODE_ENV=test), this test always
+    // fails — proving the fix is necessary.
+    it('test_90_rate_limiter_headroom', async () => {
+      // Send 301 lightweight requests to exceed the base production
+      // rate limit (300 req/15min). Each GET /health passes through
+      // app.use(globalLimiter), incrementing the in-memory counter.
+      const batch: Promise<any>[] = [];
+      for (let i = 0; i < 301; i++) {
+        batch.push(request(app).get('/health'));
+      }
+      await Promise.all(batch);
+
+      // Set up family + event — the exact flow from the flaky test.
+      const createRes = await request(app)
+        .post('/api/family')
+        .set('Authorization', `Bearer ${user1.accessToken}`)
+        .send({ name: 'Rate Limit Test Family' });
+      expect(createRes.status).toBe(201);
+
+      await request(app)
+        .post('/api/family/join')
+        .set('Authorization', `Bearer ${user2.accessToken}`)
+        .send({ code: createRes.body.code });
+
+      const calRes = await request(app)
+        .get('/api/calendars')
+        .set('Authorization', `Bearer ${user2.accessToken}`);
+      expect(calRes.status).toBe(200);
+      expect(calRes.body.length).toBeGreaterThan(0);
+
+      const user2CalendarId = calRes.body[0].id;
+
+      // The critical assertion: event creation must return 201, not 429.
+      // On base code (globalLimiter limit: 300), the 301 requests above
+      // exhaust the budget and this POST receives 429 — reproducing the
+      // exact silent failure that caused the flaky downstream assertion.
+      const eventRes = await request(app)
+        .post('/api/events')
+        .set('Authorization', `Bearer ${user2.accessToken}`)
+        .send({
+          title: 'Rate Limit Proof Event',
+          startTime: '2026-04-10T10:00:00.000Z',
+          endTime: '2026-04-10T11:00:00.000Z',
+          calendarId: user2CalendarId,
+          isPrivate: false,
+        });
+      expect(eventRes.status).toBe(201);
+
+      // Verify the event is visible in family calendars (the assertion
+      // that was flaky before the fix).
+      const familyRes = await request(app)
+        .get('/api/family/calendars')
+        .set('Authorization', `Bearer ${user1.accessToken}`);
+      expect(familyRes.status).toBe(200);
+
+      const user2Entry = familyRes.body.find(
+        (e: any) => e.member.id === user2.user.id,
+      );
+      expect(user2Entry).toBeDefined();
+      const titles = user2Entry.calendars.flatMap((c: any) => c.events).map((e: any) => e.title);
+      expect(titles).toContain('Rate Limit Proof Event');
+    });
+  });
 });
