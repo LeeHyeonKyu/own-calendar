@@ -39,17 +39,29 @@ app.use(express.json({ limit: '100kb' }));
 // to effectively unlimited to prevent non-deterministic test failures.
 //
 // Mechanism of non-determinism: express-rate-limit uses an in-memory
-// MemoryStore that persists for the lifetime of the module-scoped singleton.
-// The auth limiter (limit: 10, skipSuccessfulRequests: true) is shared across
-// all tests within a vitest file. Under CI load (tmpfs-backed Postgres,
-// connection-pool contention between the two separate PrismaClient instances in
-// tests/setup.ts vs src/lib/prisma.ts), a transient DB write failure during
-// user registration cascades: the failed /api/auth/register request counts
-// against the auth limiter budget, and if enough failures accumulate the
-// limiter starts returning 429. Because the flaky test
-// (family.test.ts:127-182) did not assert event-creation HTTP status, a 429 on
-// POST /api/events propagated as the misleading downstream error
-// "expected [] to include 'Public Event'".
+// MemoryStore that persists for the lifetime of each module-scoped singleton.
+// Two separate limiters can cause silent failures in tests:
+//
+// (1) Global limiter (limit: 300, applied to ALL routes via app.use): In a
+//     full-suite run (fileParallelism: false shares one Node process), if
+//     vitest's module cache retains the app singleton across files, the
+//     cumulative ~256 requests from 15 test files can exhaust this budget.
+//     POST /api/events then receives 429 directly from globalLimiter. Because
+//     the flaky test (family.test.ts:127-182) did not assert event-creation
+//     HTTP status, the 429 propagated as the misleading downstream error
+//     "expected [] to include 'Public Event'".
+//
+// (2) Auth limiter (limit: 10, skipSuccessfulRequests: true, applied only to
+//     /api/auth/register, /api/auth/login, /api/family/join, /api/groups/join):
+//     Under CI load (tmpfs-backed Postgres, connection-pool contention between
+//     the two PrismaClient instances in tests/setup.ts vs src/lib/prisma.ts),
+//     transient DB failures during user registration count against this low
+//     budget. Once exhausted, createTestUser receives 429 on /api/auth/register
+//     and returns no accessToken; subsequent requests with "Bearer undefined"
+//     receive 401 from auth middleware, silently preventing event creation.
+//
+// Both pathways produce the same observed symptom: no events are persisted, and
+// the downstream assertion fails with "expected [] to include 'Public Event'".
 //
 // Production and development rate limits are UNCHANGED: the elevated limits
 // apply only when NODE_ENV=test (set by scripts/factory-server-test.sh:17).
