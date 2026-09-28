@@ -252,22 +252,28 @@ describe('Family API', () => {
 
   describe('Rate-limiter headroom (regression #90)', () => {
     // FIX(#90): This test deterministically proves that the test-env
-    // rate-limiter relaxation in server/src/app.ts is necessary.
+    // rate-limiter relaxation in server/src/app.ts is necessary for the
+    // rate-limiter exhaustion pathway specifically.
     //
-    // Root cause of the flaky failure "expected [] to include 'Public Event'":
-    // the globalLimiter (express-rate-limit, limit: 300/15min) is a module-
-    // scoped singleton. In a full-suite run (fileParallelism: false, one Node
-    // process), cumulative requests from earlier test files can exhaust the
-    // 300-request budget before family.test.ts runs. POST /api/events then
-    // silently receives 429; since the test did not assert event-creation
-    // status, the error surfaced only as the misleading downstream assertion
-    // "expected [] to include 'Public Event'".
+    // One identified cause of the flaky failure "expected [] to include
+    // 'Public Event'": the globalLimiter (express-rate-limit, limit:
+    // 300/15min) is a module-scoped singleton. In a full-suite run
+    // (fileParallelism: false, one Node process), cumulative requests from
+    // earlier test files can exhaust the 300-request budget before
+    // family.test.ts runs. POST /api/events then silently receives 429;
+    // since the test did not assert event-creation status, the error surfaced
+    // only as the misleading downstream assertion "expected [] to include
+    // 'Public Event'".
     //
     // This test reproduces the exhaustion deterministically by sending 301
     // requests (exceeding the base limit of 300), then asserting that a
     // family event-creation flow still succeeds (201, not 429). Without the
     // isTestEnv guard (limit: 100_000 in NODE_ENV=test), this test always
     // fails — proving the fix is necessary.
+    //
+    // Note: infrastructure-level failures (concurrent npm ci corrupting
+    // node_modules, producing 500s / MODULE_NOT_FOUND) are a separate
+    // mechanism not addressed by this code fix.
     it('test_90_rate_limiter_headroom', async () => {
       // Send 301 lightweight requests to exceed the base production
       // rate limit (300 req/15min). Each GET /health passes through
@@ -285,10 +291,11 @@ describe('Family API', () => {
         .send({ name: 'Rate Limit Test Family' });
       expect(createRes.status).toBe(201);
 
-      await request(app)
+      const joinRes = await request(app)
         .post('/api/family/join')
         .set('Authorization', `Bearer ${user2.accessToken}`)
         .send({ code: createRes.body.code });
+      expect(joinRes.status).toBe(200);
 
       const calRes = await request(app)
         .get('/api/calendars')

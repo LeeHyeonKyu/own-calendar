@@ -36,11 +36,11 @@ if (config.corsOrigin.length > 0) {
 app.use(express.json({ limit: '100kb' }));
 
 // FIX(#90): In test environment (NODE_ENV=test), rate-limit budgets are raised
-// to effectively unlimited to prevent non-deterministic test failures.
+// to effectively unlimited to eliminate one identified source of non-determinism.
 //
-// Mechanism of non-determinism: express-rate-limit uses an in-memory
-// MemoryStore that persists for the lifetime of each module-scoped singleton.
-// Two separate limiters can cause silent failures in tests:
+// Mechanism addressed: express-rate-limit uses an in-memory MemoryStore that
+// persists for the lifetime of each module-scoped singleton. Two separate
+// limiters can cause silent failures in tests:
 //
 // (1) Global limiter (limit: 300, applied to ALL routes via app.use): In a
 //     full-suite run (fileParallelism: false shares one Node process), if
@@ -62,6 +62,15 @@ app.use(express.json({ limit: '100kb' }));
 //
 // Both pathways produce the same observed symptom: no events are persisted, and
 // the downstream assertion fails with "expected [] to include 'Public Event'".
+//
+// Scope of this fix: this change eliminates the rate-limiter exhaustion pathway.
+// It does NOT address infrastructure-level failures that produce a different
+// signature (500s, MODULE_NOT_FOUND, Worker exited unexpectedly) — those arise
+// from concurrent processes (e.g. parallel npm ci) corrupting node_modules on a
+// shared runner, and require harness-level serialisation to fix.
+// The deterministic regression test (test_90_rate_limiter_headroom) proves the
+// rate-limiter mechanism by exhausting the base 300-request budget and asserting
+// that event creation still returns 201, not 429.
 //
 // Production and development rate limits are UNCHANGED: the elevated limits
 // apply only when NODE_ENV=test (set by scripts/factory-server-test.sh:17).
