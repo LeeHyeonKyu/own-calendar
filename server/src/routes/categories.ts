@@ -4,6 +4,7 @@ import { authenticate } from '../middleware/auth';
 import { validate } from '../middleware/validate';
 import { createCategorySchema, updateCategorySchema } from '../schemas/category.schema';
 import { AuthRequest } from '../types';
+import { sendError } from '../lib/send-error';
 
 const router = Router();
 
@@ -14,8 +15,7 @@ router.get('/', async (req: AuthRequest, res: Response) => {
     const result = await categoryService.list(req.userId!);
     res.json(result);
   } catch (err: any) {
-    const status = err.statusCode || 500;
-    res.status(status).json({ error: err.message });
+    sendError(res, err);
   }
 });
 
@@ -24,8 +24,7 @@ router.post('/', validate(createCategorySchema), async (req: AuthRequest, res: R
     const result = await categoryService.create(req.userId!, req.body);
     res.status(201).json(result);
   } catch (err: any) {
-    const status = err.statusCode || 500;
-    res.status(status).json({ error: err.message });
+    sendError(res, err);
   }
 });
 
@@ -34,8 +33,7 @@ router.put('/:id', validate(updateCategorySchema), async (req: AuthRequest, res:
     const result = await categoryService.update(req.userId!, req.params.id as string, req.body);
     res.json(result);
   } catch (err: any) {
-    const status = err.statusCode || 500;
-    res.status(status).json({ error: err.message });
+    sendError(res, err);
   }
 });
 
@@ -44,8 +42,7 @@ router.delete('/:id', async (req: AuthRequest, res: Response) => {
     await categoryService.delete(req.userId!, req.params.id as string);
     res.status(204).send();
   } catch (err: any) {
-    const status = err.statusCode || 500;
-    res.status(status).json({ error: err.message });
+    sendError(res, err);
   }
 });
 
