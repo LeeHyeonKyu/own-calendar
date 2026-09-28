@@ -35,10 +35,33 @@ if (config.corsOrigin.length > 0) {
 
 app.use(express.json({ limit: '100kb' }));
 
+// FIX(#90): In test environment (NODE_ENV=test), rate-limit budgets are raised
+// to effectively unlimited to prevent non-deterministic test failures.
+//
+// Mechanism of non-determinism: express-rate-limit uses an in-memory
+// MemoryStore that persists for the lifetime of the module-scoped singleton.
+// The auth limiter (limit: 10, skipSuccessfulRequests: true) is shared across
+// all tests within a vitest file. Under CI load (tmpfs-backed Postgres,
+// connection-pool contention between the two separate PrismaClient instances in
+// tests/setup.ts vs src/lib/prisma.ts), a transient DB write failure during
+// user registration cascades: the failed /api/auth/register request counts
+// against the auth limiter budget, and if enough failures accumulate the
+// limiter starts returning 429. Because the flaky test
+// (family.test.ts:127-182) did not assert event-creation HTTP status, a 429 on
+// POST /api/events propagated as the misleading downstream error
+// "expected [] to include 'Public Event'".
+//
+// Production and development rate limits are UNCHANGED: the elevated limits
+// apply only when NODE_ENV=test (set by scripts/factory-server-test.sh:17).
+// The middleware itself stays active so rate-limit response headers (draft-7
+// standardHeaders) are still emitted — tests that assert header presence
+// (e.g. test_47_ratelimit_headers_exact_set) continue to pass.
+const isTestEnv = process.env.NODE_ENV === 'test';
+
 // Global rate limiter — everyone hitting the API.
 const globalLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  limit: 300,
+  limit: isTestEnv ? 100_000 : 300,
   standardHeaders: 'draft-7',
   legacyHeaders: false,
 });
@@ -47,7 +70,7 @@ app.use(globalLimiter);
 // Stricter limiter for authentication and family-join brute force.
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  limit: 10,
+  limit: isTestEnv ? 100_000 : 10,
   standardHeaders: 'draft-7',
   legacyHeaders: false,
   skipSuccessfulRequests: true,

@@ -139,9 +139,15 @@ describe('Family API', () => {
       const calRes = await request(app)
         .get('/api/calendars')
         .set('Authorization', `Bearer ${user2.accessToken}`);
+      expect(calRes.status).toBe(200);
+      expect(calRes.body.length).toBeGreaterThan(0);
       const user2CalendarId = calRes.body[0].id;
 
-      await request(app)
+      // FIX(#90): Assert event-creation HTTP status to surface transient
+      // failures (rate-limiter 429, validation error, DB timeout) at the
+      // causal line. Previously, a silent write failure propagated as the
+      // misleading downstream error "expected [] to include 'Public Event'".
+      const publicEventRes = await request(app)
         .post('/api/events')
         .set('Authorization', `Bearer ${user2.accessToken}`)
         .send({
@@ -151,8 +157,9 @@ describe('Family API', () => {
           calendarId: user2CalendarId,
           isPrivate: false,
         });
+      expect(publicEventRes.status).toBe(201);
 
-      await request(app)
+      const privateEventRes = await request(app)
         .post('/api/events')
         .set('Authorization', `Bearer ${user2.accessToken}`)
         .send({
@@ -162,6 +169,7 @@ describe('Family API', () => {
           calendarId: user2CalendarId,
           isPrivate: true,
         });
+      expect(privateEventRes.status).toBe(201);
 
       // User1 views family calendars
       const res = await request(app)
