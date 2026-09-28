@@ -1,44 +1,48 @@
 # Retro State
 
-- last retro: 2026-09-27T19:26:40.682Z
-- merges since last retro: 1
-- current N: 2
+- last retro: 2026-09-28T12:24:12.049Z
+- merges since last retro: 0
+- current N: 1
 
 ## History (last 5)
 
 | at | yield | n_before | n_after | needs_human_since |
 | --- | --- | --- | --- | --- |
-| 2026-09-27T02:35:11.352Z | 0 | 1 | 2 | 0 |
 | 2026-09-27T06:00:22.254Z | 0 | 2 | 1 | 3 |
 | 2026-09-27T06:16:18.892Z | 0 | 1 | 2 | 0 |
 | 2026-09-27T13:58:42.189Z | 0 | 2 | 1 | 4 |
 | 2026-09-27T19:26:40.682Z | 0 | 1 | 2 | 0 |
+| 2026-09-28T12:24:12.049Z | 0 | 2 | 1 | 8 |
 
 ## Stats
 
 | metric | this window | cumulative |
 | --- | --- | --- |
-| merged | 1 | 12 |
-| review rounds avg | 1 | 1.75 |
-| rounds/issue (plan/impl/review) | 1 / 1 / 1 | 1 / 3.08 / 1.75 |
-| escaped defects | 0 | 9 |
-| revert rate | 0.00 (0/1) | 0.00 (0/12) |
-| needs-human | 7 | 29 |
-| rejects by role | 없음 | correctness 2, architecture 1, spec-conformance 9, qa 2 |
-| reviewer overlap | 없음 | 0.35 (6/17, runs 22) |
-| unique findings by role | 없음 | correctness 4, architecture 1, spec-conformance 5, qa 1 |
-| qa na ratio | 0.00 (0/26 claims, na-heavy 0/3 approvals) | 0.03 (3/88 claims, na-heavy 0/10 approvals) |
-| cost (usd) | 111.96 | 376.83 |
-| tokens | input 7277058 / output 95422 | input 37051761 / output 527081 |
-| retro cost (usd) | 0.00 | 10.35 |
-| retro tokens | input 0 / output 0 | input 20 / output 5921 |
-| full retros | — | 7 |
+| merged | 5 | 17 |
+| review rounds avg | 1.4 | 1.65 |
+| rounds/issue (plan/impl/review) | 1 / 1.4 / 1.4 | 1 / 2.59 / 1.65 |
+| escaped defects | 2 (#49×2) | 11 |
+| revert rate | 0.00 (0/5) | 0.00 (0/17) |
+| needs-human | 8 | 37 |
+| rejects by role | spec-conformance 1, qa 1 | correctness 2, architecture 1, spec-conformance 10, qa 3 |
+| reviewer overlap | 0.00 (0/2, runs 8) | 0.32 (6/19, runs 30) |
+| unique findings by role | spec-conformance 1, qa 1 | correctness 4, architecture 1, spec-conformance 6, qa 2 |
+| qa na ratio | 0.02 (1/56 claims, na-heavy 0/6 approvals) | 0.03 (4/144 claims, na-heavy 0/16 approvals) |
+| cost (usd) | 164.82 | 541.65 |
+| tokens | input 10433426 / output 132696 | input 47485187 / output 659777 |
+| retro cost (usd) | 2.23 | 12.58 |
+| retro tokens | input 3 / output 1486 | input 23 / output 7407 |
+| full retros | — | 8 |
 
 ### Rounds per issue (this window)
 
 | issue | plan | implement | review | escaped |
 | --- | --- | --- | --- | --- |
+| #91 | 1 | 1 | 1 | 0 |
+| #52 | 1 | 1 | 1 | 0 |
+| #51 | 1 | 1 | 1 | 0 |
 | #50 | 1 | 1 | 1 | 0 |
+| #49 | 1 | 3 | 3 | 2 |
 
 ### Phase-2 gate baseline (this session)
 
@@ -52,11 +56,11 @@
 ```json
 {
   "cursor": {
-    "last_retro_at": "2026-09-27T19:26:40.682Z",
+    "last_retro_at": "2026-09-28T12:24:12.049Z",
     "last_record_offsets": {}
   },
-  "merges_since": 1,
-  "n": 2,
+  "merges_since": 0,
+  "n": 1,
   "history": [
     {
       "at": "2026-09-14T16:34:23.746Z",
@@ -564,6 +568,111 @@
       ],
       "n_before": 1,
       "n_after": 2
+    },
+    {
+      "at": "2026-09-28T12:24:12.049Z",
+      "yield": 0,
+      "needs_human_since": 8,
+      "applied": [
+        {
+          "step": "feedback-route",
+          "issues": [
+            91,
+            52,
+            51,
+            50,
+            49
+          ],
+          "actions": [
+            {
+              "kind": "warning",
+              "step": "feedback-route",
+              "login": "LeeHyeonKyu",
+              "current": "bot-hk",
+              "reason": "current factory identity: bot-hk (machine user/app, viewer); older runs in this window ran under a shared identity (LeeHyeonKyu) — their human decisions are unverifiable, nothing to register"
+            },
+            {
+              "kind": "unverifiable-decision",
+              "step": "feedback-route",
+              "issue": 52,
+              "author": "LeeHyeonKyu",
+              "reason": "shared identity — author equals a factory login; cannot distinguish a person from an agent",
+              "detail": "human-decision:v1 (skill=unstick) by @LeeHyeonKyu declares `cause: factory-defect` (ktb_fix: 1.4.29) — REFUSED as evidence: @LeeHyeonKyu is also a factory login"
+            },
+            {
+              "kind": "unverifiable-decision",
+              "step": "feedback-route",
+              "issue": 52,
+              "author": "LeeHyeonKyu",
+              "reason": "shared identity — author equals a factory login; cannot distinguish a person from an agent",
+              "detail": "human-decision:v1 (skill=unstick) by @LeeHyeonKyu declares `cause: factory-defect` (ktb_fix: 1.4.30) — REFUSED as evidence: @LeeHyeonKyu is also a factory login"
+            },
+            {
+              "kind": "unverifiable-decision",
+              "step": "feedback-route",
+              "issue": 51,
+              "author": "LeeHyeonKyu",
+              "reason": "shared identity — author equals a factory login; cannot distinguish a person from an agent",
+              "detail": "human-decision:v1 (skill=unstick) by @LeeHyeonKyu declares `cause: factory-defect` (ktb_fix: 1.4.29) — REFUSED as evidence: @LeeHyeonKyu is also a factory login"
+            },
+            {
+              "kind": "unverifiable-decision",
+              "step": "feedback-route",
+              "issue": 51,
+              "author": "LeeHyeonKyu",
+              "reason": "shared identity — author equals a factory login; cannot distinguish a person from an agent",
+              "detail": "human-decision:v1 (skill=unstick) by @LeeHyeonKyu declares `cause: factory-defect` (ktb_fix: 1.4.30) — REFUSED as evidence: @LeeHyeonKyu is also a factory login"
+            },
+            {
+              "kind": "unverifiable-decision",
+              "step": "feedback-route",
+              "issue": 49,
+              "author": "LeeHyeonKyu",
+              "reason": "shared identity — author equals a factory login; cannot distinguish a person from an agent",
+              "detail": "human-decision:v1 (skill=unstick) by @LeeHyeonKyu declares `cause: factory-defect` (ktb_fix: 1.4.29) — REFUSED as evidence: @LeeHyeonKyu is also a factory login"
+            },
+            {
+              "kind": "product",
+              "step": "feedback-route",
+              "issue": 49,
+              "count": 1
+            }
+          ]
+        },
+        {
+          "step": "lessons:factory-builder",
+          "added": [
+            "L-2026-09-28-01",
+            "L-2026-09-28-02"
+          ],
+          "rejected": [],
+          "evicted": [],
+          "cited": []
+        },
+        {
+          "step": "role:factory-builder",
+          "added": [
+            {
+              "section": "### 나쁜 발견",
+              "text": "위치: implement handoff for #48 (files_expected includes server/tests/import.test.ts). 주장: import route의 happy-path 테스트 안에 authLimiter와 globalLimiter의 rate-limit 헤더(legacyHeaders, ratelimit-policy)를 검증하는 단언을 추가했다 — 파일 이름은 files_expected 안이므로 scope 위반이 아니라고 판단했다. 근거: rate-limit 동작은 plan의 done_when에도, …"
+            }
+          ],
+          "skipped": [],
+          "deferred": []
+        },
+        {
+          "step": "publish-lessons",
+          "pr": 99,
+          "merged": false,
+          "reason": "timeout",
+          "files": [
+            ".factory/lessons/factory-builder.md",
+            ".claude/agents/factory-builder.md"
+          ]
+        }
+      ],
+      "n_before": 2,
+      "n_after": 1
     }
   ],
   "candidates": {
@@ -711,6 +820,22 @@
           49
         ],
         "source": "must_fix"
+      },
+      {
+        "role": "spec-conformance",
+        "text": "done_when dw1 (rubric: '5 consecutive full-suite runs are green; file-isolated runs alone do not suffice') is not established by any evidence in this PR's own record. Re-reading the qa reviewer's manifest, exit codes across their 12 documented runs are [1,0,0,0,1,1,0,0,1,0,0,0] (dw1-1..dw1-12). Every one of the 8 possible 5-run windows (1-5, 2-6, 3-7, 4-8, 5-9, 6-10, 7-11, 8-12) contains at least one failing run — there is no window of 5 consecutive clean runs anywhere in the 12 samples. qa's round-1 verified[] claims 'an unbroken final sequence of 5 (dw1-7,8,10,11,12, the intervening dw1-9 failure explained below)' — but dw1-9 sits between dw1-8 and dw1-10 in run order, so this is not an unbroken/consecutive sequence by any definition; it is 5 clean runs out of the last 6, with the 6th (dw1-9) explicitly excluded. That mischaracterization does not satisfy dw1's literal text.",
+        "runs": [
+          90
+        ],
+        "source": "must_fix"
+      },
+      {
+        "role": "spec-conformance",
+        "text": "The causal narrative in the diff (express-rate-limit MemoryStore exhaustion) does not account for the failure signature observed in the PR's own dw1 evidence. If it did, the residual failures should look like 429s (global limiter) or 401s tied specifically to auth-endpoint request volume — instead dw1-9.log shows 500s in family/events/tasks (not 429), a TypeError on an undefined calendar list in tasks.test.ts, and a 401 in holidays.test.ts paired with a trailing MODULE_NOT_FOUND/'Worker exited unexpectedly'. This is a materially different and more heterogeneous signature than 'two rate-limiter budgets get exhausted by cumulative cross-file requests.' Whatever is still causing dw1 to fail 5-in-a-row is not fully explained by, and is not demonstrably fixed by, the mechanism the comment names — so dw4's rubric ('the explanation must name the mechanism ... why the fix prevents recurrence') is not satisfiable as 'prevents recurrence' when recurrence (of some flakiness, in this same file) is still present in the PR's own evidence trail.",
+        "runs": [
+          90
+        ],
+        "source": "must_fix"
       }
     ],
     "examples": [],
@@ -778,8 +903,8 @@
       },
       {
         "issue": 49,
-        "reason": "gates file status is RED",
-        "at": "2026-09-27T23:05:03Z"
+        "reason": "blocked (API quota/outage) — needs human",
+        "at": "2026-09-28T10:51:44Z"
       },
       {
         "issue": 90,
@@ -794,89 +919,131 @@
     ]
   },
   "stats": {
-    "merged": 1,
-    "review_rounds_avg": 1,
+    "merged": 5,
+    "review_rounds_avg": 1.4,
     "plan_rounds_avg": 1,
-    "implement_rounds_avg": 1,
+    "implement_rounds_avg": 1.4,
     "rounds_per_issue": [
+      {
+        "issue": 91,
+        "plan": 1,
+        "implement": 1,
+        "review": 1
+      },
+      {
+        "issue": 52,
+        "plan": 1,
+        "implement": 1,
+        "review": 1
+      },
+      {
+        "issue": 51,
+        "plan": 1,
+        "implement": 1,
+        "review": 1
+      },
       {
         "issue": 50,
         "plan": 1,
         "implement": 1,
         "review": 1
+      },
+      {
+        "issue": 49,
+        "plan": 1,
+        "implement": 3,
+        "review": 3
       }
     ],
-    "escaped_defects": 0,
-    "escaped_defects_detail": [],
+    "escaped_defects": 2,
+    "escaped_defects_detail": [
+      {
+        "issue": 49,
+        "count": 2
+      }
+    ],
     "reverts": 0,
     "reverted_issues": [],
     "revert_rate": 0,
-    "rejects_by_role": {},
-    "review_runs": 1,
-    "findings_total": 0,
+    "rejects_by_role": {
+      "spec-conformance": 1,
+      "qa": 1
+    },
+    "review_runs": 8,
+    "findings_total": 2,
     "overlapping_findings": 0,
-    "unique_findings_by_role": {},
+    "unique_findings_by_role": {
+      "spec-conformance": 1,
+      "qa": 1
+    },
     "overlap_ratio": 0,
-    "needs_human": 7,
-    "qa_approvals": 3,
-    "qa_claims_total": 26,
-    "qa_na_total": 0,
-    "qa_na_ratio": 0,
+    "needs_human": 8,
+    "qa_approvals": 6,
+    "qa_claims_total": 55,
+    "qa_na_total": 1,
+    "qa_na_ratio": 0.02,
     "qa_na_heavy_approvals": 0,
     "usage": {
-      "cost_usd": 111.961636,
+      "cost_usd": 164.82104,
       "tokens": {
-        "input": 7277058,
-        "output": 95422
+        "input": 10433426,
+        "output": 132696
+      }
+    },
+    "retro_usage": {
+      "cost_usd": 2.229371,
+      "tokens": {
+        "input": 3,
+        "output": 1486
       }
     }
   },
   "stats_total": {
-    "merged": 12,
-    "review_rounds_avg": 1.75,
+    "merged": 17,
+    "review_rounds_avg": 1.65,
     "plan_rounds_avg": 1,
-    "implement_rounds_avg": 3.08,
-    "escaped_defects": 9,
+    "implement_rounds_avg": 2.59,
+    "escaped_defects": 11,
     "reverts": 0,
     "reverted_issues": [],
     "revert_rate": 0,
     "rejects_by_role": {
       "correctness": 2,
       "architecture": 1,
-      "spec-conformance": 9,
-      "qa": 2
+      "spec-conformance": 10,
+      "qa": 3
     },
-    "review_runs": 22,
-    "findings_total": 17,
+    "review_runs": 30,
+    "findings_total": 19,
     "overlapping_findings": 6,
     "unique_findings_by_role": {
       "correctness": 4,
       "architecture": 1,
-      "spec-conformance": 5,
-      "qa": 1
+      "spec-conformance": 6,
+      "qa": 2
     },
-    "overlap_ratio": 0.35,
-    "needs_human": 29,
-    "qa_approvals": 10,
-    "qa_claims_total": 85,
-    "qa_na_total": 3,
+    "overlap_ratio": 0.32,
+    "needs_human": 37,
+    "qa_approvals": 16,
+    "qa_claims_total": 140,
+    "qa_na_total": 4,
     "qa_na_ratio": 0.03,
     "qa_na_heavy_approvals": 0,
     "usage": {
-      "cost_usd": 376.831843,
+      "cost_usd": 541.652883,
       "tokens": {
-        "input": 37051761,
-        "output": 527081
+        "input": 47485187,
+        "output": 659777
       }
     },
     "retro_usage": {
-      "cost_usd": 10.350141,
+      "cost_usd": 12.579512,
       "tokens": {
-        "input": 20,
-        "output": 5921
+        "input": 23,
+        "output": 7407
       }
     },
-    "retros": 7
+    "retros": 8
   },
   "deferred_proposals": [],
   "deletion_candidates": []
