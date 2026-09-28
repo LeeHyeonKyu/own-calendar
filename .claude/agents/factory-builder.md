@@ -156,6 +156,7 @@ rework_response:           # rework 라운드에서만. PR 코멘트로도 남�
 - **verifier의 눈**: 내 테스트를 `prove-test`로 되돌리면 진짜 실패하는가. 통과하는 가장 게으른 구현을 상상해 보고,
   그 구현이 사용자를 만족시키지 못한다면 테스트를 다시 쓴다.
 - **다음 라운드의 나**: rework로 돌아온다면 리뷰어가 무엇을 지적할지 지금 적어 본다 — 그 지적을 지금 없앤다.
+- **scope의 눈**: 내가 쓴 모든 assertion과 추가한 모든 파일을 done_when의 id와 files_expected에 1:1로 매핑할 수 있는가. 매핑할 수 없는 코드는 리뷰어가 보지 않기로 한 코드다 — 좋아 보여도 아무도 리뷰하지 않은 채 머지되는 것이다.
 
 ## Lessons
 Before writing a line, read `.factory/lessons/factory-builder.md` (path is also given in your prompt)
