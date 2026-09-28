@@ -1,38 +1,44 @@
 # Retro State
 
-- last retro: 2026-09-28T12:24:12.049Z
+- last retro: 2026-09-28T14:04:50.119Z
 - merges since last retro: 0
-- current N: 1
+- current N: 2
 
 ## History (last 5)
 
 | at | yield | n_before | n_after | needs_human_since |
 | --- | --- | --- | --- | --- |
-| 2026-09-27T06:00:22.254Z | 0 | 2 | 1 | 3 |
 | 2026-09-27T06:16:18.892Z | 0 | 1 | 2 | 0 |
 | 2026-09-27T13:58:42.189Z | 0 | 2 | 1 | 4 |
 | 2026-09-27T19:26:40.682Z | 0 | 1 | 2 | 0 |
 | 2026-09-28T12:24:12.049Z | 0 | 2 | 1 | 8 |
+| 2026-09-28T14:04:50.119Z | 0 | 1 | 2 | 1 |
 
 ## Stats
 
 | metric | this window | cumulative |
 | --- | --- | --- |
-| merged | 0 | 17 |
-| review rounds avg | 0 | 1.65 |
-| rounds/issue (plan/impl/review) | 0 / 0 / 0 | 1 / 2.59 / 1.65 |
+| merged | 1 | 18 |
+| review rounds avg | 1 | 1.61 |
+| rounds/issue (plan/impl/review) | 1 / 1 / 1 | 1 / 2.5 / 1.61 |
 | escaped defects | 0 | 11 |
-| revert rate | 없음 | 0.00 (0/17) |
-| needs-human | 1 | 37 |
+| revert rate | 0.00 (0/1) | 0.00 (0/18) |
+| needs-human | 1 | 38 |
 | rejects by role | 없음 | correctness 2, architecture 1, spec-conformance 10, qa 3 |
-| reviewer overlap | 없음 | 0.32 (6/19, runs 30) |
+| reviewer overlap | 없음 | 0.32 (6/19, runs 31) |
 | unique findings by role | 없음 | correctness 4, architecture 1, spec-conformance 6, qa 2 |
-| qa na ratio | 없음 | 0.03 (4/144 claims, na-heavy 0/16 approvals) |
-| cost (usd) | 0.00 | 541.65 |
-| tokens | input 0 / output 0 | input 47485187 / output 659777 |
-| retro cost (usd) | 0.00 | 12.58 |
-| retro tokens | input 0 / output 0 | input 23 / output 7407 |
-| full retros | — | 8 |
+| qa na ratio | 0.00 (0/5 claims, na-heavy 0/1 approvals) | 0.03 (4/149 claims, na-heavy 0/17 approvals) |
+| cost (usd) | 20.49 | 562.14 |
+| tokens | input 941491 / output 14429 | input 48426678 / output 674206 |
+| retro cost (usd) | 2.11 | 14.69 |
+| retro tokens | input 3 / output 1194 | input 26 / output 8601 |
+| full retros | — | 9 |
+
+### Rounds per issue (this window)
+
+| issue | plan | implement | review | escaped |
+| --- | --- | --- | --- | --- |
+| #100 | 1 | 1 | 1 | 0 |
 
 ### Phase-2 gate baseline (this session)
 
@@ -46,11 +52,11 @@
 ```json
 {
   "cursor": {
-    "last_retro_at": "2026-09-28T12:24:12.049Z",
+    "last_retro_at": "2026-09-28T14:04:50.119Z",
     "last_record_offsets": {}
   },
   "merges_since": 0,
-  "n": 1,
+  "n": 2,
   "history": [
     {
       "at": "2026-09-14T16:34:23.746Z",
@@ -663,6 +669,61 @@
       ],
       "n_before": 2,
       "n_after": 1
+    },
+    {
+      "at": "2026-09-28T14:04:50.119Z",
+      "yield": 0,
+      "needs_human_since": 1,
+      "applied": [
+        {
+          "step": "feedback-route",
+          "issues": [
+            100
+          ],
+          "actions": [
+            {
+              "kind": "warning",
+              "step": "feedback-route",
+              "login": "LeeHyeonKyu",
+              "current": "bot-hk",
+              "reason": "current factory identity: bot-hk (machine user/app, viewer); older runs in this window ran under a shared identity (LeeHyeonKyu) — their human decisions are unverifiable, nothing to register"
+            }
+          ]
+        },
+        {
+          "step": "lessons:factory-builder",
+          "added": [
+            "L-2026-09-28-01",
+            "L-2026-09-28-02"
+          ],
+          "rejected": [],
+          "evicted": [],
+          "cited": []
+        },
+        {
+          "step": "role:factory-builder",
+          "added": [
+            {
+              "section": "## Perspectives",
+              "text": "**scope의 눈**: 내가 쓴 모든 assertion과 추가한 모든 파일을 done_when의 id와 files_expected에 1:1로 매핑할 수 있는가. 매핑할 수 없는 코드는 리뷰어가 보지 않기로 한 코드다 — 좋아 보여도 아무도 리뷰하지 않은 채 머지되는 것이다."
+            }
+          ],
+          "skipped": [],
+          "deferred": []
+        },
+        {
+          "step": "publish-lessons",
+          "pr": 102,
+          "merged": false,
+          "reason": "timeout",
+          "files": [
+            ".factory/lessons/factory-builder.md",
+            ".claude/agents/factory-builder.md"
+          ]
+        }
+      ],
+      "n_before": 1,
+      "n_after": 2
     }
   ],
   "candidates": {
@@ -909,41 +970,55 @@
     ]
   },
   "stats": {
-    "merged": 0,
-    "review_rounds_avg": 0,
-    "plan_rounds_avg": 0,
-    "implement_rounds_avg": 0,
-    "rounds_per_issue": [],
+    "merged": 1,
+    "review_rounds_avg": 1,
+    "plan_rounds_avg": 1,
+    "implement_rounds_avg": 1,
+    "rounds_per_issue": [
+      {
+        "issue": 100,
+        "plan": 1,
+        "implement": 1,
+        "review": 1
+      }
+    ],
     "escaped_defects": 0,
     "escaped_defects_detail": [],
     "reverts": 0,
     "reverted_issues": [],
-    "revert_rate": null,
+    "revert_rate": 0,
     "rejects_by_role": {},
-    "review_runs": 0,
+    "review_runs": 1,
     "findings_total": 0,
     "overlapping_findings": 0,
     "unique_findings_by_role": {},
     "overlap_ratio": 0,
     "needs_human": 1,
-    "qa_approvals": 0,
-    "qa_claims_total": 0,
+    "qa_approvals": 1,
+    "qa_claims_total": 5,
     "qa_na_total": 0,
     "qa_na_ratio": 0,
     "qa_na_heavy_approvals": 0,
     "usage": {
-      "cost_usd": 0,
+      "cost_usd": 20.485399,
       "tokens": {
-        "input": 0,
-        "output": 0
+        "input": 941491,
+        "output": 14429
+      }
+    },
+    "retro_usage": {
+      "cost_usd": 2.111447,
+      "tokens": {
+        "input": 3,
+        "output": 1194
       }
     }
   },
   "stats_total": {
-    "merged": 17,
-    "review_rounds_avg": 1.65,
+    "merged": 18,
+    "review_rounds_avg": 1.61,
     "plan_rounds_avg": 1,
-    "implement_rounds_avg": 2.59,
+    "implement_rounds_avg": 2.5,
     "escaped_defects": 11,
     "reverts": 0,
     "reverted_issues": [],
@@ -954,7 +1029,7 @@
       "spec-conformance": 10,
       "qa": 3
     },
-    "review_runs": 30,
+    "review_runs": 31,
     "findings_total": 19,
     "overlapping_findings": 6,
     "unique_findings_by_role": {
@@ -964,27 +1039,27 @@
       "qa": 2
     },
     "overlap_ratio": 0.32,
-    "needs_human": 37,
-    "qa_approvals": 16,
-    "qa_claims_total": 140,
+    "needs_human": 38,
+    "qa_approvals": 17,
+    "qa_claims_total": 145,
     "qa_na_total": 4,
     "qa_na_ratio": 0.03,
     "qa_na_heavy_approvals": 0,
     "usage": {
-      "cost_usd": 541.652883,
+      "cost_usd": 562.138282,
       "tokens": {
-        "input": 47485187,
-        "output": 659777
+        "input": 48426678,
+        "output": 674206
       }
     },
     "retro_usage": {
-      "cost_usd": 12.579512,
+      "cost_usd": 14.690959,
       "tokens": {
-        "input": 23,
-        "output": 7407
+        "input": 26,
+        "output": 8601
       }
     },
-    "retros": 8
+    "retros": 9
   },
   "deferred_proposals": [],
   "deletion_candidates": []
