@@ -124,44 +124,61 @@ describe('Family API', () => {
   });
 
   describe('GET /api/family/calendars', () => {
+    // Root cause (#100): intermediate HTTP calls (family create, join, calendar
+    // list, event POST x2) were not status-checked; a silent non-2xx (e.g. 429
+    // from authLimiter on /api/family/join, or a transient error) left zero
+    // events in the DB, producing the misleading "expected [] to include
+    // 'Public Event'" failure.  Additionally, calendar selection used the
+    // fragile body[0].id array index instead of the deterministic
+    // find-by-isDefault pattern established in events.test.ts.
+    // Fix: assert status on every intermediate call, select calendar by
+    // isDefault, and move dates to 2099 to future-proof against any later
+    // date-window filtering.
     it('shows family members public events, hides private events', async () => {
       const createRes = await request(app)
         .post('/api/family')
         .set('Authorization', `Bearer ${user1.accessToken}`)
         .send({ name: '우리 가족' });
+      expect(createRes.status).toBe(201);
 
-      await request(app)
+      const joinRes = await request(app)
         .post('/api/family/join')
         .set('Authorization', `Bearer ${user2.accessToken}`)
         .send({ code: createRes.body.code });
+      expect(joinRes.status).toBe(200);
 
       // User2 creates a public event on their default calendar
       const calRes = await request(app)
         .get('/api/calendars')
         .set('Authorization', `Bearer ${user2.accessToken}`);
-      const user2CalendarId = calRes.body[0].id;
+      expect(calRes.status).toBe(200);
+      const defaultCal = calRes.body.find((c: any) => c.isDefault === true);
+      expect(defaultCal).toBeDefined();
+      const user2CalendarId = defaultCal.id;
 
-      await request(app)
+      const publicEventRes = await request(app)
         .post('/api/events')
         .set('Authorization', `Bearer ${user2.accessToken}`)
         .send({
           title: 'Public Event',
-          startTime: '2026-04-10T10:00:00.000Z',
-          endTime: '2026-04-10T11:00:00.000Z',
+          startTime: '2099-04-10T10:00:00.000Z',
+          endTime: '2099-04-10T11:00:00.000Z',
           calendarId: user2CalendarId,
           isPrivate: false,
         });
+      expect(publicEventRes.status).toBe(201);
 
-      await request(app)
+      const privateEventRes = await request(app)
         .post('/api/events')
         .set('Authorization', `Bearer ${user2.accessToken}`)
         .send({
           title: 'Private Event',
-          startTime: '2026-04-10T14:00:00.000Z',
-          endTime: '2026-04-10T15:00:00.000Z',
+          startTime: '2099-04-10T14:00:00.000Z',
+          endTime: '2099-04-10T15:00:00.000Z',
           calendarId: user2CalendarId,
           isPrivate: true,
         });
+      expect(privateEventRes.status).toBe(201);
 
       // User1 views family calendars
       const res = await request(app)
