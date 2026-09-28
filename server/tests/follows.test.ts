@@ -57,6 +57,44 @@ describe('Follows API', () => {
       expect(followerUserIds).not.toContain(userA.user.id);
     });
 
+    it('accept by wrong caller (third party or follower) returns 403 and does not mutate follow state', async () => {
+      const userC = await createTestUser(app, { email: 'bystander@example.com', name: 'User C' });
+
+      // A sends a follow request to B
+      const sendRes = await request(app)
+        .post('/api/follows')
+        .set('Authorization', `Bearer ${userA.accessToken}`)
+        .send({ followeeId: userB.user.id });
+      expect(sendRes.status).toBe(201);
+      const followId = sendRes.body.id;
+
+      // Unrelated third party (C) tries to accept A's request to B — must be 403
+      const thirdPartyRes = await request(app)
+        .post(`/api/follows/${followId}/accept`)
+        .set('Authorization', `Bearer ${userC.accessToken}`);
+      expect(thirdPartyRes.status).toBe(403);
+
+      // The follower (A) tries to accept their own request — must be 403
+      const followerRes = await request(app)
+        .post(`/api/follows/${followId}/accept`)
+        .set('Authorization', `Bearer ${userA.accessToken}`);
+      expect(followerRes.status).toBe(403);
+
+      // Follow should still be PENDING — B must NOT appear in A's following list
+      const followingRes = await request(app)
+        .get('/api/follows/following')
+        .set('Authorization', `Bearer ${userA.accessToken}`);
+      const followingUserIds = followingRes.body.map((f: any) => f.user.id);
+      expect(followingUserIds).not.toContain(userB.user.id);
+
+      // The actual followee (B) can still accept successfully afterward
+      const realAcceptRes = await request(app)
+        .post(`/api/follows/${followId}/accept`)
+        .set('Authorization', `Bearer ${userB.accessToken}`);
+      expect(realAcceptRes.status).toBe(200);
+      expect(realAcceptRes.body.status).toBe('ACCEPTED');
+    });
+
     it('after accept, followee appears in following list and follower appears in followers list', async () => {
       const sendRes = await request(app)
         .post('/api/follows')
