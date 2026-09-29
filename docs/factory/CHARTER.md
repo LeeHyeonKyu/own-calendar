@@ -2,10 +2,10 @@
 schema: factory.charter.v1
 status: ready
 tier_default: standard
-limits: { K: 3, M: 3, R: 2 }
+limits: { K: 2, M: 3, R: 2 }   # 2026-09-29: of 8 issues that reached round 3, one was approved there — the other 7 ended with a person anyway (KTB docs/research/review-roster-evidence.md)
 roster:
   docs: [correctness, spec-conformance]
-  standard: [correctness, architecture, spec-conformance, qa]
+  standard: [correctness, spec-conformance, qa]   # 2026-09-29: architecture cast 54 verdicts over the campaign and was never the only reject (KTB #122); it stays on load-bearing
   load-bearing: [correctness, security, architecture, spec-conformance, qa]
 plan_roles:
   docs: [architect, skeptic]
@@ -28,7 +28,7 @@ any dark run is allowed to treat it as authoritative.
 | tier | 판정 기준 | 리뷰 로스터 | gate 레벨 | 예산(토큰/이슈) — 참고값, 기본 미적용 |
 |---|---|---|---|---|
 | docs | diff가 `docs/**`, `*.md`만 | correctness, spec-conformance | fast | 100k |
-| standard | 기본 | correctness, architecture, spec-conformance, qa | full | 600k |
+| standard | 기본 | correctness, spec-conformance, qa | full | 600k |
 | load-bearing | `harness.toml [load_bearing]` 경로 포함 | correctness, security, architecture, spec-conformance, qa | deep | 1.2M |
 
 ## Plan 토론 로스터
@@ -38,7 +38,7 @@ any dark run is allowed to treat it as authoritative.
 | standard / load-bearing | product-advocate, architect, skeptic, operator | 3 + 서명 |
 
 ## Hard limits
-- review rounds K = 3
+- review rounds K = 2
 - same gate RED M = 3
 - runner retries R = 2
 - review 대기(awaiting-review) 이슈가 4개 이상이면 implement는 새 claim을 하지 않는다 (back-pressure)
