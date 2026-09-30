@@ -216,6 +216,12 @@ void main() {
             reason: 'isLoading must be false after exception');
         expect(provider.events, hasLength(eventsBefore.length),
             reason: 'Existing events must be preserved on exception');
+        // Verify event identity is preserved, not just list length (dw3 rubric:
+        // "events list is identical to pre-call state" for both paths)
+        expect(provider.events.first.id, eventsBefore.first.id,
+            reason: 'First event identity must be preserved on exception');
+        expect(provider.events.last.id, eventsBefore.last.id,
+            reason: 'Last event identity must be preserved on exception');
       });
 
       test('non-200 without prior data keeps empty list and sets error',

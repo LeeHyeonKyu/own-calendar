@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:own_calendar/providers/auth_provider.dart';
@@ -172,8 +173,18 @@ void main() {
       var notifyCount = 0;
       auth.addListener(() => notifyCount++);
 
+      // Capture debugPrint output to verify operational observability (dw2 rubric)
+      final debugPrintLog = <String>[];
+      final originalDebugPrint = debugPrint;
+      debugPrint = (String? message, {int? wrapWidth}) {
+        if (message != null) debugPrintLog.add(message);
+      };
+
       // Act
       await auth.verifySession();
+
+      // Restore debugPrint before assertions (so test failures print correctly)
+      debugPrint = originalDebugPrint;
 
       // Assert: session preserved, no notification for unchanged state
       expect(auth.isAuthenticated, isTrue,
@@ -182,6 +193,9 @@ void main() {
           reason: '_user must not change on storage error');
       expect(notifyCount, 0,
           reason: 'No listener notification should fire when state is unchanged');
+      // Assert: the failure is logged via debugPrint for operational observability
+      expect(debugPrintLog, contains(contains('verifySession: storage read failed:')),
+          reason: 'Storage read failure must be logged via debugPrint (dw2 rubric)');
     });
 
     test('test_108_verify_session_idempotent_after_clear', () async {
