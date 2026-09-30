@@ -1,7 +1,7 @@
 # Retro State
 
 - last retro: 2026-09-28T14:04:50.119Z
-- merges since last retro: 0
+- merges since last retro: 1
 - current N: 2
 
 ## History (last 5)
@@ -23,22 +23,22 @@
 | rounds/issue (plan/impl/review) | 1 / 1 / 1 | 1 / 2.5 / 1.61 |
 | escaped defects | 0 | 11 |
 | revert rate | 0.00 (0/1) | 0.00 (0/18) |
-| needs-human | 1 | 38 |
+| needs-human | 0 | 38 |
 | rejects by role | 없음 | correctness 2, architecture 1, spec-conformance 10, qa 3 |
 | reviewer overlap | 없음 | 0.32 (6/19, runs 31) |
 | unique findings by role | 없음 | correctness 4, architecture 1, spec-conformance 6, qa 2 |
-| qa na ratio | 0.00 (0/5 claims, na-heavy 0/1 approvals) | 0.03 (4/149 claims, na-heavy 0/17 approvals) |
-| cost (usd) | 20.49 | 562.14 |
-| tokens | input 941491 / output 14429 | input 48426678 / output 674206 |
-| retro cost (usd) | 2.11 | 14.69 |
-| retro tokens | input 3 / output 1194 | input 26 / output 8601 |
+| qa na ratio | 0.00 (0/8 claims, na-heavy 0/1 approvals) | 0.03 (4/149 claims, na-heavy 0/17 approvals) |
+| cost (usd) | 21.54 | 562.14 |
+| tokens | input 1103577 / output 19776 | input 48426678 / output 674206 |
+| retro cost (usd) | 0.00 | 14.69 |
+| retro tokens | input 0 / output 0 | input 26 / output 8601 |
 | full retros | — | 9 |
 
 ### Rounds per issue (this window)
 
 | issue | plan | implement | review | escaped |
 | --- | --- | --- | --- | --- |
-| #100 | 1 | 1 | 1 | 0 |
+| #108 | 1 | 1 | 1 | 0 |
 
 ### Phase-2 gate baseline (this session)
 
@@ -55,7 +55,7 @@
     "last_retro_at": "2026-09-28T14:04:50.119Z",
     "last_record_offsets": {}
   },
-  "merges_since": 0,
+  "merges_since": 1,
   "n": 2,
   "history": [
     {
@@ -976,7 +976,7 @@
     "implement_rounds_avg": 1,
     "rounds_per_issue": [
       {
-        "issue": 100,
+        "issue": 108,
         "plan": 1,
         "implement": 1,
         "review": 1
@@ -993,24 +993,17 @@
     "overlapping_findings": 0,
     "unique_findings_by_role": {},
     "overlap_ratio": 0,
-    "needs_human": 1,
+    "needs_human": 0,
     "qa_approvals": 1,
-    "qa_claims_total": 5,
+    "qa_claims_total": 8,
     "qa_na_total": 0,
     "qa_na_ratio": 0,
     "qa_na_heavy_approvals": 0,
     "usage": {
-      "cost_usd": 20.485399,
+      "cost_usd": 21.536721,
       "tokens": {
-        "input": 941491,
-        "output": 14429
-      }
-    },
-    "retro_usage": {
-      "cost_usd": 2.111447,
-      "tokens": {
-        "input": 3,
-        "output": 1194
+        "input": 1103577,
+        "output": 19776
       }
     }
   },
