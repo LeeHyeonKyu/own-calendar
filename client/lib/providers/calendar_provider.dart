@@ -4,15 +4,21 @@ import 'package:home_widget/home_widget.dart';
 import '../models/calendar.dart';
 import '../models/event.dart';
 import '../models/task.dart';
+import '../providers/auth_provider.dart';
 import '../services/api_service.dart';
 
 class CalendarProvider extends ChangeNotifier {
-  final ApiService _api = ApiService();
+  CalendarProvider({ApiService? api, this.authProvider})
+      : _api = api ?? ApiService();
+
+  final ApiService _api;
+  final AuthProvider? authProvider;
   List<CalendarModel> _calendars = [];
   List<EventModel> _events = [];
   List<EventModel> _familyEvents = [];
   List<TaskModel> _tasks = [];
   bool _isLoading = false;
+  String? _error;
   bool _showFamilyEvents = true;
   Set<String> _selectedCategories = {
     'WORK', 'PERSONAL', 'FAMILY', 'HEALTH', 'SOCIAL', 'FINANCE', 'OTHER',
@@ -30,6 +36,7 @@ class CalendarProvider extends ChangeNotifier {
     return merged.where((e) => _selectedCategories.contains(e.category)).toList();
   }
   bool get isLoading => _isLoading;
+  String? get error => _error;
   bool get showFamilyEvents => _showFamilyEvents;
   Set<String> get selectedCategories => _selectedCategories;
   bool get isAllCategoriesSelected =>
@@ -205,21 +212,43 @@ class CalendarProvider extends ChangeNotifier {
     }
   }
 
+  /// Called after a successful data load to push widget updates.
+  /// Overridable in subclasses for testing widget-update side effects.
+  @protected
+  void triggerWidgetUpdates() {
+    _updateHomeWidget();
+    _updateMonthlyWidget();
+  }
+
   Future<void> loadEvents({DateTime? start, DateTime? end}) async {
     _isLoading = true;
     notifyListeners();
-    String query = '';
-    if (start != null) query += 'start=${start.toIso8601String()}&';
-    if (end != null) query += 'end=${end.toIso8601String()}&';
-    final res = await _api.get('/events${query.isNotEmpty ? "?$query" : ""}');
-    if (res.statusCode == 200) {
-      final list = jsonDecode(res.body) as List;
-      _events = list.map((j) => EventModel.fromJson(j)).toList();
+    try {
+      String query = '';
+      if (start != null) query += 'start=${start.toIso8601String()}&';
+      if (end != null) query += 'end=${end.toIso8601String()}&';
+      final res = await _api.get('/events${query.isNotEmpty ? "?$query" : ""}');
+      if (res.statusCode == 200) {
+        final list = jsonDecode(res.body) as List;
+        _events = list.map((j) => EventModel.fromJson(j)).toList();
+        _error = null;
+        _isLoading = false;
+        notifyListeners();
+        triggerWidgetUpdates();
+      } else {
+        _error = 'Failed to load events (status ${res.statusCode})';
+        _isLoading = false;
+        notifyListeners();
+        debugPrint('loadEvents: non-200 response (${res.statusCode})');
+        authProvider?.verifySession();
+      }
+    } catch (e) {
+      _error = e.toString();
+      _isLoading = false;
+      notifyListeners();
+      debugPrint('loadEvents: exception: $e');
+      authProvider?.verifySession();
     }
-    _isLoading = false;
-    notifyListeners();
-    _updateHomeWidget();
-    _updateMonthlyWidget();
   }
 
   Future<void> loadFamilyEvents({DateTime? start, DateTime? end}) async {
