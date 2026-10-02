@@ -248,6 +248,39 @@ void main() {
           reason: 'new-event form must not show delete icon');
       expect(find.byIcon(Icons.copy), findsNothing,
           reason: 'new-event form must not show copy/duplicate icon');
+
+      // ── Pre-filled field assertions added in rework (spec1) ──
+      // Description must be pre-filled
+      expect(find.text('Weekly sync'), findsOneWidget,
+          reason: 'duplicated form must pre-fill the description');
+
+      // Category dropdown must show WORK label (업무, non-default PERSONAL)
+      expect(find.text('업무'), findsAtLeastNWidgets(1),
+          reason: 'duplicated form must pre-fill category to WORK (업무)');
+
+      // Start/end dates must reflect the original event date
+      expect(find.textContaining('2026-10-01'), findsAtLeastNWidgets(1),
+          reason: 'duplicated form must show original event date');
+
+      // Scroll to isPrivate switch (original=true, default=false)
+      await _scrollToVisible(
+          tester, find.widgetWithText(SwitchListTile, '비공개'));
+      final privateTile = tester.widget<SwitchListTile>(
+          find.widgetWithText(SwitchListTile, '비공개'));
+      expect(privateTile.value, isTrue,
+          reason:
+              'duplicated form must pre-fill isPrivate to true (non-default)');
+
+      // Reminder must show 15분 전 (original=15, default=10)
+      await _scrollToVisible(tester, find.text('15분 전'));
+      expect(find.text('15분 전'), findsOneWidget,
+          reason:
+              'duplicated form must pre-fill reminder to 15분 전 (non-default)');
+
+      // Calendar dropdown must show the original calendar name
+      await _scrollToVisible(tester, find.text('My Calendar'));
+      expect(find.text('My Calendar'), findsAtLeastNWidgets(1),
+          reason: 'duplicated form must pre-fill the calendar selection');
     });
 
     // dw2: Saving the duplicated form calls createEvent (POST), not updateEvent (PUT).
@@ -296,6 +329,33 @@ void main() {
       // Payload must have the original title
       expect(fake.postBodies.first['title'], 'Team Meeting',
           reason: 'POST payload must carry the pre-filled title');
+
+      // ── Full payload field assertions added in rework (spec2) ──
+      final body = fake.postBodies.first;
+      expect(body['description'], 'Weekly sync',
+          reason: 'POST payload must carry the pre-filled description');
+      expect(body['isPrivate'], isTrue,
+          reason: 'POST payload must carry isPrivate=true');
+      expect(body['category'], 'WORK',
+          reason: 'POST payload must carry category WORK');
+      expect(body['calendarId'], 'cal-1',
+          reason: 'POST payload must carry the original calendarId');
+      expect(body['reminderMinutes'], 15,
+          reason: 'POST payload must carry reminderMinutes=15');
+      expect(body['categoryId'], 'cat-1',
+          reason: 'POST payload must carry the original categoryId');
+      expect(body['isAllDay'], isFalse,
+          reason: 'POST payload must carry isAllDay=false');
+      expect(body['recurrenceType'], 'NONE',
+          reason: 'POST payload must carry recurrenceType NONE');
+
+      // Start/end times must round-trip to the original UTC values
+      final postedStart = DateTime.parse(body['startTime'] as String);
+      final postedEnd = DateTime.parse(body['endTime'] as String);
+      expect(postedStart, DateTime.utc(2026, 10, 1, 10, 0),
+          reason: 'POST startTime must match original event start');
+      expect(postedEnd, DateTime.utc(2026, 10, 1, 11, 0),
+          reason: 'POST endTime must match original event end');
     });
 
     // dw3: Duplicating a recurring instance produces a single (non-recurring) event.
