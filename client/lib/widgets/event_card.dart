@@ -21,7 +21,7 @@ class EventCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = _parseColor(event.calendarColor);
+    final color = _parseColor(event.categoryColor ?? event.calendarColor);
     final timeFormat = DateFormat('HH:mm');
     final cs = Theme.of(context).colorScheme;
 

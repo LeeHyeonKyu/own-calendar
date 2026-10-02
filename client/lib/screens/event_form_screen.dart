@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import '../providers/calendar_provider.dart';
+import '../providers/category_provider.dart';
 import '../models/event.dart';
 import '../utils/rrule_utils.dart';
 import '../widgets/recurrence_picker.dart';
@@ -60,6 +61,7 @@ class _EventFormScreenState extends State<EventFormScreen> {
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _loadCalendars();
+      _loadCategories();
       if (isEditing) _loadEvent();
     });
   }
@@ -84,6 +86,22 @@ class _EventFormScreenState extends State<EventFormScreen> {
       setState(() {
         _selectedCalendarId = provider.calendars.first.id;
       });
+    }
+  }
+
+  Future<void> _loadCategories() async {
+    final provider = context.read<CategoryProvider>();
+    if (provider.categories.isEmpty) {
+      await provider.loadCategories();
+    }
+    if (mounted && !isEditing) {
+      // For new events, default to the isDefault category
+      final defaultCat = provider.defaultCategory;
+      if (defaultCat != null && _categoryId == null) {
+        setState(() {
+          _categoryId = defaultCat.id;
+        });
+      }
     }
   }
 
@@ -325,35 +343,40 @@ class _EventFormScreenState extends State<EventFormScreen> {
                   v == null || v.trim().isEmpty ? '제목을 입력하세요' : null,
             ),
             const SizedBox(height: Spacing.lg),
-            DropdownButtonFormField<String>(
-              value: _category,
-              decoration: const InputDecoration(
-                labelText: '카테고리',
-                border: OutlineInputBorder(),
-              ),
-              items: EventModel.categoryLabels.entries
-                  .map(
-                    (e) => DropdownMenuItem(
-                      value: e.key,
-                      child: Row(
-                        children: [
-                          Container(
-                            width: 12,
-                            height: 12,
-                            margin: const EdgeInsets.only(right: Spacing.sm),
-                            decoration: BoxDecoration(
-                              color: Color(EventModel.categoryColors[e.key]!),
-                              shape: BoxShape.circle,
-                            ),
-                          ),
-                          Text(e.value),
-                        ],
+            // Category chips (feature 017 completion)
+            Builder(
+              builder: (context) {
+                final catProvider = context.watch<CategoryProvider>();
+                final cats = catProvider.categories;
+                if (cats.isEmpty) return const SizedBox.shrink();
+                return Wrap(
+                  spacing: Spacing.sm,
+                  runSpacing: Spacing.xs,
+                  children: cats.map((cat) {
+                    final isSelected = _categoryId == cat.id;
+                    return ChoiceChip(
+                      avatar: Container(
+                        width: 12,
+                        height: 12,
+                        decoration: BoxDecoration(
+                          color: cat.colorValue,
+                          shape: BoxShape.circle,
+                        ),
                       ),
-                    ),
-                  )
-                  .toList(),
-              onChanged: (v) {
-                if (v != null) setState(() => _category = v);
+                      label: Text(
+                        cat.emoji != null && cat.emoji!.isNotEmpty
+                            ? '${cat.emoji} ${cat.name}'
+                            : cat.name,
+                      ),
+                      selected: isSelected,
+                      onSelected: (selected) {
+                        if (selected) {
+                          setState(() => _categoryId = cat.id);
+                        }
+                      },
+                    );
+                  }).toList(),
+                );
               },
             ),
             const SizedBox(height: Spacing.lg),
