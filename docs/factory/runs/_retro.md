@@ -1,43 +1,44 @@
 # Retro State
 
-- last retro: 2026-09-28T14:04:50.119Z
-- merges since last retro: 1
-- current N: 2
+- last retro: 2026-10-02T09:07:11.512Z
+- merges since last retro: 0
+- current N: 1
 
 ## History (last 5)
 
 | at | yield | n_before | n_after | needs_human_since |
 | --- | --- | --- | --- | --- |
-| 2026-09-27T06:16:18.892Z | 0 | 1 | 2 | 0 |
 | 2026-09-27T13:58:42.189Z | 0 | 2 | 1 | 4 |
 | 2026-09-27T19:26:40.682Z | 0 | 1 | 2 | 0 |
 | 2026-09-28T12:24:12.049Z | 0 | 2 | 1 | 8 |
 | 2026-09-28T14:04:50.119Z | 0 | 1 | 2 | 1 |
+| 2026-10-02T09:07:11.512Z | 0 | 2 | 1 | 2 |
 
 ## Stats
 
 | metric | this window | cumulative |
 | --- | --- | --- |
-| merged | 1 | 18 |
-| review rounds avg | 1 | 1.61 |
-| rounds/issue (plan/impl/review) | 1 / 1 / 1 | 1 / 2.5 / 1.61 |
-| escaped defects | 0 | 11 |
-| revert rate | 0.00 (0/1) | 0.00 (0/18) |
-| needs-human | 2 | 38 |
-| rejects by role | 없음 | correctness 2, architecture 1, spec-conformance 10, qa 3 |
-| reviewer overlap | 없음 | 0.32 (6/19, runs 31) |
-| unique findings by role | 없음 | correctness 4, architecture 1, spec-conformance 6, qa 2 |
-| qa na ratio | 0.06 (1/16 claims, na-heavy 0/2 approvals) | 0.03 (4/149 claims, na-heavy 0/17 approvals) |
-| cost (usd) | 36.27 | 562.14 |
-| tokens | input 2142899 / output 29535 | input 48426678 / output 674206 |
-| retro cost (usd) | 0.00 | 14.69 |
-| retro tokens | input 0 / output 0 | input 26 / output 8601 |
-| full retros | — | 9 |
+| merged | 2 | 20 |
+| review rounds avg | 1.5 | 1.6 |
+| rounds/issue (plan/impl/review) | 1 / 1.5 / 1.5 | 1 / 2.4 / 1.6 |
+| escaped defects | 1 (#114×1) | 12 |
+| revert rate | 0.00 (0/2) | 0.00 (0/20) |
+| needs-human | 2 | 40 |
+| rejects by role | spec-conformance 1, qa 1 | correctness 2, architecture 1, spec-conformance 11, qa 4 |
+| reviewer overlap | 0.50 (1/2, runs 3) | 0.33 (7/21, runs 34) |
+| unique findings by role | qa 1 | correctness 4, architecture 1, spec-conformance 6, qa 3 |
+| qa na ratio | 0.22 (5/23 claims, na-heavy 1/3 approvals) | 0.05 (9/172 claims, na-heavy 1/20 approvals) |
+| cost (usd) | 53.69 | 615.83 |
+| tokens | input 3848560 / output 44590 | input 52275238 / output 718796 |
+| retro cost (usd) | 2.23 | 16.92 |
+| retro tokens | input 3 / output 1381 | input 29 / output 9982 |
+| full retros | — | 10 |
 
 ### Rounds per issue (this window)
 
 | issue | plan | implement | review | escaped |
 | --- | --- | --- | --- | --- |
+| #114 | 1 | 2 | 2 | 1 |
 | #108 | 1 | 1 | 1 | 0 |
 
 ### Phase-2 gate baseline (this session)
@@ -52,11 +53,11 @@
 ```json
 {
   "cursor": {
-    "last_retro_at": "2026-09-28T14:04:50.119Z",
+    "last_retro_at": "2026-10-02T09:07:11.512Z",
     "last_record_offsets": {}
   },
-  "merges_since": 1,
-  "n": 2,
+  "merges_since": 0,
+  "n": 1,
   "history": [
     {
       "at": "2026-09-14T16:34:23.746Z",
@@ -724,6 +725,80 @@
       ],
       "n_before": 1,
       "n_after": 2
+    },
+    {
+      "at": "2026-10-02T09:07:11.512Z",
+      "yield": 0,
+      "needs_human_since": 2,
+      "applied": [
+        {
+          "step": "feedback-route",
+          "issues": [
+            114,
+            108
+          ],
+          "actions": [
+            {
+              "kind": "warning",
+              "step": "feedback-route",
+              "login": "LeeHyeonKyu",
+              "current": "bot-hk",
+              "reason": "current factory identity: bot-hk (machine user/app, viewer); older runs in this window ran under a shared identity (LeeHyeonKyu) — their human decisions are unverifiable, nothing to register"
+            }
+          ]
+        },
+        {
+          "step": "lessons:factory-builder",
+          "added": [
+            "L-2026-10-02-01"
+          ],
+          "rejected": [],
+          "evicted": [],
+          "cited": []
+        },
+        {
+          "step": "lessons:reviewer-correctness",
+          "added": [
+            "L-2026-10-02-01"
+          ],
+          "rejected": [],
+          "evicted": [],
+          "cited": []
+        },
+        {
+          "step": "lessons:plan-synthesizer",
+          "added": [
+            "L-2026-10-02-01"
+          ],
+          "rejected": [],
+          "evicted": [],
+          "cited": []
+        },
+        {
+          "step": "role:plan-skeptic",
+          "added": [],
+          "deferred": [
+            {
+              "kind": "good",
+              "text": "위치: #114 plan dissent (deferred delete, non_goals vs open_risks). 주장: non_goal('single pending delete is sufficient')과 open_risk('must track multiple pending IDs and timers')가 모순한다 — naive single-timer 구현은 두 번째 deleteEventDeferred 호출이 첫 번째 이벤트의 타이머를 취소해 데이터를 잃는다. 근거: calendar_provider.dart에 multi-timer 패턴이 없고 done_when dw1/dw2/dw3 전부 single-event 시나리오만 테스트해, 가장 흔한 사용 패턴(연속 삭제)이 plan 자체에 의해 테스트에서 빠졌다.",
+              "reason": "insufficient-evidence"
+            }
+          ]
+        },
+        {
+          "step": "publish-lessons",
+          "pr": 120,
+          "merged": false,
+          "reason": "timeout",
+          "files": [
+            ".factory/lessons/factory-builder.md",
+            ".factory/lessons/reviewer-correctness.md",
+            ".factory/lessons/plan-synthesizer.md"
+          ]
+        }
+      ],
+      "n_before": 2,
+      "n_after": 1
     }
   ],
   "candidates": {
@@ -887,9 +962,53 @@
           90
         ],
         "source": "must_fix"
+      },
+      {
+        "role": "spec-conformance",
+        "text": "The issue says undoDelete returns the event to the list in the same position. The implementation appends it at the end, and no test checks position. The plan's dw2 dropped this phrase, so the plan and the issue disagree and the diff follows the weaker plan wording.",
+        "runs": [
+          114
+        ],
+        "source": "must_fix"
+      },
+      {
+        "role": "qa",
+        "text": "Failure path of the deferred commit is unhandled. The callback removes the id from _pendingDeleteTimers and _pendingDeleteEvents BEFORE awaiting deleteEvent(id), and discards its result. (a) If DELETE returns non-204 or throws (network loss), the error is an uncaught async error in a Timer, with no user feedback. The user was told '일정을 삭제했습니다', but the event silently reappears on the next loadEvents, and the stash is gone so it cannot be undone. (b) During the in-flight DELETE the id is no longer filtered, so a concurrent loadEvents (e.g. a view refresh) can bring the still-server-side event back and make it flicker.",
+        "runs": [
+          114
+        ],
+        "source": "must_fix"
       }
     ],
-    "examples": [],
+    "examples": [
+      {
+        "role": "skeptic",
+        "kind": "good",
+        "text": "If the server DELETE call fails after the grace period (network error, 5xx), the event is already hidden from the user with no recovery path -- the user believes it was deleted but the server still has it.",
+        "runs": [
+          114
+        ],
+        "source": "dissent"
+      },
+      {
+        "role": "skeptic",
+        "kind": "good",
+        "text": "The non_goal says 'single pending delete is sufficient' but the open_risk says the builder 'must track multiple pending IDs and timers.' A naive single-timer implementation (one _pendingTimer field) would cancel event A's timer when deleteEventDeferred(B) is called, leaving event A hidden locally but alive on the server. On next loadEvents or app restart, event A silently reappears. This is the most common two-event-cleanup scenario (user tidying up old entries) and constitutes silent data loss -- a direct violation of PROJECT.md's '데이터 조작의 자유' principle. Evidence: calendar_provider.dart has no existing multi-timer pattern; the plan's dw1/dw2/dw3 all test single-event scenarios only.",
+        "runs": [
+          114
+        ],
+        "source": "dissent"
+      },
+      {
+        "role": "skeptic",
+        "kind": "good",
+        "text": "deleteEventDeferred does not call triggerWidgetUpdates (calendar_provider.dart:218-221), which is only invoked from loadEvents (line 237) and loadFamilyEvents (line 277-278). During the 5-second grace period, the iOS home widget and monthly widget continue to display the deleted event. If the user checks their home screen widget, they see an event they just deleted, undermining confidence in the deletion.",
+        "runs": [
+          114
+        ],
+        "source": "dissent"
+      }
+    ],
     "flaky": [],
     "needs_human": [
       {
@@ -975,11 +1094,17 @@
     ]
   },
   "stats": {
-    "merged": 1,
-    "review_rounds_avg": 1,
+    "merged": 2,
+    "review_rounds_avg": 1.5,
     "plan_rounds_avg": 1,
-    "implement_rounds_avg": 1,
+    "implement_rounds_avg": 1.5,
     "rounds_per_issue": [
+      {
+        "issue": 114,
+        "plan": 1,
+        "implement": 2,
+        "review": 2
+      },
       {
         "issue": 108,
         "plan": 1,
@@ -987,77 +1112,94 @@
         "review": 1
       }
     ],
-    "escaped_defects": 0,
-    "escaped_defects_detail": [],
+    "escaped_defects": 1,
+    "escaped_defects_detail": [
+      {
+        "issue": 114,
+        "count": 1
+      }
+    ],
     "reverts": 0,
     "reverted_issues": [],
     "revert_rate": 0,
-    "rejects_by_role": {},
-    "review_runs": 1,
-    "findings_total": 0,
-    "overlapping_findings": 0,
-    "unique_findings_by_role": {},
-    "overlap_ratio": 0,
+    "rejects_by_role": {
+      "spec-conformance": 1,
+      "qa": 1
+    },
+    "review_runs": 3,
+    "findings_total": 2,
+    "overlapping_findings": 1,
+    "unique_findings_by_role": {
+      "qa": 1
+    },
+    "overlap_ratio": 0.5,
     "needs_human": 2,
-    "qa_approvals": 2,
-    "qa_claims_total": 15,
-    "qa_na_total": 1,
-    "qa_na_ratio": 0.06,
-    "qa_na_heavy_approvals": 0,
+    "qa_approvals": 3,
+    "qa_claims_total": 18,
+    "qa_na_total": 5,
+    "qa_na_ratio": 0.22,
+    "qa_na_heavy_approvals": 1,
     "usage": {
-      "cost_usd": 36.269198,
+      "cost_usd": 53.692658,
       "tokens": {
-        "input": 2142899,
-        "output": 29535
+        "input": 3848560,
+        "output": 44590
+      }
+    },
+    "retro_usage": {
+      "cost_usd": 2.232668,
+      "tokens": {
+        "input": 3,
+        "output": 1381
       }
     }
   },
   "stats_total": {
-    "merged": 18,
-    "review_rounds_avg": 1.61,
+    "merged": 20,
+    "review_rounds_avg": 1.6,
     "plan_rounds_avg": 1,
-    "implement_rounds_avg": 2.5,
-    "escaped_defects": 11,
+    "implement_rounds_avg": 2.4,
+    "escaped_defects": 12,
     "reverts": 0,
     "reverted_issues": [],
     "revert_rate": 0,
     "rejects_by_role": {
       "correctness": 2,
       "architecture": 1,
-      "spec-conformance": 10,
-      "qa": 3
+      "spec-conformance": 11,
+      "qa": 4
     },
-    "review_runs": 31,
-    "findings_total": 19,
-    "overlapping_findings": 6,
+    "review_runs": 34,
+    "findings_total": 21,
+    "overlapping_findings": 7,
     "unique_findings_by_role": {
       "correctness": 4,
       "architecture": 1,
       "spec-conformance": 6,
-      "qa": 2
+      "qa": 3
     },
-    "overlap_ratio": 0.32,
-    "needs_human": 38,
-    "qa_approvals": 17,
-    "qa_claims_total": 145,
-    "qa_na_total": 4,
-    "qa_na_ratio": 0.03,
-    "qa_na_heavy_approvals": 0,
+    "overlap_ratio": 0.33,
+    "needs_human": 40,
+    "qa_approvals": 20,
+    "qa_claims_total": 163,
+    "qa_na_total": 9,
+    "qa_na_ratio": 0.05,
+    "qa_na_heavy_approvals": 1,
     "usage": {
-      "cost_usd": 562.138282,
+      "cost_usd": 615.83094,
       "tokens": {
-        "input": 48426678,
-        "output": 674206
+        "input": 52275238,
+        "output": 718796
       }
     },
     "retro_usage": {
-      "cost_usd": 14.690959,
+      "cost_usd": 16.923627,
       "tokens": {
-        "input": 26,
-        "output": 8601
+        "input": 29,
+        "output": 9982
       }
     },
-    "retros": 9
+    "retros": 10
   },
   "deferred_proposals": [],
   "deletion_candidates": []
