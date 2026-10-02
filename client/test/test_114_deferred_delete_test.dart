@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:fake_async/fake_async.dart';
@@ -36,6 +37,113 @@ class _FakeApiService implements ApiService {
   }
 
   // --- Storage stubs (not needed for these tests) ---
+  @override
+  Future<String?> get accessToken async => 'fake';
+  @override
+  Future<String?> get refreshToken async => 'fake';
+  @override
+  Future<String?> get cachedUserJson async => null;
+  @override
+  Future<void> saveTokens(String a, String r) async {}
+  @override
+  Future<void> saveCachedUser(String userJson) async {}
+  @override
+  Future<void> clearTokens() async {}
+
+  @override
+  Future<http.Response> post(String path, Map<String, dynamic> body) async =>
+      throw UnimplementedError();
+  @override
+  Future<http.Response> put(String path, Map<String, dynamic> body) async =>
+      throw UnimplementedError();
+  @override
+  Future<http.Response> patch(String path,
+          [Map<String, dynamic>? body]) async =>
+      throw UnimplementedError();
+}
+
+/// Fake [ApiService] that can simulate delete failures for testing error
+/// handling (qa1 rework).
+class _FailableApiService implements ApiService {
+  _FailableApiService({this.events = const []});
+
+  List<Map<String, dynamic>> events;
+  final List<String> deletedPaths = [];
+
+  /// When true, [delete] returns 500 instead of 204.
+  bool deleteWillFail = false;
+
+  /// When true, [delete] throws an exception (simulates network loss).
+  bool deleteWillThrow = false;
+
+  @override
+  Future<http.Response> get(String path) async {
+    if (path.startsWith('/events')) {
+      return http.Response(jsonEncode(events), 200);
+    }
+    return http.Response('', 404);
+  }
+
+  @override
+  Future<http.Response> delete(String path) async {
+    deletedPaths.add(path);
+    if (deleteWillThrow) {
+      throw Exception('Network error: connection refused');
+    }
+    if (deleteWillFail) {
+      return http.Response('Internal Server Error', 500);
+    }
+    return http.Response('', 204);
+  }
+
+  @override
+  Future<String?> get accessToken async => 'fake';
+  @override
+  Future<String?> get refreshToken async => 'fake';
+  @override
+  Future<String?> get cachedUserJson async => null;
+  @override
+  Future<void> saveTokens(String a, String r) async {}
+  @override
+  Future<void> saveCachedUser(String userJson) async {}
+  @override
+  Future<void> clearTokens() async {}
+
+  @override
+  Future<http.Response> post(String path, Map<String, dynamic> body) async =>
+      throw UnimplementedError();
+  @override
+  Future<http.Response> put(String path, Map<String, dynamic> body) async =>
+      throw UnimplementedError();
+  @override
+  Future<http.Response> patch(String path,
+          [Map<String, dynamic>? body]) async =>
+      throw UnimplementedError();
+}
+
+/// Fake [ApiService] whose [delete] hangs until a [Completer] is completed,
+/// allowing tests to observe the in-flight window (qa1 rework part b).
+class _SlowDeleteApiService implements ApiService {
+  _SlowDeleteApiService({this.events = const [], required this.deleteCompleter});
+
+  List<Map<String, dynamic>> events;
+  final Completer<http.Response> deleteCompleter;
+  final List<String> deletedPaths = [];
+
+  @override
+  Future<http.Response> get(String path) async {
+    if (path.startsWith('/events')) {
+      return http.Response(jsonEncode(events), 200);
+    }
+    return http.Response('', 404);
+  }
+
+  @override
+  Future<http.Response> delete(String path) async {
+    deletedPaths.add(path);
+    return deleteCompleter.future;
+  }
+
   @override
   Future<String?> get accessToken async => 'fake';
   @override
@@ -237,6 +345,152 @@ void main() {
             reason: 'API delete for A must fire exactly once');
         expect(deletedEvtB, hasLength(1),
             reason: 'API delete for B must fire exactly once');
+      });
+    });
+
+    // spec1 rework: undoDelete restores event at its original position, not
+    // appended at the end.
+    test('test_114_undo_restores_at_original_position', () {
+      fakeAsync((async) {
+        final eventA = _makeEvent('evt-A', title: 'Event A');
+        final eventB = _makeEvent('evt-B', title: 'Event B');
+        final eventC = _makeEvent('evt-C', title: 'Event C');
+        final fake = _FakeApiService(events: [eventA, eventB, eventC]);
+        final provider = _TestableCalendarProvider(api: fake);
+
+        provider.loadEvents();
+        async.flushMicrotasks();
+        expect(provider.events.map((e) => e.id).toList(),
+            ['evt-A', 'evt-B', 'evt-C'],
+            reason: 'precondition: three events loaded in order');
+
+        // Delete the middle event (index 1)
+        provider.deleteEventDeferred('evt-B');
+        async.flushMicrotasks();
+        expect(provider.events.map((e) => e.id).toList(), ['evt-A', 'evt-C'],
+            reason: 'middle event removed');
+
+        // Undo
+        provider.undoDelete('evt-B');
+        async.flushMicrotasks();
+
+        // Event B must be back at its original position (index 1), not
+        // appended at the end.
+        expect(provider.events.map((e) => e.id).toList(),
+            ['evt-A', 'evt-B', 'evt-C'],
+            reason:
+                'undoDelete must restore event at its original position (issue #114: 같은 자리로)');
+
+        provider.dispose();
+      });
+    });
+
+    // qa1 rework: API delete failure (non-204) restores the event.
+    test('test_114_deferred_delete_failure_restores_event', () {
+      fakeAsync((async) {
+        final eventData = _makeEvent('evt-1');
+        final fake = _FailableApiService(events: [eventData]);
+        fake.deleteWillFail = true;
+        final provider = _TestableCalendarProvider(api: fake);
+
+        provider.loadEvents();
+        async.flushMicrotasks();
+        expect(provider.events, hasLength(1),
+            reason: 'precondition: one event loaded');
+
+        // Deferred delete
+        provider.deleteEventDeferred('evt-1');
+        async.flushMicrotasks();
+        expect(provider.events.where((e) => e.id == 'evt-1'), isEmpty,
+            reason: 'event must disappear immediately');
+
+        // Advance past grace period -- API delete fires but returns 500
+        async.elapse(const Duration(seconds: 5));
+        async.flushMicrotasks();
+
+        // Event must be restored because the API delete returned non-204
+        expect(provider.events.where((e) => e.id == 'evt-1'), hasLength(1),
+            reason:
+                'event must be restored when API delete fails (non-204 response)');
+
+        provider.dispose();
+      });
+    });
+
+    // qa1 rework: API delete exception (network error) restores the event.
+    test('test_114_deferred_delete_exception_restores_event', () {
+      fakeAsync((async) {
+        final eventData = _makeEvent('evt-1');
+        final fake = _FailableApiService(events: [eventData]);
+        fake.deleteWillThrow = true;
+        final provider = _TestableCalendarProvider(api: fake);
+
+        provider.loadEvents();
+        async.flushMicrotasks();
+        expect(provider.events, hasLength(1),
+            reason: 'precondition: one event loaded');
+
+        // Deferred delete
+        provider.deleteEventDeferred('evt-1');
+        async.flushMicrotasks();
+        expect(provider.events.where((e) => e.id == 'evt-1'), isEmpty,
+            reason: 'event must disappear immediately');
+
+        // Advance past grace period -- API delete throws
+        async.elapse(const Duration(seconds: 5));
+        async.flushMicrotasks();
+
+        // Event must be restored because the API delete threw
+        expect(provider.events.where((e) => e.id == 'evt-1'), hasLength(1),
+            reason:
+                'event must be restored when API delete throws (network error)');
+
+        provider.dispose();
+      });
+    });
+
+    // qa1 rework: during in-flight API delete, loadEvents still filters the
+    // pending-delete event (the id must remain in the filter set until the
+    // API call completes). Uses a Completer-based fake to hold the delete
+    // in-flight so we can observe the window.
+    test('test_114_inflight_delete_keeps_event_filtered', () {
+      fakeAsync((async) {
+        final eventData = _makeEvent('evt-1');
+        final deleteCompleter = Completer<http.Response>();
+        final fake = _SlowDeleteApiService(
+          events: [eventData],
+          deleteCompleter: deleteCompleter,
+        );
+        final provider = _TestableCalendarProvider(api: fake);
+
+        provider.loadEvents();
+        async.flushMicrotasks();
+        expect(provider.events, hasLength(1));
+
+        provider.deleteEventDeferred('evt-1');
+        async.flushMicrotasks();
+
+        // Fire the timer -- the async callback starts but awaits the
+        // Completer-controlled _api.delete, so the delete is in-flight.
+        async.elapse(const Duration(seconds: 5));
+
+        // Trigger a concurrent loadEvents while the delete is in-flight.
+        // The server still returns the event, but it must stay filtered
+        // because the id is still in _pendingDeleteEvents.
+        provider.loadEvents();
+        async.flushMicrotasks();
+
+        // The event must NOT have reappeared from the server response
+        // during the in-flight delete window.
+        expect(provider.events.where((e) => e.id == 'evt-1'), isEmpty,
+            reason:
+                'event must stay filtered during in-flight API delete');
+
+        // Complete the delete so the test can clean up without pending futures.
+        deleteCompleter.complete(http.Response('', 204));
+        async.flushMicrotasks();
+
+        provider.dispose();
       });
     });
   });

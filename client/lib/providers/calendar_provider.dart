@@ -29,11 +29,16 @@ class CalendarProvider extends ChangeNotifier {
   final Map<String, Timer> _pendingDeleteTimers = {};
 
   /// Stashed events awaiting deferred delete (for undo restoration).
-  final Map<String, EventModel> _pendingDeleteEvents = {};
+  /// Stores the event and its original index in [_events] for
+  /// position-preserving undo (spec1 rework: issue #114 같은 자리로).
+  final Map<String, ({EventModel event, int index})> _pendingDeleteEvents = {};
 
   /// IDs of events whose deferred delete is pending -- used to filter them
   /// out of [_events] when [loadEvents] refreshes from the server.
-  Set<String> get _pendingDeleteIds => _pendingDeleteTimers.keys.toSet();
+  /// Derived from [_pendingDeleteEvents] (not [_pendingDeleteTimers]) so that
+  /// events remain filtered during the in-flight API delete window after the
+  /// timer fires but before the API call completes (qa1 rework).
+  Set<String> get _pendingDeleteIds => _pendingDeleteEvents.keys.toSet();
 
   List<CalendarModel> get calendars => _calendars;
   List<EventModel> get events => _events;
@@ -473,24 +478,52 @@ class CalendarProvider extends ChangeNotifier {
   /// The [delay] parameter exists so tests can inject a custom duration,
   /// but the default 5-second grace period is the product requirement.
   void deleteEventDeferred(String id, {Duration delay = const Duration(seconds: 5)}) {
-    // Stash the event for potential undo restoration.
+    // Stash the event and its original index for position-preserving undo
+    // (spec1 rework: issue #114 같은 자리로).
     final idx = _events.indexWhere((e) => e.id == id);
     if (idx >= 0) {
-      _pendingDeleteEvents[id] = _events[idx];
+      _pendingDeleteEvents[id] = (event: _events[idx], index: idx);
       _events.removeAt(idx);
     }
 
     // Cancel any existing timer for the same id (idempotency).
     _pendingDeleteTimers[id]?.cancel();
 
-    // Schedule the actual API delete.
-    _pendingDeleteTimers[id] = Timer(delay, () {
+    // Schedule the actual API delete. The callback is async so we can await
+    // deleteEvent and handle failures (qa1 rework).
+    _pendingDeleteTimers[id] = Timer(delay, () async {
       _pendingDeleteTimers.remove(id);
-      _pendingDeleteEvents.remove(id);
-      deleteEvent(id);
+      // Keep _pendingDeleteEvents[id] during the API call so that
+      // _pendingDeleteIds still filters the event from loadEvents results
+      // (qa1 rework: in-flight filtering).
+      try {
+        final success = await deleteEvent(id);
+        if (success) {
+          // API delete succeeded -- clean up stash.
+          _pendingDeleteEvents.remove(id);
+        } else {
+          // API returned non-204 -- restore the event (qa1 rework).
+          _restoreStashedEvent(id);
+        }
+      } catch (e) {
+        // Network error or other exception -- restore the event (qa1 rework).
+        _restoreStashedEvent(id);
+        debugPrint('deleteEventDeferred: API delete failed for $id: $e');
+      }
     });
 
     notifyListeners();
+  }
+
+  /// Restores a stashed event to [_events] at its original position (clamped)
+  /// and notifies listeners. Used by the timer callback on API failure.
+  void _restoreStashedEvent(String id) {
+    final stash = _pendingDeleteEvents.remove(id);
+    if (stash != null) {
+      final insertIdx = stash.index.clamp(0, _events.length);
+      _events.insert(insertIdx, stash.event);
+      notifyListeners();
+    }
   }
 
   /// Cancels a pending deferred delete and restores the event to the
@@ -499,16 +532,21 @@ class CalendarProvider extends ChangeNotifier {
     final timer = _pendingDeleteTimers.remove(id);
     timer?.cancel();
 
-    final event = _pendingDeleteEvents.remove(id);
-    if (event != null) {
-      _events.add(event);
+    final stash = _pendingDeleteEvents.remove(id);
+    if (stash != null) {
+      // Insert at the original position (clamped to current list bounds)
+      // so the event returns to the same slot (spec1 rework: issue #114
+      // 같은 자리로).
+      final insertIdx = stash.index.clamp(0, _events.length);
+      _events.insert(insertIdx, stash.event);
     }
 
     notifyListeners();
   }
 
   /// Whether there is a pending deferred delete for the given event id.
-  bool hasPendingDelete(String id) => _pendingDeleteTimers.containsKey(id);
+  /// Returns true during both the grace period and the in-flight API delete.
+  bool hasPendingDelete(String id) => _pendingDeleteEvents.containsKey(id);
 
   @override
   void dispose() {
