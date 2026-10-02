@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:home_widget/home_widget.dart';
@@ -23,6 +24,16 @@ class CalendarProvider extends ChangeNotifier {
   Set<String> _selectedCategories = {
     'WORK', 'PERSONAL', 'FAMILY', 'HEALTH', 'SOCIAL', 'FINANCE', 'OTHER',
   };
+
+  /// Pending deferred deletes: event id -> timer.
+  final Map<String, Timer> _pendingDeleteTimers = {};
+
+  /// Stashed events awaiting deferred delete (for undo restoration).
+  final Map<String, EventModel> _pendingDeleteEvents = {};
+
+  /// IDs of events whose deferred delete is pending -- used to filter them
+  /// out of [_events] when [loadEvents] refreshes from the server.
+  Set<String> get _pendingDeleteIds => _pendingDeleteTimers.keys.toSet();
 
   List<CalendarModel> get calendars => _calendars;
   List<EventModel> get events => _events;
@@ -230,7 +241,14 @@ class CalendarProvider extends ChangeNotifier {
       final res = await _api.get('/events${query.isNotEmpty ? "?$query" : ""}');
       if (res.statusCode == 200) {
         final list = jsonDecode(res.body) as List;
-        _events = list.map((j) => EventModel.fromJson(j)).toList();
+        final parsed = list.map((j) => EventModel.fromJson(j)).toList();
+        // Filter out events whose deferred delete is still pending (dw3):
+        // the server still returns them, but the user has locally deleted them.
+        if (_pendingDeleteIds.isNotEmpty) {
+          _events = parsed.where((e) => !_pendingDeleteIds.contains(e.id)).toList();
+        } else {
+          _events = parsed;
+        }
         _error = null;
         _isLoading = false;
         notifyListeners();
@@ -441,5 +459,66 @@ class CalendarProvider extends ChangeNotifier {
 
   List<TaskModel> get unscheduledTasks {
     return _tasks.where((t) => t.scheduledDate == null && t.dueDate == null && t.isTodo).toList();
+  }
+
+  // ─── Deferred delete (#114) ───
+
+  /// Removes the event from the visible list immediately (optimistic) and
+  /// schedules the real API delete after [delay].
+  ///
+  /// If another deferred delete is already pending for a different event,
+  /// both are tracked independently -- the second call does not cancel the
+  /// first (dw5 / dissent-3).
+  ///
+  /// The [delay] parameter exists so tests can inject a custom duration,
+  /// but the default 5-second grace period is the product requirement.
+  void deleteEventDeferred(String id, {Duration delay = const Duration(seconds: 5)}) {
+    // Stash the event for potential undo restoration.
+    final idx = _events.indexWhere((e) => e.id == id);
+    if (idx >= 0) {
+      _pendingDeleteEvents[id] = _events[idx];
+      _events.removeAt(idx);
+    }
+
+    // Cancel any existing timer for the same id (idempotency).
+    _pendingDeleteTimers[id]?.cancel();
+
+    // Schedule the actual API delete.
+    _pendingDeleteTimers[id] = Timer(delay, () {
+      _pendingDeleteTimers.remove(id);
+      _pendingDeleteEvents.remove(id);
+      deleteEvent(id);
+    });
+
+    notifyListeners();
+  }
+
+  /// Cancels a pending deferred delete and restores the event to the
+  /// visible list. If the event is not pending, this is a no-op.
+  void undoDelete(String id) {
+    final timer = _pendingDeleteTimers.remove(id);
+    timer?.cancel();
+
+    final event = _pendingDeleteEvents.remove(id);
+    if (event != null) {
+      _events.add(event);
+    }
+
+    notifyListeners();
+  }
+
+  /// Whether there is a pending deferred delete for the given event id.
+  bool hasPendingDelete(String id) => _pendingDeleteTimers.containsKey(id);
+
+  @override
+  void dispose() {
+    // Cancel all pending timers to avoid calling notifyListeners on a
+    // disposed ChangeNotifier (dissent-4).
+    for (final timer in _pendingDeleteTimers.values) {
+      timer.cancel();
+    }
+    _pendingDeleteTimers.clear();
+    _pendingDeleteEvents.clear();
+    super.dispose();
   }
 }
