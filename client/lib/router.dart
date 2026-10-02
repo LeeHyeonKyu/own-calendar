@@ -6,6 +6,7 @@ import 'screens/daily_view_screen.dart';
 import 'screens/weekly_view_screen.dart';
 import 'screens/yearly_view_screen.dart';
 import 'screens/family_screen.dart';
+import 'models/event.dart';
 import 'screens/event_form_screen.dart';
 import 'screens/task_form_screen.dart';
 import 'screens/search_screen.dart';
@@ -89,8 +90,17 @@ GoRouter createRouter(AuthProvider authProvider) {
       GoRoute(
         path: '/event/new',
         builder: (context, state) {
-          final dateStr = state.uri.queryParameters['date'];
-          final date = dateStr != null ? DateTime.tryParse(dateStr) : null;
+          final extra = state.extra;
+          if (extra is EventModel) {
+            return EventFormScreen(template: extra);
+          }
+          DateTime? date;
+          if (extra is DateTime) {
+            date = extra;
+          } else {
+            final dateStr = state.uri.queryParameters['date'];
+            date = dateStr != null ? DateTime.tryParse(dateStr) : null;
+          }
           return EventFormScreen(initialDate: date);
         },
       ),

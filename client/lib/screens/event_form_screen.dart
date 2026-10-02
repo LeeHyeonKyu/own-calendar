@@ -12,8 +12,9 @@ import '../themes/spacing.dart';
 class EventFormScreen extends StatefulWidget {
   final String? eventId;
   final DateTime? initialDate;
+  final EventModel? template;
 
-  const EventFormScreen({super.key, this.eventId, this.initialDate});
+  const EventFormScreen({super.key, this.eventId, this.initialDate, this.template});
 
   @override
   State<EventFormScreen> createState() => _EventFormScreenState();
@@ -58,10 +59,42 @@ class _EventFormScreenState extends State<EventFormScreen> {
     _endDate = base;
     _endTime = TimeOfDay(hour: base.hour + 2, minute: 0);
 
+    if (widget.template != null) {
+      _applyTemplate(widget.template!);
+    }
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _loadCalendars();
       if (isEditing) _loadEvent();
     });
+  }
+
+  /// Pre-fills all form fields from a template event (used by the duplicate
+  /// action). Reads every field the form exposes so the user sees an exact
+  /// copy of the source event in a new-event form.
+  void _applyTemplate(EventModel template) {
+    _titleController.text = template.title;
+    _descController.text = template.description ?? '';
+    _startDate = template.startTime;
+    _startTime = TimeOfDay.fromDateTime(template.startTime);
+    _endDate = template.endTime;
+    _endTime = TimeOfDay.fromDateTime(template.endTime);
+    _isAllDay = template.isAllDay;
+    _isPrivate = template.isPrivate;
+    _category = template.category;
+    _tags = List.from(template.tags);
+    _recurrenceType = template.recurrenceType;
+    _recurrenceEnd = template.recurrenceEnd;
+    _rrule = template.rrule;
+    _selectedCalendarId = template.calendarId;
+    _locationController.text = template.location ?? '';
+    _notesController.text = template.notes ?? '';
+    _attendees = List.from(template.attendees);
+    _reminderMinutes = template.reminderMinutes;
+    _categoryId = template.categoryId;
+    _showMetadata = template.location != null ||
+        template.notes != null ||
+        template.attendees.isNotEmpty;
   }
 
   @override
@@ -303,6 +336,38 @@ class _EventFormScreenState extends State<EventFormScreen> {
     }
   }
 
+  /// Reads the current form values (including any unsaved edits the user
+  /// made) and opens a new-event form pre-filled with those values via
+  /// pushReplacement. For recurring instances, the recurrence rule is
+  /// stripped so the duplicate becomes a single event.
+  void _duplicateEvent() {
+    final template = EventModel(
+      id: '',
+      title: _titleController.text,
+      description: _descController.text.isEmpty ? null : _descController.text,
+      startTime: _combine(_startDate, _startTime),
+      endTime: _combine(_endDate, _endTime),
+      isAllDay: _isAllDay,
+      isPrivate: _isPrivate,
+      category: _category,
+      tags: List.from(_tags),
+      // If editing a recurring instance, strip the recurrence rule so the
+      // duplicate becomes a single (non-recurring) event.
+      recurrenceType: _isEditingInstance ? 'NONE' : _recurrenceType,
+      recurrenceEnd: _isEditingInstance ? null : _recurrenceEnd,
+      rrule: _isEditingInstance ? null : _rrule,
+      calendarId: _selectedCalendarId ?? '',
+      location: _locationController.text.isEmpty
+          ? null
+          : _locationController.text,
+      notes: _notesController.text.isEmpty ? null : _notesController.text,
+      attendees: List.from(_attendees),
+      reminderMinutes: _reminderMinutes,
+      categoryId: _categoryId,
+    );
+    context.pushReplacement('/event/new', extra: template);
+  }
+
   @override
   Widget build(BuildContext context) {
     final calProvider = context.watch<CalendarProvider>();
@@ -313,11 +378,17 @@ class _EventFormScreenState extends State<EventFormScreen> {
       appBar: AppBar(
         title: Text(isEditing ? '일정 수정' : '새 일정'),
         actions: [
-          if (isEditing)
+          if (isEditing) ...[
+            IconButton(
+              icon: const Icon(Icons.copy),
+              tooltip: '복제',
+              onPressed: _duplicateEvent,
+            ),
             IconButton(
               icon: const Icon(Icons.delete),
               onPressed: _delete,
             ),
+          ],
         ],
       ),
       body: Form(
