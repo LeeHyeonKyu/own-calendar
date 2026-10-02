@@ -1,7 +1,7 @@
 import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
-import rateLimit from 'express-rate-limit';
+import rateLimit, { MemoryStore } from 'express-rate-limit';
 import { config } from './config';
 import authRoutes from './routes/auth';
 import calendarRoutes from './routes/calendars';
@@ -35,6 +35,10 @@ if (config.corsOrigin.length > 0) {
 
 app.use(express.json({ limit: '100kb' }));
 
+// Explicit stores so tests can reset accumulated counters between files (#124).
+const globalStore = new MemoryStore();
+const authStore = new MemoryStore();
+
 // Global rate limiter — everyone hitting the API.
 // In test mode the limit is raised so the ~350 supertest requests across the full
 // suite do not cross the threshold and cause 429s (root cause of #91 flakiness).
@@ -44,16 +48,23 @@ const globalLimiter = rateLimit({
   limit: config.nodeEnv === 'test' ? 10000 : 300,
   standardHeaders: 'draft-7',
   legacyHeaders: false,
+  store: globalStore,
 });
 app.use(globalLimiter);
 
 // Stricter limiter for authentication and family-join brute force.
+// In test mode the limit is raised (matching globalLimiter above) so the
+// ~110 createTestUser calls across the full integration suite do not trigger
+// rate-limiting between test files.  The in-memory MemoryStore is never
+// reset between vitest files (setup.ts only clears DB tables), so without
+// this override the counter accumulates and later files get blocked (#124).
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  limit: 10,
+  limit: config.nodeEnv === 'test' ? 10000 : 10,
   standardHeaders: 'draft-7',
   legacyHeaders: false,
   skipSuccessfulRequests: true,
+  store: authStore,
 });
 
 app.get('/health', (_req, res) => {
@@ -86,5 +97,12 @@ app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
   console.error(err.stack);
   res.status(500).json({ error: 'Internal server error' });
 });
+
+// Reset in-memory rate limiter state.  Called from tests/setup.ts beforeEach
+// so counters accumulated during a prior test file do not leak into the next (#124).
+export function resetRateLimitState(): void {
+  globalStore.resetAll();
+  authStore.resetAll();
+}
 
 export default app;

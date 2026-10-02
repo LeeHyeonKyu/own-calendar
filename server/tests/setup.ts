@@ -3,10 +3,12 @@ dotenv.config();
 
 import { PrismaClient } from '../src/generated/prisma/client';
 import request from 'supertest';
+import { resetRateLimitState } from '../src/app';
 
 const prisma = new PrismaClient();
 
 beforeEach(async () => {
+  // Clear database tables
   await prisma.event.deleteMany();
   await prisma.externalCalendarConnection.deleteMany();
   await prisma.refreshToken.deleteMany();
@@ -16,6 +18,9 @@ beforeEach(async () => {
   await prisma.familyGroup.deleteMany();
   await prisma.group.deleteMany();
   await prisma.user.deleteMany();
+  // Clear in-memory rate limiter state so counters accumulated during a prior
+  // test file do not leak into the next (#124).
+  resetRateLimitState();
 });
 
 afterAll(async () => {
