@@ -7,6 +7,7 @@ import { changedFiles } from "./changed-files.js";
 import { matchesAny } from "./glob.js";
 import { classifyFailures } from "./classify-failure.js";
 import { mustNotContract, mustNotViolations, addedLines, fixesTests } from "./integrity.js";
+import { inMirrorFamily, mirrorApplicable } from "./mirror.js";
 import { proveTest, repeatNewTests, proveModeFor, selfReferentialTests, proveFixedTests } from "./prove-test.js";
 import { runDiffCoverage } from "./diff-coverage.js";
 import { mutationGate } from "./mutation.js";
@@ -581,8 +582,8 @@ export async function runStageGates({ run: injectedRun, cwd, harness, stage, tie
          * 다른 모든 큐 전이와 같은 게이트를 지난다. 예전에는 `labels: ["factory:queue", …]`로 바로
          * 태어나서, 리허설한 적 없는 하네스 위에서도 triage 런이 시작됐다 — 게이트를 통째로 비켜 가는
          * 유일한 생산 경로였다. 거부되면 이슈는 `backlog`에 남고(사람의 `:next`가 집는다) 그 이유를
-         * 코멘트로 적는다. `harness-request.js`의 하네스 이슈는 여전히 바로 큐로 간다(그건 설계다 —
-         * 리허설이 낡았을 때 그것을 고치는 이슈까지 막으면 저장소가 잠긴다).
+         * 코멘트로 적는다. `harness-request.js`의 하네스 이슈도 #136(S2b)부터 같은 모양이다 — `backlog`로
+         * 태어나 리허설 + 심사를 실은 문을 지나고, 거부되면 `factory-harness-not-queued` 코멘트를 단다.
          */
         try {
           const n = await gh?.createIssue({ title, body: `Detected while implementing #${issue}. evidence: ${JSON.stringify(c.evidence)}`, labels: ["backlog", "factory:flaky"] });
@@ -628,10 +629,20 @@ export async function runStageGates({ run: injectedRun, cwd, harness, stage, tie
         if (u0.code === 0) added = addedLines(u0.stdout);
         else result.must_not_diff_error = String(u0.stderr || "").trim().slice(0, 200);
       }
-      const v = mustNotViolations({ contract, changed: ch.all, added });
+      /**
+       * 설계 2026-09-30 §8.3 (S3, KTB #130 실측) — KTB 자기 저장소에서 미러 가족(`.factory/{lib,bin,actions}/**`·`.claude/hooks/*.sh`)은
+       * 러너가 `factory/**`에서 생성해 커밋한 것이지 빌더의 변경이 아니다(빌더는 거기 쓸 수 없다). `must_not: touch .factory/**`는
+       * 그 생성물에 대는 계약이 아니라 빌더의 손에 대는 계약이므로, 그 경로는 계약 대조에서 뺀다. 채택자 저장소에서는 그대로다.
+       */
+      const mirrorSelf = mirrorApplicable(cwd);
+      const changedForContract = mirrorSelf ? ch.all.filter((p) => !inMirrorFamily(p)) : ch.all;
+      const excluded = mirrorSelf ? ch.all.length - changedForContract.length : 0;
+      if (mirrorSelf) for (const k of [...added.keys()]) if (inMirrorFamily(k)) added.delete(k);
+      const v = mustNotViolations({ contract, changed: changedForContract, added });
+      const note = excluded ? ` (runner-generated mirror paths excluded: ${excluded})` : "";
       result.gates["must-not"] = v.length
-        ? { status: "RED", code: null, duration_ms: 0, log: `issue must_not contract violated: ${v.map((x) => `${x.file}: ${x.rule}`).join("; ")}` }
-        : { status: "GREEN", code: null, duration_ms: 0, log: `issue must_not contract holds (touch: ${contract.touch.join(", ") || "-"}; add: ${contract.add.join(", ") || "-"})` };
+        ? { status: "RED", code: null, duration_ms: 0, log: `issue must_not contract violated: ${v.map((x) => `${x.file}: ${x.rule}`).join("; ")}${note}` }
+        : { status: "GREEN", code: null, duration_ms: 0, log: `issue must_not contract holds (touch: ${contract.touch.join(", ") || "-"}; add: ${contract.add.join(", ") || "-"})${note}` };
     }
     // 새로 추가된 테스트만이 아니라 **수정된 테스트 파일**도 증명 대상이다 — 기존 파일에 추가된
     // 케이스도 base에서는 실패해야 한다. 면제는 **실효 tier**로 판단한다(자기 신고 docs로 빠져나갈 수 없게).
