@@ -1,32 +1,44 @@
 /**
- * Regression test for issue #124: POST /api/auth/register intermittently returns
- * a non-201 response because the authLimiter (app.ts:51-57) accumulates failed
- * request counts across test files via its in-memory MemoryStore.
+ * Regression guard for issue #124: POST /api/auth/register intermittently
+ * returned a non-201 response during createTestUser in follows.test.ts and
+ * family.test.ts.  The reported error was "expected 201, got 200 — {}".
  *
- * Root cause: authLimiter has limit:10 with NO test-mode override (unlike
- * globalLimiter at line 44 which uses 10000 in test mode). With
- * skipSuccessfulRequests:true, only failed requests (status >= 400) accumulate.
- * After 10 failed auth requests across the suite, subsequent register calls
- * are rate-limited. The MemoryStore is never reset between tests because
- * setup.ts only clears database tables, not app-level in-memory state.
+ * Investigation findings (rework R2):
  *
- * The test deterministically reproduces this by making 10 failed register
- * requests (missing required field -> 400), then verifying that the next
- * register call succeeds with 201. Without the fix (authLimiter limit:10),
- * the 11th request is rate-limited. With the fix (authLimiter limit:10000
- * in test mode), it passes.
+ *   1. The authLimiter (app.ts, express-rate-limit v8.3.2) was configured with
+ *      limit:10 and skipSuccessfulRequests:true but NO test-mode override.
+ *      After 10 failed auth requests within a single test file, the 11th
+ *      request is rate-limited with HTTP 429 (not 200).  The fix raises the
+ *      limit to 10000 in test mode (matching globalLimiter) and adds
+ *      resetRateLimitState() in beforeEach.
+ *
+ *   2. Vitest (^4.1.2) runs each file in its own worker (default pool with
+ *      isolate:true).  Module caches are separate per worker, so the
+ *      Express app singleton and its MemoryStore are NOT shared across
+ *      files.  Cross-file rate-limiter accumulation is therefore not the
+ *      mechanism behind the original issue.
+ *
+ *   3. No code path in the POST /api/auth/register middleware chain
+ *      (validate.ts -> auth.ts -> authService.register) can produce HTTP
+ *      200 with body {}.  The handler sends 201 on success, validate sends
+ *      400, the rate limiter sends 429, and the error handler sends 500.
+ *      The phantom 200 {} cannot be traced to application code.
+ *
+ * Conclusion: the authLimiter fix (item 1) eliminates a real within-file
+ * rate-limiting hazard but does NOT explain the reported 200 {} symptom
+ * (item 3).  Per plan dissent d1/d3, the 200 {} mechanism is documented
+ * as unidentified and handed off to a human.  This test guards against
+ * the reproducible rate-limiter accumulation path.
  */
 import request from 'supertest';
 import app from '../src/app';
-import { createTestUser } from './setup';
 
 describe('test_124_register_isolation', () => {
   it('test_124_register_never_answers_200_empty — register returns 201 even after accumulated auth failures', async () => {
-    // Simulate the leaking state: make 10 failed POST /api/auth/register
-    // requests. Each sends a body missing the required 'name' field,
-    // triggering a 400 from the validate middleware. With
-    // skipSuccessfulRequests:true these failures are NOT decremented from
-    // the authLimiter's counter, so the counter reaches 10.
+    // Accumulate 10 failed POST /api/auth/register requests within this
+    // file.  Each omits the required 'name' field, so the validate
+    // middleware returns 400.  With skipSuccessfulRequests:true, these
+    // failures count toward the authLimiter budget.
     const failures: number[] = [];
     for (let i = 0; i < 10; i++) {
       const res = await request(app).post('/api/auth/register').send({
@@ -40,16 +52,33 @@ describe('test_124_register_isolation', () => {
     // Verify the failures were 400 (validate middleware rejected them)
     expect(failures.every((s) => s === 400)).toBe(true);
 
-    // The next register call (the 11th request through the authLimiter)
-    // must still return 201. Before the fix, the authLimiter's counter
-    // is 10, increment pushes it to 11 > limit(10), and the request is
-    // rate-limited instead of reaching the register handler.
-    const user = await createTestUser(app, {
+    // The 11th request must still return 201.  Without the test-mode
+    // limit override, the authLimiter counter would be 10 and the 11th
+    // request would be rate-limited (429).  The fix raises the limit to
+    // 10000 in test mode so the counter never reaches the threshold.
+    //
+    // We make the raw request (not via createTestUser) to explicitly
+    // assert both the 200-empty and the 429 conditions.
+    const res = await request(app).post('/api/auth/register').send({
       email: 'should-still-work@test.com',
       name: 'Still Works',
+      password: 'password123',
     });
 
-    expect(user.accessToken).toBeDefined();
-    expect(user.user.email).toBe('should-still-work@test.com');
+    // Guard: register must not answer 200 {} (the reported symptom)
+    if (res.status === 200) {
+      throw new Error(
+        `register returned 200 with body ${JSON.stringify(res.body)} — ` +
+        'this is the phantom symptom from issue #124 whose root cause is unidentified',
+      );
+    }
+
+    // Guard: register must not be rate-limited (the reproducible path)
+    expect(res.status).not.toBe(429);
+
+    // Primary assertion: register succeeds
+    expect(res.status).toBe(201);
+    expect(res.body.accessToken).toBeDefined();
+    expect(res.body.user.email).toBe('should-still-work@test.com');
   });
 });
