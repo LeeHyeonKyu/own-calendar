@@ -23,13 +23,13 @@
 | rounds/issue (plan/impl/review) | 1 / 1 / 1 | 1 / 2.5 / 1.61 |
 | escaped defects | 0 | 11 |
 | revert rate | 0.00 (0/1) | 0.00 (0/18) |
-| needs-human | 0 | 38 |
+| needs-human | 2 | 38 |
 | rejects by role | 없음 | correctness 2, architecture 1, spec-conformance 10, qa 3 |
 | reviewer overlap | 없음 | 0.32 (6/19, runs 31) |
 | unique findings by role | 없음 | correctness 4, architecture 1, spec-conformance 6, qa 2 |
-| qa na ratio | 0.00 (0/8 claims, na-heavy 0/1 approvals) | 0.03 (4/149 claims, na-heavy 0/17 approvals) |
-| cost (usd) | 21.54 | 562.14 |
-| tokens | input 1103577 / output 19776 | input 48426678 / output 674206 |
+| qa na ratio | 0.06 (1/16 claims, na-heavy 0/2 approvals) | 0.03 (4/149 claims, na-heavy 0/17 approvals) |
+| cost (usd) | 36.27 | 562.14 |
+| tokens | input 2142899 / output 29535 | input 48426678 / output 674206 |
 | retro cost (usd) | 0.00 | 14.69 |
 | retro tokens | input 0 / output 0 | input 26 / output 8601 |
 | full retros | — | 9 |
@@ -966,6 +966,11 @@
         "issue": 91,
         "reason": "blocked (job cancelled) — needs human",
         "at": "2026-09-28T04:52:36Z"
+      },
+      {
+        "issue": 111,
+        "reason": "gates RED at merge",
+        "at": "2026-10-02T01:52:28Z"
       }
     ]
   },
@@ -993,17 +998,17 @@
     "overlapping_findings": 0,
     "unique_findings_by_role": {},
     "overlap_ratio": 0,
-    "needs_human": 0,
-    "qa_approvals": 1,
-    "qa_claims_total": 8,
-    "qa_na_total": 0,
-    "qa_na_ratio": 0,
+    "needs_human": 2,
+    "qa_approvals": 2,
+    "qa_claims_total": 15,
+    "qa_na_total": 1,
+    "qa_na_ratio": 0.06,
     "qa_na_heavy_approvals": 0,
     "usage": {
-      "cost_usd": 21.536721,
+      "cost_usd": 36.269198,
       "tokens": {
-        "input": 1103577,
-        "output": 19776
+        "input": 2142899,
+        "output": 29535
       }
     }
   },
