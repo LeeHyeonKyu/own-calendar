@@ -1,6 +1,6 @@
 # Retro State
 
-- last retro: 2026-10-02T09:07:11.512Z
+- last retro: 2026-10-02T16:30:27.517Z
 - merges since last retro: 0
 - current N: 1
 
@@ -8,38 +8,37 @@
 
 | at | yield | n_before | n_after | needs_human_since |
 | --- | --- | --- | --- | --- |
-| 2026-09-27T13:58:42.189Z | 0 | 2 | 1 | 4 |
 | 2026-09-27T19:26:40.682Z | 0 | 1 | 2 | 0 |
 | 2026-09-28T12:24:12.049Z | 0 | 2 | 1 | 8 |
 | 2026-09-28T14:04:50.119Z | 0 | 1 | 2 | 1 |
 | 2026-10-02T09:07:11.512Z | 0 | 2 | 1 | 2 |
+| 2026-10-02T16:30:27.517Z | 0 | 1 | 1 | 5 |
 
 ## Stats
 
 | metric | this window | cumulative |
 | --- | --- | --- |
-| merged | 2 | 20 |
-| review rounds avg | 1.5 | 1.6 |
-| rounds/issue (plan/impl/review) | 1 / 1.5 / 1.5 | 1 / 2.4 / 1.6 |
-| escaped defects | 1 (#114×1) | 12 |
-| revert rate | 0.00 (0/2) | 0.00 (0/20) |
-| needs-human | 2 | 40 |
-| rejects by role | spec-conformance 1, qa 1 | correctness 2, architecture 1, spec-conformance 11, qa 4 |
-| reviewer overlap | 0.50 (1/2, runs 3) | 0.33 (7/21, runs 34) |
-| unique findings by role | qa 1 | correctness 4, architecture 1, spec-conformance 6, qa 3 |
-| qa na ratio | 0.22 (5/23 claims, na-heavy 1/3 approvals) | 0.05 (9/172 claims, na-heavy 1/20 approvals) |
-| cost (usd) | 53.69 | 615.83 |
-| tokens | input 3848560 / output 44590 | input 52275238 / output 718796 |
-| retro cost (usd) | 2.23 | 16.92 |
-| retro tokens | input 3 / output 1381 | input 29 / output 9982 |
-| full retros | — | 10 |
+| merged | 1 | 21 |
+| review rounds avg | 2 | 1.62 |
+| rounds/issue (plan/impl/review) | 1 / 2 / 2 | 1 / 2.38 / 1.62 |
+| escaped defects | 1 (#115×1) | 13 |
+| revert rate | 0.00 (0/1) | 0.00 (0/21) |
+| needs-human | 5 | 45 |
+| rejects by role | spec-conformance 1 | correctness 2, architecture 1, spec-conformance 12, qa 4 |
+| reviewer overlap | 0.00 (0/2, runs 3) | 0.30 (7/23, runs 37) |
+| unique findings by role | spec-conformance 2 | correctness 4, architecture 1, spec-conformance 8, qa 3 |
+| qa na ratio | 0.00 (0/14 claims, na-heavy 0/2 approvals) | 0.05 (9/186 claims, na-heavy 1/22 approvals) |
+| cost (usd) | 49.55 | 665.38 |
+| tokens | input 5183483 / output 44797 | input 57458721 / output 763593 |
+| retro cost (usd) | 2.08 | 19.00 |
+| retro tokens | input 3 / output 1649 | input 32 / output 11631 |
+| full retros | — | 11 |
 
 ### Rounds per issue (this window)
 
 | issue | plan | implement | review | escaped |
 | --- | --- | --- | --- | --- |
-| #114 | 1 | 2 | 2 | 1 |
-| #108 | 1 | 1 | 1 | 0 |
+| #115 | 1 | 2 | 2 | 1 |
 
 ### Phase-2 gate baseline (this session)
 
@@ -53,7 +52,7 @@
 ```json
 {
   "cursor": {
-    "last_retro_at": "2026-10-02T09:07:11.512Z",
+    "last_retro_at": "2026-10-02T16:30:27.517Z",
     "last_record_offsets": {}
   },
   "merges_since": 0,
@@ -799,6 +798,71 @@
       ],
       "n_before": 2,
       "n_after": 1
+    },
+    {
+      "at": "2026-10-02T16:30:27.517Z",
+      "yield": 0,
+      "needs_human_since": 5,
+      "applied": [
+        {
+          "step": "feedback-route",
+          "issues": [
+            115
+          ],
+          "actions": [
+            {
+              "kind": "warning",
+              "step": "feedback-route",
+              "login": "LeeHyeonKyu",
+              "current": "bot-hk",
+              "reason": "current factory identity: bot-hk (machine user/app, viewer); older runs in this window ran under a shared identity (LeeHyeonKyu) — their human decisions are unverifiable, nothing to register"
+            },
+            {
+              "kind": "product",
+              "step": "feedback-route",
+              "issue": 115,
+              "count": 2
+            }
+          ]
+        },
+        {
+          "step": "lessons:factory-builder",
+          "added": [
+            "L-2026-10-02-01",
+            "L-2026-10-02-02"
+          ],
+          "rejected": [],
+          "evicted": [],
+          "cited": []
+        },
+        {
+          "step": "role:plan-skeptic",
+          "added": [],
+          "deferred": [
+            {
+              "kind": "good",
+              "text": "위치: #114 plan dissent (deferred delete failure path). 주장: grace period 후 서버 DELETE가 실패(네트워크 에러, 5xx)하면 이벤트는 이미 UI에서 숨겨졌고 _pendingDeleteTimers에서도 제거됐으므로 복구 경로가 없다 — 사용자는 삭제됐다고 믿지만 다음 loadEvents에서 이벤트가 재출현한다. 근거: qa 리뷰어가 round 1에서 이 정확한 시나리오를 독립적으로 must_fix로 올렸다(callback이 await deleteEvent(id) 전에 stash를 지움). 이 dissent가 plan에서 그 위험을 먼저 짚었다.",
+              "reason": "insufficient-evidence"
+            },
+            {
+              "kind": "good",
+              "text": "위치: #114 plan dissent (non_goals vs open_risks 모순). 주장: non_goal이 'single pending delete is sufficient'라 하고 open_risk가 'must track multiple pending IDs and timers'라 하여 모순한다 — naive single-timer 구현은 두 번째 deleteEventDeferred(B) 호출 시 첫 번째(A) 타이머를 취소해 이벤트 A가 서버에 남지만 UI에서 숨겨진다. 근거: calendar_provider.dart에 multi-timer 패턴이 없고 done_when dw1-dw3이 전부 single-event 시나리오만 테스트해 가장 흔한 사용 패턴(연속 삭제)을 plan이 검증에서 제외했다.",
+              "reason": "insufficient-evidence"
+            }
+          ]
+        },
+        {
+          "step": "publish-lessons",
+          "pr": 126,
+          "merged": false,
+          "reason": "timeout",
+          "files": [
+            ".factory/lessons/factory-builder.md"
+          ]
+        }
+      ],
+      "n_before": 1,
+      "n_after": 1
     }
   ],
   "candidates": {
@@ -978,6 +1042,110 @@
           114
         ],
         "source": "must_fix"
+      },
+      {
+        "role": "spec-conformance",
+        "text": "dw1 is not met. The test reproduces authLimiter 429 accumulation, not the 200 {} symptom. dw1 text: 'reproduces the exact condition that causes POST /api/auth/register to return 200 {} instead of 201'. Plan dissent d2 warned about exactly this substitution.",
+        "runs": [
+          124
+        ],
+        "source": "must_fix"
+      },
+      {
+        "role": "spec-conformance",
+        "text": "dw3 is not met by the diff. dw3 requires a Root Cause naming the exact file:line that produces the phantom 200 {}. The only root-cause text in the diff is the test header comment, which names authLimiter at app.ts:51-57, and that code produces 429 and cannot produce 200 {}.",
+        "runs": [
+          124
+        ],
+        "source": "must_fix"
+      },
+      {
+        "role": "spec-conformance",
+        "text": "dw2 is unconfirmed. The text requires 20 consecutive GREEN full-suite runs, and the gate threshold is 3 (new_test_repeats=3).",
+        "runs": [
+          124
+        ],
+        "source": "must_fix"
+      },
+      {
+        "role": "qa",
+        "text": "The claimed root cause (authLimiter exhaustion) does not match the reported symptom. A tripped express-rate-limit answers 429, but issue #124 reports 'expected 201, got 200 — {}'. The regression test would fail with 429 on unpatched code, so it proves a different bug from the one reported. The 200 {} cause is unexplained, and the flake may persist after this change.",
+        "runs": [
+          124
+        ],
+        "source": "must_fix"
+      },
+      {
+        "role": "qa",
+        "text": "I could not reproduce any done_when item. server/node_modules is missing and QA may not install packages, so dw1, dw2 (20x stability) and dw3 are all marked not_applicable. qa-evidence finish reports the coverage as INCOMPLETE. An unverified approve is not acceptable.",
+        "runs": [
+          124
+        ],
+        "source": "must_fix"
+      },
+      {
+        "role": "spec-conformance",
+        "text": "dw1 is not met. The test reproduces authLimiter 429 accumulation, not the 200 {} condition. The test id claims 'never_answers_200_empty' but the failure it guards on base is a 429.",
+        "runs": [
+          124
+        ],
+        "source": "must_fix"
+      },
+      {
+        "role": "spec-conformance",
+        "text": "dw3 is not met. The diff identifies no file:line that emits 200 {}. It says the mechanism is 'unidentified'. The escape hatch (dissent d1/d3) covers a root cause that sits in NEVER_AUTOMATE code, not one that was never found, so the change cannot cite it.",
+        "runs": [
+          124
+        ],
+        "source": "must_fix"
+      },
+      {
+        "role": "spec-conformance",
+        "text": "dw2 is not met. The text requires 20 consecutive GREEN runs with zero intermittent failures; the only evidence is the gate's 3 repeats, and the implement handoff itself reports 18/20 GREEN with 2 REDs (a 401 {} in family.test.ts and an ETIMEDOUT in holidays.test.ts).",
+        "runs": [
+          124
+        ],
+        "source": "must_fix"
+      },
+      {
+        "role": "qa",
+        "text": "dw1 is not met. The test reproduces a 429 from authLimiter, not the reported `200 {}`. The test header says the 200 {} mechanism is 'unidentified' and 'cannot be traced to application code'. The test's own header (item 2) says vitest isolates each file, so MemoryStore state cannot leak across files. That undercuts the 'register never answers 200 empty' claim and means the fix probably does not address the reported flake. Prove-test passing would only show the 429 hazard is gone.",
+        "runs": [
+          124
+        ],
+        "source": "must_fix"
+      },
+      {
+        "role": "qa",
+        "text": "dw3 is not met. The diff itself states no code path produces 200 {} and defers the cause to a human. The issue requires a code-line root cause, and says 'retry/timeout' is not a fix. Raising the test-mode limit to 10000 is a mitigation that masks the limiter rather than identifying the cause. The issue also says that if the cause is in auth code, the PR should name the lines and stop.",
+        "runs": [
+          124
+        ],
+        "source": "must_fix"
+      },
+      {
+        "role": "qa",
+        "text": "dw2 is unverified. I could not run the suite: server/node_modules is absent and installs are denied to the qa role. No 20-run evidence is available from the diff, and with the cause unidentified a green run does not show the flake is fixed.",
+        "runs": [
+          124
+        ],
+        "source": "must_fix"
+      },
+      {
+        "role": "spec-conformance",
+        "text": "dw1: test_115_duplicate_opens_prefilled_new_form does not measure what dw1 says. The text requires fields pre-filled from the original (title, description, start/end, all-day, calendar, category, categoryId, reminders, private, metadata). The test asserts only the title, the AppBar title, and the absent icons.",
+        "runs": [
+          115
+        ],
+        "source": "must_fix"
+      },
+      {
+        "role": "spec-conformance",
+        "text": "dw2: test_115_duplicate_save_creates_not_updates checks only title in the POST payload. dw2 and the issue require createEvent to be called with a payload of the same fields as the original.",
+        "runs": [
+          115
+        ],
+        "source": "must_fix"
       }
     ],
     "examples": [
@@ -1088,34 +1256,38 @@
       },
       {
         "issue": 111,
-        "reason": "gates RED at merge",
-        "at": "2026-10-02T01:52:28Z"
+        "reason": "blocked (environment/credentials) — needs human",
+        "at": "2026-10-02T16:25:46Z"
+      },
+      {
+        "issue": 124,
+        "reason": "review rounds exhausted (K=2): 6 must_fix remain",
+        "at": "2026-10-02T16:25:25Z"
+      },
+      {
+        "issue": 115,
+        "reason": "gates file status is RED",
+        "at": "2026-10-02T10:53:10Z"
       }
     ]
   },
   "stats": {
-    "merged": 2,
-    "review_rounds_avg": 1.5,
+    "merged": 1,
+    "review_rounds_avg": 2,
     "plan_rounds_avg": 1,
-    "implement_rounds_avg": 1.5,
+    "implement_rounds_avg": 2,
     "rounds_per_issue": [
       {
-        "issue": 114,
+        "issue": 115,
         "plan": 1,
         "implement": 2,
         "review": 2
-      },
-      {
-        "issue": 108,
-        "plan": 1,
-        "implement": 1,
-        "review": 1
       }
     ],
     "escaped_defects": 1,
     "escaped_defects_detail": [
       {
-        "issue": 114,
+        "issue": 115,
         "count": 1
       }
     ],
@@ -1123,83 +1295,82 @@
     "reverted_issues": [],
     "revert_rate": 0,
     "rejects_by_role": {
-      "spec-conformance": 1,
-      "qa": 1
+      "spec-conformance": 1
     },
     "review_runs": 3,
     "findings_total": 2,
-    "overlapping_findings": 1,
+    "overlapping_findings": 0,
     "unique_findings_by_role": {
-      "qa": 1
+      "spec-conformance": 2
     },
-    "overlap_ratio": 0.5,
-    "needs_human": 2,
-    "qa_approvals": 3,
-    "qa_claims_total": 18,
-    "qa_na_total": 5,
-    "qa_na_ratio": 0.22,
-    "qa_na_heavy_approvals": 1,
+    "overlap_ratio": 0,
+    "needs_human": 5,
+    "qa_approvals": 2,
+    "qa_claims_total": 14,
+    "qa_na_total": 0,
+    "qa_na_ratio": 0,
+    "qa_na_heavy_approvals": 0,
     "usage": {
-      "cost_usd": 53.692658,
+      "cost_usd": 49.545761,
       "tokens": {
-        "input": 3848560,
-        "output": 44590
+        "input": 5183483,
+        "output": 44797
       }
     },
     "retro_usage": {
-      "cost_usd": 2.232668,
+      "cost_usd": 2.081267,
       "tokens": {
         "input": 3,
-        "output": 1381
+        "output": 1649
       }
     }
   },
   "stats_total": {
-    "merged": 20,
-    "review_rounds_avg": 1.6,
+    "merged": 21,
+    "review_rounds_avg": 1.62,
     "plan_rounds_avg": 1,
-    "implement_rounds_avg": 2.4,
-    "escaped_defects": 12,
+    "implement_rounds_avg": 2.38,
+    "escaped_defects": 13,
     "reverts": 0,
     "reverted_issues": [],
     "revert_rate": 0,
     "rejects_by_role": {
       "correctness": 2,
       "architecture": 1,
-      "spec-conformance": 11,
+      "spec-conformance": 12,
       "qa": 4
     },
-    "review_runs": 34,
-    "findings_total": 21,
+    "review_runs": 37,
+    "findings_total": 23,
     "overlapping_findings": 7,
     "unique_findings_by_role": {
       "correctness": 4,
       "architecture": 1,
-      "spec-conformance": 6,
+      "spec-conformance": 8,
       "qa": 3
     },
-    "overlap_ratio": 0.33,
-    "needs_human": 40,
-    "qa_approvals": 20,
-    "qa_claims_total": 163,
+    "overlap_ratio": 0.3,
+    "needs_human": 45,
+    "qa_approvals": 22,
+    "qa_claims_total": 177,
     "qa_na_total": 9,
     "qa_na_ratio": 0.05,
     "qa_na_heavy_approvals": 1,
     "usage": {
-      "cost_usd": 615.83094,
+      "cost_usd": 665.376701,
       "tokens": {
-        "input": 52275238,
-        "output": 718796
+        "input": 57458721,
+        "output": 763593
       }
     },
     "retro_usage": {
-      "cost_usd": 16.923627,
+      "cost_usd": 19.004894,
       "tokens": {
-        "input": 29,
-        "output": 9982
+        "input": 32,
+        "output": 11631
       }
     },
-    "retros": 10
+    "retros": 11
   },
   "deferred_proposals": [],
   "deletion_candidates": []
