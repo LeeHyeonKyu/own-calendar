@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:home_widget/home_widget.dart';
@@ -23,6 +24,21 @@ class CalendarProvider extends ChangeNotifier {
   Set<String> _selectedCategories = {
     'WORK', 'PERSONAL', 'FAMILY', 'HEALTH', 'SOCIAL', 'FINANCE', 'OTHER',
   };
+
+  /// Pending deferred deletes: event id -> timer.
+  final Map<String, Timer> _pendingDeleteTimers = {};
+
+  /// Stashed events awaiting deferred delete (for undo restoration).
+  /// Stores the event and its original index in [_events] for
+  /// position-preserving undo (spec1 rework: issue #114 같은 자리로).
+  final Map<String, ({EventModel event, int index})> _pendingDeleteEvents = {};
+
+  /// IDs of events whose deferred delete is pending -- used to filter them
+  /// out of [_events] when [loadEvents] refreshes from the server.
+  /// Derived from [_pendingDeleteEvents] (not [_pendingDeleteTimers]) so that
+  /// events remain filtered during the in-flight API delete window after the
+  /// timer fires but before the API call completes (qa1 rework).
+  Set<String> get _pendingDeleteIds => _pendingDeleteEvents.keys.toSet();
 
   List<CalendarModel> get calendars => _calendars;
   List<EventModel> get events => _events;
@@ -230,7 +246,14 @@ class CalendarProvider extends ChangeNotifier {
       final res = await _api.get('/events${query.isNotEmpty ? "?$query" : ""}');
       if (res.statusCode == 200) {
         final list = jsonDecode(res.body) as List;
-        _events = list.map((j) => EventModel.fromJson(j)).toList();
+        final parsed = list.map((j) => EventModel.fromJson(j)).toList();
+        // Filter out events whose deferred delete is still pending (dw3):
+        // the server still returns them, but the user has locally deleted them.
+        if (_pendingDeleteIds.isNotEmpty) {
+          _events = parsed.where((e) => !_pendingDeleteIds.contains(e.id)).toList();
+        } else {
+          _events = parsed;
+        }
         _error = null;
         _isLoading = false;
         notifyListeners();
@@ -441,5 +464,99 @@ class CalendarProvider extends ChangeNotifier {
 
   List<TaskModel> get unscheduledTasks {
     return _tasks.where((t) => t.scheduledDate == null && t.dueDate == null && t.isTodo).toList();
+  }
+
+  // ─── Deferred delete (#114) ───
+
+  /// Removes the event from the visible list immediately (optimistic) and
+  /// schedules the real API delete after [delay].
+  ///
+  /// If another deferred delete is already pending for a different event,
+  /// both are tracked independently -- the second call does not cancel the
+  /// first (dw5 / dissent-3).
+  ///
+  /// The [delay] parameter exists so tests can inject a custom duration,
+  /// but the default 5-second grace period is the product requirement.
+  void deleteEventDeferred(String id, {Duration delay = const Duration(seconds: 5)}) {
+    // Stash the event and its original index for position-preserving undo
+    // (spec1 rework: issue #114 같은 자리로).
+    final idx = _events.indexWhere((e) => e.id == id);
+    if (idx >= 0) {
+      _pendingDeleteEvents[id] = (event: _events[idx], index: idx);
+      _events.removeAt(idx);
+    }
+
+    // Cancel any existing timer for the same id (idempotency).
+    _pendingDeleteTimers[id]?.cancel();
+
+    // Schedule the actual API delete. The callback is async so we can await
+    // deleteEvent and handle failures (qa1 rework).
+    _pendingDeleteTimers[id] = Timer(delay, () async {
+      _pendingDeleteTimers.remove(id);
+      // Keep _pendingDeleteEvents[id] during the API call so that
+      // _pendingDeleteIds still filters the event from loadEvents results
+      // (qa1 rework: in-flight filtering).
+      try {
+        final success = await deleteEvent(id);
+        if (success) {
+          // API delete succeeded -- clean up stash.
+          _pendingDeleteEvents.remove(id);
+        } else {
+          // API returned non-204 -- restore the event (qa1 rework).
+          _restoreStashedEvent(id);
+        }
+      } catch (e) {
+        // Network error or other exception -- restore the event (qa1 rework).
+        _restoreStashedEvent(id);
+        debugPrint('deleteEventDeferred: API delete failed for $id: $e');
+      }
+    });
+
+    notifyListeners();
+  }
+
+  /// Restores a stashed event to [_events] at its original position (clamped)
+  /// and notifies listeners. Used by the timer callback on API failure.
+  void _restoreStashedEvent(String id) {
+    final stash = _pendingDeleteEvents.remove(id);
+    if (stash != null) {
+      final insertIdx = stash.index.clamp(0, _events.length);
+      _events.insert(insertIdx, stash.event);
+      notifyListeners();
+    }
+  }
+
+  /// Cancels a pending deferred delete and restores the event to the
+  /// visible list. If the event is not pending, this is a no-op.
+  void undoDelete(String id) {
+    final timer = _pendingDeleteTimers.remove(id);
+    timer?.cancel();
+
+    final stash = _pendingDeleteEvents.remove(id);
+    if (stash != null) {
+      // Insert at the original position (clamped to current list bounds)
+      // so the event returns to the same slot (spec1 rework: issue #114
+      // 같은 자리로).
+      final insertIdx = stash.index.clamp(0, _events.length);
+      _events.insert(insertIdx, stash.event);
+    }
+
+    notifyListeners();
+  }
+
+  /// Whether there is a pending deferred delete for the given event id.
+  /// Returns true during both the grace period and the in-flight API delete.
+  bool hasPendingDelete(String id) => _pendingDeleteEvents.containsKey(id);
+
+  @override
+  void dispose() {
+    // Cancel all pending timers to avoid calling notifyListeners on a
+    // disposed ChangeNotifier (dissent-4).
+    for (final timer in _pendingDeleteTimers.values) {
+      timer.cancel();
+    }
+    _pendingDeleteTimers.clear();
+    _pendingDeleteEvents.clear();
+    super.dispose();
   }
 }

@@ -259,38 +259,48 @@ class _EventFormScreenState extends State<EventFormScreen> {
   Future<void> _delete() async {
     if (!isEditing) return;
 
-    String? editMode;
     if (_isEditingInstance) {
-      editMode = await showDeleteModeDialog(context);
+      // Recurring-instance deletion: show the existing mode dialog.
+      final editMode = await showDeleteModeDialog(context);
       if (editMode == null) return; // cancelled
+
+      if (!mounted) return;
+      final success = await context.read<CalendarProvider>().deleteEvent(
+        widget.eventId!,
+        editMode: editMode,
+        instanceDate: _originalEvent?.instanceDateString,
+      );
+      if (success && mounted) context.pop();
     } else {
-      final confirmed = await showDialog<bool>(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          title: const Text('일정 삭제'),
-          content: const Text('이 일정을 삭제하시겠습니까?'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('취소'),
-            ),
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, true),
-              child: Text('삭제', style: TextStyle(color: Theme.of(ctx).colorScheme.error)),
-            ),
-          ],
+      // Non-recurring single event: deferred delete with undo (#114).
+      // No confirmation dialog -- pop immediately, show SnackBar with undo.
+      final provider = context.read<CalendarProvider>();
+      final eventId = widget.eventId!;
+
+      // Capture ScaffoldMessenger before pop -- after pop, this widget's
+      // context is no longer mounted and lookups on it would fail.
+      final messenger = ScaffoldMessenger.of(context);
+
+      provider.deleteEventDeferred(eventId);
+
+      if (!mounted) return;
+      context.pop();
+
+      // Show SnackBar on the ScaffoldMessenger that persists after pop
+      // (attached to MaterialApp, not to this screen's Scaffold).
+      messenger.showSnackBar(
+        SnackBar(
+          content: const Text('일정을 삭제했습니다'),
+          duration: const Duration(seconds: 5),
+          action: SnackBarAction(
+            label: '실행 취소',
+            onPressed: () {
+              provider.undoDelete(eventId);
+            },
+          ),
         ),
       );
-      if (confirmed != true) return;
     }
-
-    if (!mounted) return;
-    final success = await context.read<CalendarProvider>().deleteEvent(
-      widget.eventId!,
-      editMode: editMode,
-      instanceDate: _isEditingInstance ? _originalEvent?.instanceDateString : null,
-    );
-    if (success && mounted) context.pop();
   }
 
   @override
