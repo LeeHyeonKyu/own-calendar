@@ -74,6 +74,30 @@ export async function resolveRepo({ run }) {
 export const LABEL_RETRY_DELAYS_MS = [1000, 3000, 9000];
 const realSleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
+/** #195 — the PR-body read/edit bound (the merge stage puts its own, larger bound around the whole evidence step). */
+export const PR_BODY_TIMEOUT_MS = 30 * 1000;
+/**
+ * `start(signal)` bounded by `ms` and by the caller's `signal`: whichever fires first rejects AND aborts the signal handed to
+ * `start` — `run()` kills an aborted child (lib/exec.js), so a timed-out `gh` is ended, not left running to land later. The
+ * timer and the listener never outlive the call.
+ */
+export function bounded(start, { ms, what, signal = null }) {
+  const ac = new AbortController();
+  let timer, onAbort;
+  const stop = new Promise((_, reject) => {
+    const fire = (e) => { ac.abort(e); reject(e); };
+    timer = setTimeout(() => fire(new Error(`${what} timed out after ${ms} ms`)), ms);
+    if (signal) {
+      onAbort = () => fire(signal.reason ?? new Error(`${what} aborted`));
+      if (signal.aborted) onAbort(); else signal.addEventListener("abort", onAbort, { once: true });
+    }
+  });
+  return Promise.race([Promise.resolve().then(() => start(ac.signal)), stop]).finally(() => {
+    clearTimeout(timer);
+    if (signal && onAbort) signal.removeEventListener("abort", onAbort);
+  });
+}
+
 /**
  * 팩토리 자신의 계정 **이름**(값이 아니다) — commit status의 게시자를 대조할 기준(외부 감사 H1b).
  *
@@ -102,7 +126,9 @@ const realSleep = (ms) => new Promise((r) => setTimeout(r, ms));
  * 그래서 `env`는 **필수 주입**이다(`classifyFinding`의 `ownerOf`/`isInstalled`와 같은 규율):
  * 빠뜨리면 던진다. `process.env`라는 기본값은 CLI·워크플로의 **진입점 한 줄**에만 산다.
  */
-export async function resolveFactoryLogins({ gh, env, comments = null, repo = gh?.repo ?? null }) {
+export async function resolveFactoryLogins({ gh, env, comments = null, repo = gh?.repo ?? null, signal = null }) {
+  // #195 — `signal` (optional) reaches the two `gh api user` reads so a caller's bound kills them; absent → the old calls.
+  const viewerOpts = signal ? [{ signal }] : [];
   if (!env || typeof env !== "object") {
     throw new TypeError("resolveFactoryLogins: env is required — pass the caller's env explicitly (`process.env` belongs at the CLI/workflow entry point, not here); reading the ambient environment from inside made this function answer differently on a runner than on a laptop");
   }
@@ -127,7 +153,7 @@ export async function resolveFactoryLogins({ gh, env, comments = null, repo = gh
    */
   if (env.GITHUB_ACTIONS === "true") {
     let viewer;
-    try { viewer = await gh.viewerLogin(); }
+    try { viewer = await gh.viewerLogin(...viewerOpts); }
     catch (e) { return { ok: false, reason: `gh api user failed — ${e?.message || e}` }; }
     logins.push(viewer);
     /**
@@ -135,7 +161,7 @@ export async function resolveFactoryLogins({ gh, env, comments = null, repo = gh
      * 한 번(런당 한 번 도는 함수다). 이 호출의 실패는 `ok`를 바꾸지 않는다: 로그인 목록은 이미
      * 손에 있고, 못 읽은 것은 "사람 계정인지 모른다"일 뿐이다(`personal: null`).
      */
-    try { candidates.push({ login: viewer, type: await gh.viewerType?.() ?? null }); }
+    try { candidates.push({ login: viewer, type: await gh.viewerType?.(...viewerOpts) ?? null }); }
     catch { candidates.push({ login: viewer, type: null }); }
   }
 
@@ -265,6 +291,8 @@ export function makeGh({ run, repo, sleep = realSleep }) {
     }
   }
   return {
+    /** #208 dw2 — the `owner/name` every call here targets; the PR evidence builds its fixing-commit links from it. */
+    repo,
     async issue(n) {
       const j = JSON.parse(await gh(["issue", "view", String(n), "-R", repo, "--json", "number,title,body,labels"]));
       return { number: j.number, title: j.title, body: j.body || "", labels: (j.labels || []).map((l) => l.name) };
@@ -329,9 +357,10 @@ export function makeGh({ run, repo, sleep = realSleep }) {
      * **권한**으로 읽으므로(그 한 줄이 상류 저장소 쓰기를 연다) 작성자가 판정의 일부여야 한다.
      * 필드는 응답에 이미 있었고 이 어댑터가 떨어뜨리고 있었을 뿐이다 — 추가 호출은 없다.
      */
-    async comments(n) {
+    async comments(n, { signal = null } = {}) {
       // --paginate 단독은 페이지 배열을 이어붙여 깨진 JSON을 만든다. --slurp이 [[page],[page]]로 감싸주므로 flat()으로 편다.
-      const j = JSON.parse(await gh(["api", `repos/${repo}/issues/${n}/comments?per_page=100`, "--paginate", "--slurp"])).flat();
+      // #195 — `signal` (optional) kills the gh child when the caller's bound fires; absent → exactly the old call.
+      const j = JSON.parse(await gh(["api", `repos/${repo}/issues/${n}/comments?per_page=100`, "--paginate", "--slurp"], signal ? { signal } : {})).flat();
       /**
        * T5 재리뷰 SF-A — `authorType`/`viaApp`은 GitHub이 **계정에** 붙인 사실이지 본문이 아니다.
        * 로그인 이름은 코멘트를 적는 쪽이 고를 수 없지만 본문은 고를 수 있으므로(하트비트를 인용해
@@ -345,8 +374,8 @@ export function makeGh({ run, repo, sleep = realSleep }) {
         viaApp: c.performed_via_github_app ? (c.performed_via_github_app.slug ?? c.performed_via_github_app.name ?? true) : null,
       }));
     },
-    async comment(n, body) {
-      return (await gh(["issue", "comment", String(n), "-R", repo, "--body-file", "-"], { input: body })).trim();
+    async comment(n, body, { signal = null } = {}) {
+      return (await gh(["issue", "comment", String(n), "-R", repo, "--body-file", "-"], { input: body, ...(signal ? { signal } : {}) })).trim();
     },
     async addLabels(n, labels) {
       if (!labels.length) return;
@@ -419,9 +448,13 @@ export function makeGh({ run, repo, sleep = realSleep }) {
       const out = await gh(args, { input: body });
       const m = /\/pull\/(\d+)/.exec(out); return m ? Number(m[1]) : null;
     },
-    async patchComment(commentId, body) {
+    /**
+     * The one PATCH path for an issue comment (heartbeat edits; #195's marked evidence comment on a merge rerun). #195 — an
+     * optional `signal` kills the gh child when the caller's bound fires; absent → exactly the old call. No retry.
+     */
+    async patchComment(commentId, body, { signal = null } = {}) {
       // --input stdin JSON avoids -f treating a leading "@" in body as a file reference
-      await gh(["api", "-X", "PATCH", `repos/${repo}/issues/comments/${commentId}`, "--input", "-"], { input: JSON.stringify({ body }) });
+      await gh(["api", "-X", "PATCH", `repos/${repo}/issues/comments/${commentId}`, "--input", "-"], { input: JSON.stringify({ body }), ...(signal ? { signal } : {}) });
     },
     /**
      * 이 라벨이 붙은 이슈들. 기본은 **열린 것만** — sweeper의 모든 팔과 back-pressure가 묻는 것은
@@ -565,6 +598,17 @@ export function makeGh({ run, repo, sleep = realSleep }) {
       // 해시는 이 필드에 실려 온다(`factory/rehearsal` context).
       return j.map((s) => ({ context: s.context, state: s.state, description: s.description ?? null, creatorLogin: s.creator?.login ?? null, createdAt: s.created_at }));
     },
+    /**
+     * #179 (ADR-033) — 이슈에 `label`이 **붙은** 이벤트 전부(`[{login, at}]`, 오래된 순). 라벨 목록은 누가 붙였는지도, 붙였다
+     * 뗀 일도 말하지 않는다 — 거부권 창은 둘 다 알아야 한다(붙였다 뗀 거부권도 거부권이다). 행위자가 없는 이벤트는 login null.
+     * 실패는 삼키지 않는다: 호출자가 "거부권 없음"이 아니라 판정 불가로 받는다.
+     */
+    async labelEvents(n, label) {
+      const j = JSON.parse(await gh(["api", `repos/${repo}/issues/${n}/events?per_page=100`, "--paginate", "--slurp"])).flat();
+      return j
+        .filter((e) => e?.event === "labeled" && e?.label?.name === label)
+        .map((e) => ({ login: e.actor?.login ?? null, at: e.created_at ?? null }));
+    },
     async listSecrets() {
       return JSON.parse(await gh(["secret", "list", "-R", repo, "--json", "name"])).map((s) => s.name);
     },
@@ -622,6 +666,21 @@ export function makeGh({ run, repo, sleep = realSleep }) {
       await gh(["pr", "ready", String(pr), "-R", repo]);
     },
     /**
+     * #195 — the PR body, read right before the runner rewrites its evidence section (read-modify-write). Bounded by a
+     * timeout and never retried: the caller sits right before a merge or a hand-off, and a slow GitHub must not hold it.
+     */
+    async prBody(pr, { timeoutMs = PR_BODY_TIMEOUT_MS, signal = null } = {}) {
+      const out = await bounded((s) => gh(["pr", "view", String(pr), "-R", repo, "--json", "body"], { signal: s }), { ms: timeoutMs, what: "gh pr view --json body", signal });
+      return JSON.parse(out).body ?? "";
+    },
+    /**
+     * #195 — replace the PR body. The body goes on stdin (`--body-file -`), never into argv. Timeout, no retry. A timeout or
+     * the caller's abort kills the `gh` child (so the edit cannot land after the caller moved on).
+     */
+    async editPrBody(pr, body, { timeoutMs = PR_BODY_TIMEOUT_MS, signal = null } = {}) {
+      await bounded((s) => gh(["pr", "edit", String(pr), "-R", repo, "--body-file", "-"], { input: body, signal: s }), { ms: timeoutMs, what: "gh pr edit --body-file", signal });
+    },
+    /**
      * ADR-021 — 두 배우 모드의 승인 한 번. **머지 배우의 토큰으로만** 의미가 있다: PR을 연 계정
      * (에이전트 배우)이 이걸 부르면 GitHub이 422(`Can not approve your own pull request`)로 거부하고,
      * 그 거부가 곧 이 설계가 증명하려는 사실이다 — 에이전트가 쥔 토큰으로는 승인도, 따라서 머지도
@@ -634,8 +693,9 @@ export function makeGh({ run, repo, sleep = realSleep }) {
      * ADR-021 doctor — **지금 이 토큰이 누구인가**. 값은 절대 찍지 않고 로그인 이름만 돌려준다.
      * `gh api user`는 PAT이 붙은 계정을 그대로 말한다(GitHub App 설치 토큰이면 `<app>[bot]`).
      */
-    async viewerLogin() {
-      return JSON.parse(await gh(["api", "user"])).login;
+    async viewerLogin({ signal = null } = {}) {
+      // #195 — `signal` (optional) kills the gh child when the caller's bound fires; absent → exactly the old call.
+      return JSON.parse(await gh(["api", "user"], signal ? { signal } : {})).login;
     },
     /**
      * T7 — **이 토큰이 붙은 계정의 종류**(`User`|`Organization`|`Bot`). 값(토큰)은 절대 읽지도 찍지도
@@ -643,8 +703,8 @@ export function makeGh({ run, repo, sleep = realSleep }) {
      * 코멘트가 팩토리의 코멘트와 구별되지 않아 `human-decision:v1` 귀속이 통째로 불가능해진다.
      * 빈 응답은 `null`("모른다")이다 — 빈 문자열을 종류로 읽으면 거짓 판정이 된다.
      */
-    async viewerType() {
-      return (await gh(["api", "user", "--jq", ".type"])).trim() || null;
+    async viewerType({ signal = null } = {}) {
+      return (await gh(["api", "user", "--jq", ".type"], signal ? { signal } : {})).trim() || null;
     },
     /** 1.4.2 — 임의 계정의 종류(`User`|`Organization`|`Bot`), 없으면 null. doctor가 `FACTORY_BOT_LOGIN`의 계정을 본다. */
     async userType(login) {
@@ -705,9 +765,17 @@ export function makeGh({ run, repo, sleep = realSleep }) {
     async collaboratorPermission(login) {
       return JSON.parse(await gh(["api", `repos/${repo}/collaborators/${login}/permission`])).permission;
     },
-    async mergePr(pr, { method = "squash", deleteBranch = true } = {}) {
+    /**
+     * `matchHeadCommit`(#179): 주면 `--match-head-commit <sha>` — 그 사이 PR head가 움직였으면 GitHub이 머지를 거부한다.
+     * sha 모양(7–40자 hex)이 아니면 던진다: 고정하지 못한 머지를 고정한 척 내보내지 않는다.
+     */
+    async mergePr(pr, { method = "squash", deleteBranch = true, matchHeadCommit } = {}) {
+      if (matchHeadCommit !== undefined && !/^[0-9a-f]{7,40}$/.test(String(matchHeadCommit))) {
+        throw new Error(`mergePr: matchHeadCommit must be a commit sha — got ${JSON.stringify(matchHeadCommit)}`);
+      }
       const args = ["pr", "merge", String(pr), "-R", repo, `--${method}`];
       if (deleteBranch) args.push("--delete-branch");
+      if (matchHeadCommit !== undefined) args.push("--match-head-commit", String(matchHeadCommit));
       await gh(args);
     },
     async closeIssue(n, comment) {
@@ -730,6 +798,27 @@ export function makeGh({ run, repo, sleep = realSleep }) {
       args.push("--json", "number,title,body,headRefName,updatedAt");
       const j = JSON.parse(await gh(args));
       return j.map((p) => ({ number: p.number, title: p.title, body: p.body ?? "", headRefName: p.headRefName, updatedAt: p.updatedAt }));
+    },
+    /**
+     * #201 — 이 저장소(fork 제외)에서 head 브랜치가 `prefix`로 시작하는 **열린** PR들, 번호 내림차순(최근 것이 먼저).
+     * retro가 "이미 열린 lessons/제안 PR"을 찾아 제자리에서 갱신하는 자리다. `prList`와 따로 두는 이유: lessons PR에는
+     * 거를 라벨이 없어 전체 목록을 봐야 하고, gh의 기본 `--limit`(30)에 기대면 열린 PR이 30개를 넘는 순간 그 PR이
+     * 목록 밖으로 밀려 PR이 다시 쌓인다. `headRefOid`는 force-with-lease의 기대값 후보, `isCrossRepository`는 fork
+     * PR(같은 이름의 남의 브랜치)을 retro가 retitle·코멘트하지 않도록 거르는 데 쓴다.
+     */
+    async openPrsByHeadPrefix(prefix, { limit = 500 } = {}) {
+      const j = JSON.parse(await gh(["pr", "list", "-R", repo, "--state", "open", "--limit", String(limit), "--json", "number,title,headRefName,headRefOid,isCrossRepository"]));
+      return j
+        .filter((p) => !p.isCrossRepository && String(p.headRefName ?? "").startsWith(prefix))
+        .sort((a, b) => b.number - a.number)
+        .map((p) => ({ number: p.number, title: p.title, headRefName: p.headRefName, headRefOid: p.headRefOid }));
+    },
+    /**
+     * #201 — 열린 PR의 제목과 본문을 바꾼다. 본문은 `editPrBody`처럼 stdin(`--body-file -`)으로만 넘긴다 — argv에
+     * 넣으면 `>`로 시작하는 줄 하나가 셸·훅에서 리다이렉션으로 읽힌다. 실패는 삼키지 않는다(호출자가 판단한다).
+     */
+    async editPr(pr, { title, body }) {
+      await gh(["pr", "edit", String(pr), "-R", repo, "--title", title, "--body-file", "-"], { input: body });
     },
   };
 }
