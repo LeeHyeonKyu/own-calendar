@@ -5,15 +5,13 @@ import 'package:home_widget/home_widget.dart';
 import '../models/calendar.dart';
 import '../models/event.dart';
 import '../models/task.dart';
-import '../providers/auth_provider.dart';
 import '../services/api_service.dart';
 
 class CalendarProvider extends ChangeNotifier {
-  CalendarProvider({ApiService? api, this.authProvider})
+  CalendarProvider({ApiService? api})
       : _api = api ?? ApiService();
 
   final ApiService _api;
-  final AuthProvider? authProvider;
   List<CalendarModel> _calendars = [];
   List<EventModel> _events = [];
   List<EventModel> _familyEvents = [];
@@ -263,14 +261,12 @@ class CalendarProvider extends ChangeNotifier {
         _isLoading = false;
         notifyListeners();
         debugPrint('loadEvents: non-200 response (${res.statusCode})');
-        authProvider?.verifySession();
       }
     } catch (e) {
       _error = e.toString();
       _isLoading = false;
       notifyListeners();
       debugPrint('loadEvents: exception: $e');
-      authProvider?.verifySession();
     }
   }
 

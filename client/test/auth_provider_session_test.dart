@@ -1,15 +1,14 @@
 import 'dart:convert';
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:own_calendar/providers/auth_provider.dart';
 import 'package:own_calendar/services/api_service.dart';
 
-/// In-memory fake [ApiService] for session verification tests.
+/// In-memory fake [ApiService] for session expiry tests.
 ///
-/// Supports configurable token presence and throwing on storage reads
-/// to simulate iOS keychain lock scenarios (dw2).
+/// Supports configurable token presence and allows triggering the
+/// onSessionExpired callback that AuthProvider wires up.
 class _FakeApiService implements ApiService {
   _FakeApiService({
     String? access,
@@ -25,21 +24,11 @@ class _FakeApiService implements ApiService {
   String? _access;
   String? _refresh;
   String? _cachedUser;
-  bool throwOnAccessToken = false;
-  bool throwOnRefreshToken = false;
 
   @override
-  Future<String?> get accessToken async {
-    if (throwOnAccessToken) throw Exception('Keychain locked');
-    return _access;
-  }
-
+  Future<String?> get accessToken async => _access;
   @override
-  Future<String?> get refreshToken async {
-    if (throwOnRefreshToken) throw Exception('Keychain locked');
-    return _refresh;
-  }
-
+  Future<String?> get refreshToken async => _refresh;
   @override
   Future<String?> get cachedUserJson async => _cachedUser;
 
@@ -98,9 +87,16 @@ Future<AuthProvider> _authenticatedProvider(_FakeApiService fake) async {
 }
 
 void main() {
-  group('AuthProvider.verifySession (#108)', () {
-    test('test_108_verify_session_clears_auth', () async {
-      // Arrange: start with a valid session (tokens + cached user present)
+  group('AuthProvider.onSessionExpired (#135)', () {
+    test('constructor wires onSessionExpired callback', () {
+      final fake = _FakeApiService();
+      AuthProvider(api: fake);
+
+      expect(fake.onSessionExpired, isNotNull,
+          reason: 'AuthProvider must wire onSessionExpired in constructor');
+    });
+
+    test('onSessionExpired clears user and notifies listeners', () async {
       final fake = _FakeApiService(
         access: 'access-token-abc',
         refresh: 'refresh-token-xyz',
@@ -112,97 +108,41 @@ void main() {
       );
       final auth = await _authenticatedProvider(fake);
 
-      // Simulate the #106 race: tokens disappear from secure storage
-      // while the app is still running and _user is non-null.
-      fake._access = null;
-      fake._refresh = null;
-
       var notifyCount = 0;
       auth.addListener(() => notifyCount++);
 
-      // Act
-      await auth.verifySession();
+      // Act: simulate ApiService detecting definitive refresh failure
+      fake.onSessionExpired!();
 
       // Assert: session invalidated, listeners notified
       expect(auth.isAuthenticated, isFalse,
-          reason: 'isAuthenticated must be false when both tokens are absent');
+          reason: 'isAuthenticated must be false after onSessionExpired fires');
       expect(auth.user, isNull,
-          reason: '_user must be cleared when tokens are absent');
+          reason: '_user must be cleared when onSessionExpired fires');
       expect(notifyCount, greaterThanOrEqualTo(1),
           reason: 'notifyListeners must fire at least once');
     });
 
-    test('test_108_verify_session_noop_when_only_access_missing', () async {
-      // Edge case: only the access token is gone but refresh remains.
-      // This is not evidence of total token loss (refresh may still recover).
-      final fake = _FakeApiService(
-        access: 'access-token-abc',
-        refresh: 'refresh-token-xyz',
-        cachedUser: jsonEncode({
-          'id': 'u1',
-          'email': 'user@example.com',
-          'name': 'Test User',
-        }),
-      );
-      final auth = await _authenticatedProvider(fake);
+    test('onSessionExpired is safe when user is already null', () async {
+      final fake = _FakeApiService();
+      final auth = AuthProvider(api: fake);
+      await auth.tryRestore();
+      await _drainMicrotasks();
 
-      // Only access token is removed; refresh still present
-      fake._access = null;
-
-      await auth.verifySession();
-
-      expect(auth.isAuthenticated, isTrue,
-          reason: 'Session should remain when refresh token exists');
-    });
-
-    test('test_108_storage_error_keeps_session', () async {
-      // Arrange: authenticated session
-      final fake = _FakeApiService(
-        access: 'access-token-abc',
-        refresh: 'refresh-token-xyz',
-        cachedUser: jsonEncode({
-          'id': 'u1',
-          'email': 'user@example.com',
-          'name': 'Test User',
-        }),
-      );
-      final auth = await _authenticatedProvider(fake);
-      final userBefore = auth.user;
-
-      // Simulate iOS keychain being locked (storage reads throw)
-      fake.throwOnAccessToken = true;
-      fake.throwOnRefreshToken = true;
+      // User is not authenticated
+      expect(auth.isAuthenticated, isFalse);
 
       var notifyCount = 0;
       auth.addListener(() => notifyCount++);
 
-      // Capture debugPrint output to verify operational observability (dw2 rubric)
-      final debugPrintLog = <String>[];
-      final originalDebugPrint = debugPrint;
-      debugPrint = (String? message, {int? wrapWidth}) {
-        if (message != null) debugPrintLog.add(message);
-      };
+      // Act: calling onSessionExpired when already logged out should not crash
+      fake.onSessionExpired!();
 
-      // Act
-      await auth.verifySession();
-
-      // Restore debugPrint before assertions (so test failures print correctly)
-      debugPrint = originalDebugPrint;
-
-      // Assert: session preserved, no notification for unchanged state
-      expect(auth.isAuthenticated, isTrue,
-          reason: 'A storage error must not cause a false logout');
-      expect(auth.user, equals(userBefore),
-          reason: '_user must not change on storage error');
-      expect(notifyCount, 0,
-          reason: 'No listener notification should fire when state is unchanged');
-      // Assert: the failure is logged via debugPrint for operational observability
-      expect(debugPrintLog, contains(contains('verifySession: storage read failed:')),
-          reason: 'Storage read failure must be logged via debugPrint (dw2 rubric)');
+      // notifyListeners is still called (idempotent), but no crash
+      expect(auth.isAuthenticated, isFalse);
     });
 
-    test('test_108_verify_session_idempotent_after_clear', () async {
-      // Calling verifySession twice after tokens are gone should be safe
+    test('onSessionExpired called twice is idempotent', () async {
       final fake = _FakeApiService(
         access: 'access-token-abc',
         refresh: 'refresh-token-xyz',
@@ -213,20 +153,17 @@ void main() {
         }),
       );
       final auth = await _authenticatedProvider(fake);
-      fake._access = null;
-      fake._refresh = null;
 
-      await auth.verifySession();
+      // First call
+      fake.onSessionExpired!();
       expect(auth.isAuthenticated, isFalse);
 
-      // Second call: _user is already null, should be a no-op
+      // Second call: should not crash, state remains cleared
       var notifyCount = 0;
       auth.addListener(() => notifyCount++);
 
-      await auth.verifySession();
+      fake.onSessionExpired!();
       expect(auth.isAuthenticated, isFalse);
-      expect(notifyCount, 0,
-          reason: 'Second call with _user already null should not notify');
     });
   });
 }

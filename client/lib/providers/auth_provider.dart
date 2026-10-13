@@ -6,9 +6,20 @@ import '../models/user.dart';
 import '../services/api_service.dart';
 
 class AuthProvider extends ChangeNotifier {
-  AuthProvider({ApiService? api}) : _api = api ?? ApiService();
+  AuthProvider({ApiService? api}) : _api = api ?? ApiService() {
+    _api.onSessionExpired = _handleSessionExpired;
+  }
 
   final ApiService _api;
+
+  /// Called by ApiService when the refresh token is definitively invalid.
+  /// Clears the user session and notifies listeners so the router redirects
+  /// to the login screen.
+  void _handleSessionExpired() {
+    _user = null;
+    _clearWidgetData();
+    notifyListeners();
+  }
   User? _user;
   bool _isLoading = false;
   bool _isInitialized = false;
@@ -112,26 +123,6 @@ class AuthProvider extends ChangeNotifier {
     await _clearWidgetData();
     _user = null;
     notifyListeners();
-  }
-
-  /// 세션 토큰이 보안 저장소에 여전히 존재하는지 확인한다.
-  /// 두 토큰(access, refresh)이 모두 없으면 세션을 무효화하고 리스너에 통지한다.
-  /// 저장소 읽기가 예외를 던지면(예: iOS 키체인 잠금) 기존 세션을 유지한다 —
-  /// 불확실한 증거로 로그아웃시키는 것이 가장 나쁜 결과이기 때문이다.
-  Future<void> verifySession() async {
-    if (_user == null) return;
-    try {
-      final access = await _api.accessToken;
-      final refresh = await _api.refreshToken;
-      if (access == null && refresh == null) {
-        _user = null;
-        unawaited(_clearWidgetData());
-        notifyListeners();
-      }
-    } catch (e) {
-      // 저장소 읽기 실패 — 기존 세션 유지 (dw2: false logout 방지)
-      debugPrint('verifySession: storage read failed: $e');
-    }
   }
 
   /// 앱 시작 시 1회 호출. 저장된 토큰과 캐시된 user JSON으로 세션을 즉시 복원.

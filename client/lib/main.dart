@@ -110,7 +110,7 @@ class _OwnCalendarAppState extends State<OwnCalendarApp> {
       providers: [
         ChangeNotifierProvider.value(value: widget.authProvider),
         ChangeNotifierProvider.value(value: widget.themeProvider),
-        ChangeNotifierProvider(create: (_) => CalendarProvider(authProvider: widget.authProvider)),
+        ChangeNotifierProvider(create: (_) => CalendarProvider()),
         ChangeNotifierProvider(create: (_) => RoutineProvider()),
         ChangeNotifierProvider(create: (_) => CategoryProvider()),
       ],

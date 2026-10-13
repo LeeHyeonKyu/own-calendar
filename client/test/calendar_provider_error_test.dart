@@ -2,7 +2,6 @@ import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
-import 'package:own_calendar/providers/auth_provider.dart';
 import 'package:own_calendar/providers/calendar_provider.dart';
 import 'package:own_calendar/services/api_service.dart';
 
@@ -60,60 +59,6 @@ class _FakeApiService implements ApiService {
       throw UnimplementedError();
 }
 
-/// Fake [ApiService] for the AuthProvider used in dw6 tests.
-///
-/// Token presence is controllable to verify that verifySession checks it.
-class _FakeAuthApiService implements ApiService {
-  @override
-  void Function()? onSessionExpired;
-
-  String? access;
-  String? refresh;
-
-  _FakeAuthApiService({this.access, this.refresh});
-
-  @override
-  Future<String?> get accessToken async => access;
-  @override
-  Future<String?> get refreshToken async => refresh;
-  @override
-  Future<String?> get cachedUserJson async => null;
-  @override
-  Future<void> saveTokens(String a, String r) async {}
-  @override
-  Future<void> saveCachedUser(String userJson) async {}
-  @override
-  Future<void> clearTokens() async {}
-  @override
-  Future<http.Response> get(String path) async => http.Response('', 500);
-  @override
-  Future<http.Response> post(String path, Map<String, dynamic> body) async =>
-      throw UnimplementedError();
-  @override
-  Future<http.Response> put(String path, Map<String, dynamic> body) async =>
-      throw UnimplementedError();
-  @override
-  Future<http.Response> delete(String path) async =>
-      throw UnimplementedError();
-  @override
-  Future<http.Response> patch(String path,
-          [Map<String, dynamic>? body]) async =>
-      throw UnimplementedError();
-}
-
-/// Subclass of [AuthProvider] that tracks calls to [verifySession].
-class _TrackingAuthProvider extends AuthProvider {
-  _TrackingAuthProvider({required ApiService api}) : super(api: api);
-
-  int verifySessionCallCount = 0;
-
-  @override
-  Future<void> verifySession() async {
-    verifySessionCallCount++;
-    await super.verifySession();
-  }
-}
-
 /// Subclass of [CalendarProvider] that tracks widget update calls.
 ///
 /// Overrides [triggerWidgetUpdates] to count invocations without calling
@@ -121,8 +66,7 @@ class _TrackingAuthProvider extends AuthProvider {
 class _TrackableCalendarProvider extends CalendarProvider {
   _TrackableCalendarProvider({
     required ApiService api,
-    AuthProvider? authProvider,
-  }) : super(api: api, authProvider: authProvider);
+  }) : super(api: api);
 
   int widgetUpdateCallCount = 0;
 
@@ -312,73 +256,5 @@ void main() {
       });
     });
 
-    // -----------------------------------------------------------------------
-    // dw6: verifySession called on failed loadEvents
-    // -----------------------------------------------------------------------
-    group('test_108_verify_session_called_on_failed_load', () {
-      test('non-200 response calls verifySession once', () async {
-        final authFake = _FakeAuthApiService(
-          access: 'token',
-          refresh: 'refresh',
-        );
-        final trackingAuth = _TrackingAuthProvider(api: authFake);
-
-        final calFake = _FakeApiService(
-          onGet: (_) => http.Response('Forbidden', 403),
-        );
-        final provider = CalendarProvider(
-          api: calFake,
-          authProvider: trackingAuth,
-        );
-
-        await provider.loadEvents();
-
-        expect(trackingAuth.verifySessionCallCount, 1,
-            reason:
-                'verifySession must be called exactly once on non-200 response');
-      });
-
-      test('thrown exception calls verifySession once', () async {
-        final authFake = _FakeAuthApiService(
-          access: 'token',
-          refresh: 'refresh',
-        );
-        final trackingAuth = _TrackingAuthProvider(api: authFake);
-
-        final calFake = _FakeApiService();
-        calFake.throwOnGet = true;
-        final provider = CalendarProvider(
-          api: calFake,
-          authProvider: trackingAuth,
-        );
-
-        await provider.loadEvents();
-
-        expect(trackingAuth.verifySessionCallCount, 1,
-            reason:
-                'verifySession must be called exactly once on thrown exception');
-      });
-
-      test('successful load does not call verifySession', () async {
-        final authFake = _FakeAuthApiService(
-          access: 'token',
-          refresh: 'refresh',
-        );
-        final trackingAuth = _TrackingAuthProvider(api: authFake);
-
-        final calFake = _FakeApiService(
-          onGet: (_) => http.Response(_eventsJson([_sampleEvent]), 200),
-        );
-        final provider = CalendarProvider(
-          api: calFake,
-          authProvider: trackingAuth,
-        );
-
-        await provider.loadEvents();
-
-        expect(trackingAuth.verifySessionCallCount, 0,
-            reason: 'verifySession must NOT be called on successful load');
-      });
-    });
   });
 }

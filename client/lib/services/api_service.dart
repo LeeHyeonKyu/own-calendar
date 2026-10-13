@@ -18,7 +18,7 @@ class ApiService {
   static const _kCachedUserKey = 'cachedUser';
 
   /// Called when the refresh token is definitively invalid (401).
-  /// AuthProvider wiring is handled in #135.
+  /// AuthProvider wires this callback in its constructor.
   void Function()? onSessionExpired;
 
   /// Single-flight guard: concurrent 401 retries share one refresh Future.
