@@ -27,24 +27,50 @@ export const holidayService = {
   },
 
   async listSubscriptions(userId: string) {
-    return prisma.holidaySubscription.findMany({
+    let subs = await prisma.holidaySubscription.findMany({
       where: { userId },
       orderBy: { createdAt: 'asc' },
     });
+
+    // Auto-subscribe KR for existing users with no subscriptions
+    if (subs.length === 0) {
+      const created = await prisma.holidaySubscription.create({
+        data: { userId, countryCode: 'KR' },
+      }).catch(() => null);
+      if (created) {
+        subs = [created];
+        // Fetch holidays for the current year
+        const year = new Date().getFullYear();
+        await holidayService.refreshHolidays('KR', year).catch(() => {});
+      }
+    }
+
+    return subs;
   },
 
   async getHolidays(userId: string, year: number, month?: number, countryCode?: string) {
-    const subscriptions = await prisma.holidaySubscription.findMany({
+    let subscriptions = await prisma.holidaySubscription.findMany({
       where: { userId },
     });
 
-    if (subscriptions.length === 0) return [];
+    // Auto-subscribe KR for existing users with no subscriptions
+    if (subscriptions.length === 0) {
+      const created = await prisma.holidaySubscription.create({
+        data: { userId, countryCode: 'KR' },
+      }).catch(() => null);
+      if (created) {
+        subscriptions = [created];
+        await holidayService.refreshHolidays('KR', year).catch(() => {});
+      } else {
+        return [];
+      }
+    }
 
-    let countryCodes = subscriptions.map((s) => s.countryCode);
+    let countryCodes = subscriptions.map((s: { countryCode: string }) => s.countryCode);
 
     // If countryCode filter is provided, narrow to only that country (must be subscribed)
     if (countryCode) {
-      countryCodes = countryCodes.filter((c) => c === countryCode);
+      countryCodes = countryCodes.filter((c: string) => c === countryCode);
       if (countryCodes.length === 0) return [];
     }
 
@@ -102,6 +128,19 @@ export const holidayService = {
   },
 };
 
+// Fixed Korean holidays: month-day pairs for holidays that always fall on the same date.
+// Used to detect alternative (substitute) holidays.
+const FIXED_KOREAN_HOLIDAYS: Record<string, string> = {
+  '01-01': '신정',
+  '03-01': '삼일절',
+  '05-05': '어린이날',
+  '06-06': '현충일',
+  '08-15': '광복절',
+  '10-03': '개천절',
+  '10-09': '한글날',
+  '12-25': '크리스마스',
+};
+
 async function fetchKoreanHolidays(year: number): Promise<Array<{ date: Date; name: string }>> {
   const apiKey = config.koreaHolidayApiKey;
   if (!apiKey) {
@@ -126,12 +165,26 @@ async function fetchKoreanHolidays(year: number): Promise<Array<{ date: Date; na
       for (const item of itemList) {
         if (item.isHoliday !== 'Y') continue;
         const dateStr = String(item.locdate);
+        const m = parseInt(dateStr.substring(4, 6));
+        const d = parseInt(dateStr.substring(6, 8));
         const date = new Date(
           parseInt(dateStr.substring(0, 4)),
-          parseInt(dateStr.substring(4, 6)) - 1,
-          parseInt(dateStr.substring(6, 8)),
+          m - 1,
+          d,
         );
-        holidays.push({ date, name: item.dateName });
+
+        let name: string = item.dateName;
+
+        // Detect alternative (substitute) holidays:
+        // If the name matches a fixed holiday but falls on a different date,
+        // it is an alternative holiday.
+        const dateKey = `${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+        const fixedName = FIXED_KOREAN_HOLIDAYS[dateKey];
+        if (!fixedName && Object.values(FIXED_KOREAN_HOLIDAYS).includes(name)) {
+          name = `대체공휴일 (${name})`;
+        }
+
+        holidays.push({ date, name });
       }
     } catch {
       continue;

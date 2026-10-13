@@ -61,6 +61,11 @@ export const authService = {
       },
     });
 
+    // Auto-subscribe KR holidays for new users
+    await prisma.holidaySubscription.create({
+      data: { userId: user.id, countryCode: 'KR' },
+    }).catch(() => {});
+
     const { accessToken, refreshToken } = generateTokens(user.id);
 
     const expiresMs = parseExpiresIn(config.jwt.refreshExpiresIn);

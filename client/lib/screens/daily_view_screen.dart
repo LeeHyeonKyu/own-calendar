@@ -53,6 +53,7 @@ class _DailyViewScreenState extends State<DailyViewScreen> {
       provider.loadEvents(start: start, end: end),
       provider.loadGroupEvents(start: start, end: end),
       provider.loadTasks(start: start, end: end),
+      provider.loadHolidays(_selectedDate.year, month: _selectedDate.month),
     ]);
   }
 
@@ -108,6 +109,7 @@ class _DailyViewScreenState extends State<DailyViewScreen> {
       body: Column(
         children: [
           _buildWeekStrip(),
+          _buildHolidayBanner(calProvider),
           _buildSubTabs(),
           Expanded(
             child: calProvider.isLoading
@@ -174,6 +176,32 @@ class _DailyViewScreenState extends State<DailyViewScreen> {
             ),
           );
         },
+      ),
+    );
+  }
+
+  Widget _buildHolidayBanner(CalendarProvider calProvider) {
+    final holidays = calProvider.holidaysForDay(_selectedDate);
+    if (holidays.isEmpty) return const SizedBox.shrink();
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: Spacing.lg, vertical: Spacing.sm),
+      color: AppColors.sundayText.withAlpha(25),
+      child: Row(
+        children: [
+          Icon(Icons.celebration, size: 16, color: AppColors.sundayText),
+          const SizedBox(width: Spacing.sm),
+          Expanded(
+            child: Text(
+              holidays.map((h) => h.name).join(', '),
+              style: const TextStyle(
+                fontSize: AppTypography.bodySmall,
+                fontWeight: FontWeight.w600,
+                color: AppColors.sundayText,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

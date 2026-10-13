@@ -66,7 +66,12 @@ class _WeeklyViewScreenState extends State<WeeklyViewScreen> {
     await Future.wait([
       provider.loadEvents(start: _weekStart, end: weekEnd),
       provider.loadGroupEvents(start: _weekStart, end: weekEnd),
+      provider.loadHolidays(_weekStart.year, month: _weekStart.month),
     ]);
+    // If the week spans two months, also load the next month's holidays
+    if (weekEnd.month != _weekStart.month) {
+      await provider.loadHolidays(weekEnd.year, month: weekEnd.month);
+    }
   }
 
   void _changeWeek(int delta) {
@@ -156,7 +161,7 @@ class _WeeklyViewScreenState extends State<WeeklyViewScreen> {
           ? const Center(child: CircularProgressIndicator())
           : Column(
               children: [
-                _buildDayHeaders(days, now, isDark),
+                _buildDayHeaders(days, now, isDark, calProvider),
                 _buildAllDayRow(days, calProvider.allVisibleEvents),
                 Expanded(
                   child: _buildTimeGrid(days, calProvider.allVisibleEvents, now, isDark),
@@ -166,7 +171,7 @@ class _WeeklyViewScreenState extends State<WeeklyViewScreen> {
     );
   }
 
-  Widget _buildDayHeaders(List<DateTime> days, DateTime now, bool isDark) {
+  Widget _buildDayHeaders(List<DateTime> days, DateTime now, bool isDark, CalendarProvider calProvider) {
     return Container(
       decoration: BoxDecoration(
         border: Border(
@@ -196,52 +201,69 @@ class _WeeklyViewScreenState extends State<WeeklyViewScreen> {
                 day.day == now.day;
             final isSunday = day.weekday == DateTime.sunday;
             final isSaturday = day.weekday == DateTime.saturday;
+            final dayHolidays = calProvider.holidaysForDay(day);
+            final isHoliday = dayHolidays.isNotEmpty;
 
-            return Expanded(
-              child: GestureDetector(
-                onTap: () => context.go('/daily', extra: day),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(vertical: 8),
-                  child: Column(
-                    children: [
-                      Text(
-                        DateFormat('E', 'ko').format(day),
+            final headerColor = isToday
+                ? _nowColor
+                : isHoliday
+                    ? Colors.red[400]!
+                    : isSunday
+                        ? Colors.red[400]
+                        : isSaturday
+                            ? Colors.blue[400]
+                            : Colors.grey[500];
+
+            Widget header = GestureDetector(
+              onTap: () => context.go('/daily', extra: day),
+              child: Container(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                child: Column(
+                  children: [
+                    Text(
+                      DateFormat('E', 'ko').format(day),
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w500,
+                        color: headerColor,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Container(
+                      width: 28,
+                      height: 28,
+                      decoration: BoxDecoration(
+                        color: isToday ? _nowColor : null,
+                        shape: BoxShape.circle,
+                      ),
+                      alignment: Alignment.center,
+                      child: Text(
+                        '${day.day}',
                         style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w500,
+                          fontSize: 14,
+                          fontWeight:
+                              isToday ? FontWeight.bold : FontWeight.w500,
                           color: isToday
-                              ? _nowColor
-                              : isSunday
+                              ? Colors.white
+                              : isHoliday
                                   ? Colors.red[400]
-                                  : isSaturday
-                                      ? Colors.blue[400]
-                                      : Colors.grey[500],
+                                  : null,
                         ),
                       ),
-                      const SizedBox(height: 4),
-                      Container(
-                        width: 28,
-                        height: 28,
-                        decoration: BoxDecoration(
-                          color: isToday ? _nowColor : null,
-                          shape: BoxShape.circle,
-                        ),
-                        alignment: Alignment.center,
-                        child: Text(
-                          '${day.day}',
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight:
-                                isToday ? FontWeight.bold : FontWeight.w500,
-                            color: isToday ? Colors.white : null,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
               ),
             );
+
+            if (isHoliday) {
+              header = Tooltip(
+                message: dayHolidays.map((h) => h.name).join(', '),
+                child: header,
+              );
+            }
+
+            return Expanded(child: header);
           }),
           // Right arrow
           SizedBox(

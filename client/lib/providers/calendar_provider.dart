@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../models/calendar.dart';
 import '../models/category.dart';
 import '../models/event.dart';
+import '../models/holiday.dart';
 import '../models/task.dart';
 import '../services/api_service.dart';
 
@@ -22,6 +23,7 @@ class CalendarProvider extends ChangeNotifier {
   List<EventModel> _groupEvents = [];
   List<CategoryModel> _categories = [];
   List<TaskModel> _tasks = [];
+  final List<HolidayModel> _holidays = [];
   bool _isLoading = false;
   String? _error;
   bool _showGroupEvents = true;
@@ -48,6 +50,7 @@ class CalendarProvider extends ChangeNotifier {
   List<EventModel> get groupEvents => _groupEvents;
   List<CategoryModel> get categories => _categories;
   List<TaskModel> get tasks => _tasks;
+  List<HolidayModel> get holidays => _holidays;
   List<EventModel> get allVisibleEvents {
     final merged = _showGroupEvents ? [..._events, ..._groupEvents] : _events;
     if (_hiddenCategoryIds.isEmpty && !_hideUncategorized) {
@@ -271,6 +274,32 @@ class CalendarProvider extends ChangeNotifier {
       _calendars = list.map((j) => CalendarModel.fromJson(j)).toList();
       notifyListeners();
     }
+  }
+
+  Future<void> loadHolidays(int year, {int? month}) async {
+    String query = 'year=$year';
+    if (month != null) query += '&month=$month';
+    final res = await _api.get('/holidays/holidays?$query');
+    if (res.statusCode == 200) {
+      final list = jsonDecode(res.body) as List;
+      final newHolidays = list.map((j) => HolidayModel.fromJson(j)).toList();
+      // Merge: remove holidays for this year+month range, then add new ones
+      if (month != null) {
+        _holidays.removeWhere((h) => h.date.year == year && h.date.month == month);
+      } else {
+        _holidays.removeWhere((h) => h.date.year == year);
+      }
+      _holidays.addAll(newHolidays);
+      notifyListeners();
+    }
+  }
+
+  List<HolidayModel> holidaysForDay(DateTime day) {
+    return _holidays.where((h) =>
+      h.date.year == day.year &&
+      h.date.month == day.month &&
+      h.date.day == day.day
+    ).toList();
   }
 
   /// Called after a successful data load to push widget updates.

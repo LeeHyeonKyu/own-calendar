@@ -110,6 +110,7 @@ class _MonthlyViewScreenState extends State<MonthlyViewScreen> {
     await provider.loadEvents(start: start, end: end);
     await provider.loadGroupEvents(start: start, end: end);
     await provider.loadTasks(start: start, end: end);
+    await provider.loadHolidays(_currentMonth.year, month: _currentMonth.month);
   }
 
   void _previousMonth() {
@@ -173,6 +174,7 @@ class _MonthlyViewScreenState extends State<MonthlyViewScreen> {
     final day = _selectedDay!;
     final dayEvents = _eventsForDay(day, allEvents);
     final dayTasks = _tasksForDay(day, allTasks);
+    final dayHolidays = calProvider.holidaysForDay(day);
     final dateStr = DateFormat('M월 d일 (E)', 'ko').format(day);
     final theme = Theme.of(context);
 
@@ -230,6 +232,28 @@ class _MonthlyViewScreenState extends State<MonthlyViewScreen> {
               ],
             ),
           ),
+          if (dayHolidays.isNotEmpty)
+            Container(
+              width: double.infinity,
+              padding: EdgeInsets.symmetric(horizontal: Spacing.lg, vertical: Spacing.xs),
+              color: AppColors.sundayText.withAlpha(20),
+              child: Row(
+                children: [
+                  Icon(Icons.celebration, size: 14, color: AppColors.sundayText),
+                  SizedBox(width: Spacing.xs),
+                  Expanded(
+                    child: Text(
+                      dayHolidays.map((h) => h.name).join(', '),
+                      style: TextStyle(
+                        fontSize: AppTypography.bodySmall,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.sundayText,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
           Expanded(
             child: (dayEvents.isEmpty && dayTasks.isEmpty)
                 ? Center(
@@ -463,6 +487,8 @@ class _MonthlyViewScreenState extends State<MonthlyViewScreen> {
                           day.day == _selectedDay!.day;
                       final dayEvents = _eventsForDay(day, allEvents);
                       final dayTasks = _tasksForDay(day, allTasks);
+                      final dayHolidays = calProvider.holidaysForDay(day);
+                      final isHoliday = dayHolidays.isNotEmpty;
                       final hasEvents = dayEvents.isNotEmpty;
                       final hasTasks = dayTasks.isNotEmpty;
                       final eventColors = _uniqueEventColors(dayEvents);
@@ -505,41 +531,57 @@ class _MonthlyViewScreenState extends State<MonthlyViewScreen> {
                                       fontWeight: FontWeight.w500,
                                       color: isToday
                                           ? Colors.white
-                                          : col == 0
+                                          : isHoliday
                                               ? AppColors.sundayText
-                                              : col == 6
-                                                  ? AppColors.saturdayText
-                                                  : null,
+                                              : col == 0
+                                                  ? AppColors.sundayText
+                                                  : col == 6
+                                                      ? AppColors.saturdayText
+                                                      : null,
                                     ),
                                   ),
                                 ),
-                                const SizedBox(height: 2),
-                                // Event indicator dots (up to 3 unique colors) + task dot
-                                Row(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    if (hasEvents)
-                                      ...eventColors.map((color) => Container(
-                                            width: 5,
-                                            height: 5,
-                                            margin: const EdgeInsets.symmetric(horizontal: 1),
-                                            decoration: BoxDecoration(
-                                              color: isToday ? Colors.white : color,
-                                              shape: BoxShape.circle,
-                                            ),
-                                          )),
-                                    if (hasTasks)
-                                      Container(
-                                        width: 5,
-                                        height: 5,
-                                        margin: const EdgeInsets.symmetric(horizontal: 1),
-                                        decoration: BoxDecoration(
-                                          color: isToday ? Colors.white70 : AppColors.taskPending,
-                                          shape: BoxShape.circle,
+                                if (isHoliday) ...[
+                                  Text(
+                                    dayHolidays.first.name,
+                                    style: const TextStyle(
+                                      fontSize: 8,
+                                      color: AppColors.sundayText,
+                                      fontWeight: FontWeight.w500,
+                                      height: 1.1,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ] else ...[
+                                  const SizedBox(height: 2),
+                                  // Event indicator dots (up to 3 unique colors) + task dot
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      if (hasEvents)
+                                        ...eventColors.map((color) => Container(
+                                              width: 5,
+                                              height: 5,
+                                              margin: const EdgeInsets.symmetric(horizontal: 1),
+                                              decoration: BoxDecoration(
+                                                color: isToday ? Colors.white : color,
+                                                shape: BoxShape.circle,
+                                              ),
+                                            )),
+                                      if (hasTasks)
+                                        Container(
+                                          width: 5,
+                                          height: 5,
+                                          margin: const EdgeInsets.symmetric(horizontal: 1),
+                                          decoration: BoxDecoration(
+                                            color: isToday ? Colors.white70 : AppColors.taskPending,
+                                            shape: BoxShape.circle,
+                                          ),
                                         ),
-                                      ),
-                                  ],
-                                ),
+                                    ],
+                                  ),
+                                ],
                               ],
                             ),
                           ),
