@@ -124,8 +124,12 @@ export const authService = {
       throw error;
     }
 
-    // Token rotation: delete old token
-    await prisma.refreshToken.delete({ where: { id: stored.id } });
+    // Token rotation: grace period — keep old token valid for 10s so a
+    // concurrent refresh racing with the same token can still succeed.
+    await prisma.refreshToken.update({
+      where: { id: stored.id },
+      data: { expiresAt: new Date(Date.now() + 10_000) },
+    });
 
     const { accessToken, refreshToken: newRefreshToken } = generateTokens(stored.userId);
 

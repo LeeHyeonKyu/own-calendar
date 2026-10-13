@@ -16,6 +16,9 @@ import 'package:own_calendar/services/api_service.dart';
 class _FakeApiService implements ApiService {
   _FakeApiService({this.onGet});
 
+  @override
+  void Function()? onSessionExpired;
+
   /// Callback that determines the response for a GET request.
   /// If null or throws, the test controls the failure path.
   http.Response Function(String path)? onGet;
@@ -61,6 +64,9 @@ class _FakeApiService implements ApiService {
 ///
 /// Token presence is controllable to verify that verifySession checks it.
 class _FakeAuthApiService implements ApiService {
+  @override
+  void Function()? onSessionExpired;
+
   String? access;
   String? refresh;
 

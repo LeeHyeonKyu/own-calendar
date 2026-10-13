@@ -19,6 +19,9 @@ class _FakeApiService implements ApiService {
         _refresh = refresh,
         _cachedUser = cachedUser;
 
+  @override
+  void Function()? onSessionExpired;
+
   String? _access;
   String? _refresh;
   String? _cachedUser;

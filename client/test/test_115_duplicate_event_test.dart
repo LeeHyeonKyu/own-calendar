@@ -18,6 +18,9 @@ import 'package:own_calendar/services/api_service.dart';
 class _FakeApiService implements ApiService {
   _FakeApiService({this.events = const [], this.calendars = const []});
 
+  @override
+  void Function()? onSessionExpired;
+
   List<Map<String, dynamic>> events;
   List<Map<String, dynamic>> calendars;
   final List<String> postPaths = [];

@@ -16,6 +16,9 @@ import 'package:own_calendar/services/api_service.dart';
 class _FakeApiService implements ApiService {
   _FakeApiService({this.events = const []});
 
+  @override
+  void Function()? onSessionExpired;
+
   /// Events the server "holds" -- returned by GET /events.
   List<Map<String, dynamic>> events;
 
@@ -66,6 +69,9 @@ class _FakeApiService implements ApiService {
 /// handling (qa1 rework).
 class _FailableApiService implements ApiService {
   _FailableApiService({this.events = const []});
+
+  @override
+  void Function()? onSessionExpired;
 
   List<Map<String, dynamic>> events;
   final List<String> deletedPaths = [];
@@ -125,6 +131,9 @@ class _FailableApiService implements ApiService {
 /// allowing tests to observe the in-flight window (qa1 rework part b).
 class _SlowDeleteApiService implements ApiService {
   _SlowDeleteApiService({this.events = const [], required this.deleteCompleter});
+
+  @override
+  void Function()? onSessionExpired;
 
   List<Map<String, dynamic>> events;
   final Completer<http.Response> deleteCompleter;

@@ -17,6 +17,13 @@ class ApiService {
   static const _kRefreshTokenKey = 'refreshToken';
   static const _kCachedUserKey = 'cachedUser';
 
+  /// Called when the refresh token is definitively invalid (401).
+  /// AuthProvider wiring is handled in #135.
+  void Function()? onSessionExpired;
+
+  /// Single-flight guard: concurrent 401 retries share one refresh Future.
+  Future<bool>? _refreshInFlight;
+
   Future<String?> get accessToken => _storage.read(key: _kAccessTokenKey);
   Future<String?> get refreshToken => _storage.read(key: _kRefreshTokenKey);
 
@@ -33,10 +40,11 @@ class ApiService {
     await _storage.write(key: _kCachedUserKey, value: userJson);
   }
 
-  /// 토큰 + 캐시된 user + 그 외 secure storage 전체 삭제.
+  /// 토큰만 삭제. 캐시된 user 정보는 유지하여 재로그인 UX에 활용.
   /// refresh 실패로 세션이 무효화될 때 호출된다.
   Future<void> clearTokens() async {
-    await _storage.deleteAll();
+    await _storage.delete(key: _kAccessTokenKey);
+    await _storage.delete(key: _kRefreshTokenKey);
   }
 
   Future<Map<String, String>> _headers() async {
@@ -135,9 +143,22 @@ class ApiService {
     return response;
   }
 
-  Future<bool> _refreshTokens() async {
+  /// Single-flight: concurrent callers share one in-flight refresh Future.
+  Future<bool> _refreshTokens() {
+    _refreshInFlight ??= _doRefresh().whenComplete(() => _refreshInFlight = null);
+    return _refreshInFlight!;
+  }
+
+  /// Performs the actual refresh call.
+  /// - 200: saves new tokens, returns true.
+  /// - 401: definitive failure — clears tokens, signals session expired.
+  /// - 5xx/429/exception: transient — keeps tokens, returns false.
+  Future<bool> _doRefresh() async {
     final refresh = await refreshToken;
-    if (refresh == null) return false;
+    if (refresh == null) {
+      onSessionExpired?.call();
+      return false;
+    }
     try {
       final response = await http.post(
         Uri.parse('$baseUrl/auth/refresh'),
@@ -149,8 +170,17 @@ class ApiService {
         await saveTokens(data['accessToken'], data['refreshToken']);
         return true;
       }
-    } catch (_) {}
-    await clearTokens();
-    return false;
+      if (response.statusCode == 401) {
+        // Definitive: token is invalid/expired — clear and signal
+        await clearTokens();
+        onSessionExpired?.call();
+        return false;
+      }
+      // 5xx, 429, etc. — transient failure, keep tokens
+      return false;
+    } catch (_) {
+      // Network error — transient, keep tokens
+      return false;
+    }
   }
 }

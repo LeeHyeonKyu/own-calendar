@@ -22,6 +22,9 @@ import 'package:own_calendar/widgets/event_card.dart';
 /// Returns controllable responses per path prefix and captures POST/PUT
 /// payloads so tests can inspect the save data.
 class _FakeApiService implements ApiService {
+  @override
+  void Function()? onSessionExpired;
+
   final Map<String, http.Response Function(String)> _getHandlers = {};
   final List<Map<String, dynamic>> capturedPosts = [];
   final List<Map<String, dynamic>> capturedPuts = [];
