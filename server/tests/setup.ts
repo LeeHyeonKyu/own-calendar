@@ -1,12 +1,30 @@
 import dotenv from 'dotenv';
 dotenv.config();
 
+// --- Test DB isolation guard ---
+// 2026-09-09 incident: vitest inside Docker deleted all prod data.
+// Auto-redirect to _test DB if DATABASE_URL does not contain "test".
+const dbUrl = process.env.DATABASE_URL || '';
+if (!dbUrl.includes('_test') && !dbUrl.includes('test') && !process.env.ALLOW_TEST_ON_PROD) {
+  const testDbUrl = dbUrl.replace(/\/([^/?]+)(\?|$)/, '/$1_test$2');
+  process.env.DATABASE_URL = testDbUrl;
+  console.warn(`[TEST SAFETY] Redirected to test DB: ${testDbUrl.replace(/:[^:@]+@/, ':***@')}`);
+}
+
 import { PrismaClient } from '../src/generated/prisma/client';
 import request from 'supertest';
 
 const prisma = new PrismaClient();
 
 beforeEach(async () => {
+  // Double-check: abort if we're about to wipe a non-test DB
+  const url = process.env.DATABASE_URL || '';
+  if (!url.includes('_test')) {
+    throw new Error(`FATAL: beforeEach would run deleteMany() against non-test DB: ${url.replace(/:[^:@]+@/, ':***@')}. Aborting.`);
+  }
+
+  await prisma.eventInvite.deleteMany();
+  await prisma.follow.deleteMany();
   await prisma.event.deleteMany();
   await prisma.externalCalendarConnection.deleteMany();
   await prisma.refreshToken.deleteMany();
