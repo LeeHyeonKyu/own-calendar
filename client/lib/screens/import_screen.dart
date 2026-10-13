@@ -100,6 +100,8 @@ class _ImportScreenState extends State<ImportScreen> {
               icon: const Icon(Icons.file_upload),
               label: Text(_isUploading ? '업로드 중...' : 'ICS 파일 선택'),
               style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.indigo,
+                foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(vertical: 16),
               ),
             ),
