@@ -1,5 +1,7 @@
 import { checkNewTestsFailOnMutation, isWrongReasonRed } from "./mutation-check.js";
 import { q } from "./prove-test.js";
+import { matchesAny } from "./glob.js";
+import { inMirrorFamily } from "./mirror.js";
 
 /**
  * ── Structure B (review-efficiency plan Task 3 / design §4.B) ──────────────────────────────────
@@ -185,6 +187,8 @@ export async function runSelfGate({
   gates = null, run, changedTests = [], changedSources = [],
   mutation = {},           // fs/tmp passthrough for checkNewTestsFailOnMutation (tests inject doubles)
   pins = [],               // Task 5 — regression pins carried from the prior rework round
+  restartBrief = null,     // #174 — { paths, newFiles, error? } computed by run-stage (`restartBriefInput`); null = no restart
+  scope = null,            // #200 — { issue, plan, filesExpected, changes, error? } computed by run-stage (`scopeInput`); null = not wired
 } = {}) {
   const findings = [];
   const ranChecks = [];
@@ -263,7 +267,175 @@ export async function runSelfGate({
     findings.push(...pinFindings);
   }
 
+  // (5) #174 — the K self-restart brief. Runs ONLY when a brief is loaded (no brief → nothing here changes, not even a skip
+  // entry: the result is the same object as before this check existed). A new file — added vs. merge-base AND absent from the
+  // restart head's tree, as run-stage measured it — outside the brief's `where` paths is RED and named. Edits, deletions,
+  // files the PR had already added before the restart, and new files the brief names pass. An unreadable restart head or an
+  // unparsable brief fails CLOSED (blocking), never "everything allowed".
+  if (restartBrief != null) {
+    ranChecks.push("restart-brief");
+    if (restartBrief.error) {
+      findings.push({ check: "restart-brief", blocking: true, detail: `restart brief unusable — ${restartBrief.error} (fail closed: new files cannot be checked against it)` });
+    } else {
+      const allowed = (Array.isArray(restartBrief.paths) ? restartBrief.paths : []).filter((p) => typeof p === "string" && p);
+      // exact paths only — a directory or a prose token in the allow-list must never admit every file under it
+      const inBrief = (f) => allowed.includes(f);
+      for (const f of Array.isArray(restartBrief.newFiles) ? restartBrief.newFiles : []) {
+        if (!inBrief(f)) findings.push({ check: "restart-brief", blocking: true, detail: `new file outside the restart brief: ${f}` });
+      }
+    }
+  }
+
+  // (6) #200 — `scope`: every changed path outside the plan's files_expected carries a `Scope change (#<issue>)` line in the
+  // diff. No scope input (null) → nothing here changes, not even a skip entry. No plan / unusable files_expected → skipped,
+  // visibly (a quality aid, fail open). A git read failure → a non-blocking finding, never a pass and never BLOCKED.
+  if (scope != null) {
+    const why = scopeSkipReason(scope);
+    if (why) skip("scope", why);
+    else {
+      ranChecks.push("scope");
+      if (scope.error) findings.push({ check: "scope", blocking: false, detail: `scope check could not run — ${scope.error}` });
+      else findings.push(...judgeScope(scope));
+    }
+  }
+
   return { ok: !findings.some((f) => f.blocking), findings, ranChecks, skippedChecks };
+}
+
+/**
+ * ── #200 — `scope`: a path outside `files_expected` must carry a "Scope change (#<issue>)" line in the diff ───────────────
+ *
+ * spec-conformance rejected #149·#156·#157·#170·#178 for exactly this, one whole review round each; the check costs one git
+ * read. run-stage (`scopeInput`) reads `git diff --no-renames <merge-base>...HEAD` and hands over every changed path with its
+ * status and ONLY the lines that diff added — removed and context lines never arrive, and a line that reached HEAD by merging
+ * the base branch is not in `<merge-base>...HEAD` at all. This function only judges.
+ *
+ * A path P passes when it is
+ *   · in scope: `glob.js` `matchesAny(files_expected, P)`, or under an entry ending in `/` (a directory prefix — local to
+ *     this check, glob.js is unchanged), or
+ *   · runner-written: `mirror.js` `inMirrorFamily(P)` (the same rule, `.claude/hooks/*.sh` special case included) or under
+ *     `docs/factory/runs/`, or
+ *   · justified in its own added lines: one contains `Scope change (#<issue>)`, or
+ *   · named elsewhere: some added line in the diff contains both the token and P as a whole path (`foo.js.bak` does not name
+ *     `foo.js`). The issue scoped this route to deleted files; the plan widened it to every outside path, because a JSON
+ *     fixture, a lockfile or a binary cannot carry a comment line in its own content.
+ * Anything else is one blocking finding per path, naming the path, the exact line and where it may go.
+ */
+const RUN_RECORDS_PREFIX = "docs/factory/runs/";
+
+/** Why the scope check cannot judge this round, or null when it can. One reader for the dep (which then skips the git
+ * read) and the judge (which records the skip) — the reason text is what the run record's `self-gate-detail` line carries.
+ * Scope change (#200): dw4 names three fail-open cases (no plan, non-array, empty); two more skip the same visible way —
+ * no issue number (dw5: a finding is never said under `#undefined`) and a files_expected entry glob.js cannot match in
+ * bounded time (round-1 must_fix cf1/sec1/spec1/qa1: it hung the self-gate). Each names itself in the skip detail, so the
+ * run record still tells "not checked (and why)" apart from "nothing out of scope". */
+export function scopeSkipReason({ issue, plan, filesExpected } = {}) {
+  if (!plan) return "skipped — no plan handoff in this run's context, so there is no files_expected to check against";
+  if (!Array.isArray(filesExpected)) return "skipped — files_expected is not an array in the plan handoff";
+  if (!filesExpected.some((e) => typeof e === "string" && e.trim())) return "skipped — files_expected is empty in the plan handoff";
+  if (!(Number.isInteger(issue) && issue > 0)) return "skipped — this run carries no issue number to look for";
+  // A malformed entry skips the whole check, visibly (dropping just that entry would turn the paths it meant to cover into
+  // blocking false positives). A skip, not a finding: non-blocking findings are copied into the reviewer handoff (plan
+  // non_goals), and the plan's typo is not the builder's defect.
+  for (const e of filesExpected.filter((x) => typeof x === "string" && x)) {
+    const why = unsafeEntryReason(e);
+    if (why) return `skipped — files_expected entry ${JSON.stringify(e)} ${why}, which glob.js cannot match in bounded time`;
+  }
+  return null;
+}
+
+/** `Scope change (#<issue>)` — the exact token. `(#200)` never matches `(#2000)` or `(#199)`: the closing paren is part of it. */
+export const scopeChangeToken = (issue) => `Scope change (#${issue})`;
+
+/** Is `files_expected` covering `path`? Its globs through glob.js, plus a trailing-`/` entry as a directory prefix. */
+export function inFilesExpected(filesExpected, path) {
+  const entries = (Array.isArray(filesExpected) ? filesExpected : []).filter((e) => typeof e === "string" && e);
+  if (matchesAny(entries, path)) return true;
+  return entries.some((e) => e.endsWith("/") && path.startsWith(e));
+}
+
+/** Why glob.js cannot match this plan-authored `files_expected` entry in bounded time, or null when it can (#200 cf1).
+ * Before #200 globToRegex only saw operator/contract globs; plan entries are LLM- or comment-authored, and glob.js loops
+ * forever on an unclosed `{`, passes a `*`/`?` inside `{…}` to RegExp raw (a SyntaxError for `{*}`, a backtracking quantifier
+ * for `{a*a*}`), and backtracks catastrophically on a run of 3+ `*` or on more than MAX_STAR_RUNS `*` runs (four runs
+ * against a 250-char path already take ~1 s). Decided here WITHOUT calling glob.js, so a bad entry never reaches it. */
+const MAX_STAR_RUNS = 3;
+function unsafeEntryReason(entry) {
+  let open = false, runs = 0;
+  for (let i = 0; i < entry.length; i++) {
+    const ch = entry[i];
+    if (ch === "{" && !open) open = true;
+    else if (ch === "}" && open) open = false;
+    else if (open && (ch === "*" || ch === "?")) return `has a \`${ch}\` inside \`{…}\``;
+    else if (ch === "*") {
+      let n = 1; while (entry[i + n] === "*") n++;
+      if (n > 2) return `has a run of ${n} \`*\``;
+      runs++; i += n - 1;
+    }
+  }
+  if (open) return "has a `{` with no closing `}`";
+  if (runs > MAX_STAR_RUNS) return `has ${runs} \`*\` runs (at most ${MAX_STAR_RUNS})`;
+  return null;
+}
+
+/** A path the runner wrote, never the builder — the mirror families and the run records. */
+export const runnerWrittenPath = (path) => inMirrorFamily(path) || path.startsWith(RUN_RECORDS_PREFIX);
+
+const PATH_CHAR = /[A-Za-z0-9_\-/~]/;
+/** Is `path` at `line[i]` delimited as a whole path? */
+function wholeAt(line, i, path) {
+  const before = i > 0 ? line[i - 1] : "";
+  const after = line[i + path.length] ?? "";
+  const next = line[i + path.length + 1] ?? "";
+  if (before && (PATH_CHAR.test(before) || before === ".")) return false;
+  if (after && PATH_CHAR.test(after)) return false;
+  if (after === "." && next && (PATH_CHAR.test(next) || next === ".")) return false;
+  return true;
+}
+/** Does `line` name `path` as a whole path? The neighbours must not continue a path: `x/foo.js`, `foo.js.bak` and `foo.jsx`
+ * do not name `foo.js`; a sentence's final `.` (end of line or before a space/punctuation) does not count as a continuation.
+ * A space ends a path here, so `others` (the other changed paths) resolve a path with a space: where a longer one of them
+ * is named at the same spot (`docs/my notes.md`), its space-delimited prefix (`docs/my`) is not. */
+export function namesPath(line, path, others = []) {
+  if (!path) return false;
+  const longer = (Array.isArray(others) ? others : []).filter((q) => typeof q === "string" && q.length > path.length && q.startsWith(path));
+  for (let i = line.indexOf(path); i !== -1; i = line.indexOf(path, i + 1)) {
+    if (!wholeAt(line, i, path)) continue;
+    if (longer.some((q) => line.startsWith(q, i) && wholeAt(line, i, q))) continue;
+    return true;
+  }
+  return false;
+}
+
+/** The judgement. `changes`: `[{ path, status, added: string[] }]`. Returns blocking findings, one per unjustified path.
+ * Precondition: `scopeSkipReason` returned null for this input (runSelfGate checks it) — that is what keeps a malformed
+ * plan entry out of glob.js. */
+export function judgeScope({ issue, filesExpected, changes } = {}) {
+  const token = scopeChangeToken(issue);
+  const rows = (Array.isArray(changes) ? changes : []).filter((c) => c && typeof c.path === "string" && c.path);
+  const paths = rows.map((c) => c.path);
+  const names = (l, p) => namesPath(l, p, paths);
+  const addedOf = (c) => (Array.isArray(c.added) ? c.added : []).filter((l) => typeof l === "string");
+  const tokenLines = rows.flatMap((c) => addedOf(c).filter((l) => l.includes(token)));
+  // An own token line justifies its host, whatever other path it also names (dw1) — so the finding below, "carries no … line",
+  // is only ever said of a path whose own added lines truly carry none (review cf1/spec1/qa1).
+  // dw1 over dw2 here, deliberately: dw2's "a reason for one file never silently covers a different file" governs the
+  // named-elsewhere route (a line in file X clears Y only by naming Y). A line in P's OWN diff is not silent about P — it sits
+  // in P's hunk, where spec-conformance reads it; whether its reason holds is that reviewer's call (plan non_goals: "checks
+  // that a line is present, not that the reason holds"). Narrowing it was the round-2 defect cf1/spec1/qa1 rejected.
+  const findings = [];
+  for (const c of rows) {
+    const p = c.path;
+    if (runnerWrittenPath(p) || inFilesExpected(filesExpected, p)) continue;
+    if (addedOf(c).some((l) => l.includes(token))) continue;
+    if (tokenLines.some((l) => names(l, p))) continue;
+    findings.push({
+      check: "scope", blocking: true,
+      // The check name is the summary's prefix (`summarizeFindings` → `scope: <P> is outside …`), so the detail starts at P.
+      detail: `${p} is outside files_expected and carries no "${token}" line — add a line containing "${token}: <why — the done_when, non_goal or must_fix it serves>" to ${p}${c.status === "D" ? " (it is deleted: put the line, naming this path, in another changed file)" : ", or put that line naming this exact path in another changed file (for a deleted, JSON or binary file)"}`,
+    });
+  }
+  return findings;
 }
 
 /**
@@ -293,7 +465,10 @@ export function selfGateDetailLine(result, { runId = null, runnerId = null, ktbV
       blocked: result?.ok === false,
       harness: Boolean(harnessBlock),
       ran: Array.isArray(result?.ranChecks) ? [...result.ranChecks] : [],
-      skipped: (Array.isArray(result?.skippedChecks) ? result.skippedChecks : []).map((s) => ({ check: s.check, reason: s.reason })),
+      // #200 — a `scope` skip also carries its `detail` (which of no plan / empty / non-array files_expected it was): `reason`
+      // alone ("no-input") cannot tell those apart in the record. Other checks keep their two-field entries (readers and the
+      // exact-equality tests on them are unchanged); readers ignore unknown fields.
+      skipped: (Array.isArray(result?.skippedChecks) ? result.skippedChecks : []).map((s) => ({ check: s.check, reason: s.reason, ...(s.check === "scope" && typeof s.detail === "string" ? { detail: s.detail } : {}) })),
     });
   } catch (e) {
     return `${SELF_GATE_DETAIL_PREFIX}unavailable — ${e?.message || e}`;

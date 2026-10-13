@@ -1,16 +1,34 @@
+// Scope change (#208): 기록 경로 규칙(`runRecordPath`)을 writer 옆으로 — #195 arch1. 헤더 파서는 여기 새로 두지 않는다:
+// evidence.js는 형식의 주인인 lib/usage.js `parseRunRecord`로 섹션을 읽는다(#208 plan non_goal — 다섯 번째 파서 금지, dw6).
 import { existsSync, mkdirSync, readFileSync, writeFileSync, appendFileSync } from "node:fs";
 import { join, dirname } from "node:path";
+import { neutralizeRecordLine } from "./usage.js";
 
 const short = (iso) => iso.replace(/^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}):\d{2}(\.\d+)?Z$/, "$1Z"); // 2026-09-08T09:02:00Z → 2026-09-08T09:02Z; already-short values pass through unchanged
 
+/**
+ * #196 rework sec1 — 줄은 **헤더를 세우지 못한다.** 섹션 헤더는 이 함수의 템플릿만 쓴다: `lines`의 원소(에이전트·의존성이 만든
+ * 문구를 옮겨 적을 수 있다)가 개행 + `## <stage> · <ts> · <runner>`를 실으면, 예전에는 그것이 진짜 섹션이 되어 뒤따르는 러너의
+ * `usage:` 줄을 가져갔다(engine-crash 위조·음수 비용). `neutralizeRecordLine`(lib/usage.js — 형식의 주인)이 인용 표시한다.
+ */
 export function appendRunRecord({ root, issue, title = "", stage, runnerId, lines = [], now = new Date().toISOString() }) {
   const p = recordPath({ root, issue, title });
-  appendFileSync(p, `\n## ${stage} · ${short(now)} · ${runnerId}\n${lines.join("\n")}\n`);
+  appendFileSync(p, `\n## ${stage} · ${short(now)} · ${runnerId}\n${lines.map(neutralizeRecordLine).join("\n")}\n`);
   return p;
 }
 
+/**
+ * #195 rework arch1 (#208) — the ONE owner of the run-record path rule (`<root>/docs/factory/runs/<issue>.md`). Pure: it
+ * creates nothing (the writer's `recordPath` below creates the directory and the header; a reader must not). The writer
+ * takes its path from here, and so does run-stage's evidence dep (`makePrEvidenceDeps`), so the evidence step cannot read
+ * a different file from the one `appendRunRecord` wrote.
+ */
+export function runRecordPath({ root, issue }) {
+  return join(root, "docs/factory/runs", `${issue}.md`);
+}
+
 function recordPath({ root, issue, title = "" }) {
-  const p = join(root, "docs/factory/runs", `${issue}.md`);
+  const p = runRecordPath({ root, issue });
   mkdirSync(dirname(p), { recursive: true });
   if (!existsSync(p)) writeFileSync(p, `# Run · #${issue}${title ? " " + title : ""}\n`);
   return p;

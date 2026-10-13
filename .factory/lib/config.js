@@ -109,6 +109,71 @@ export function neverAutomateQualified(body) {
   return out;
 }
 
+/**
+ * #178 (S4a-1, ADR-033) — CHARTER `self_change`: 엔진 저장소의 자기 머지 스위치 두 개와 거부권 창(분).
+ * **없으면 꺼짐**이다 — 기본값이 곧 오늘의 동작(보호 경로 PR은 사람이 머지한다). `merge.human_gate`와 달리 기본값을
+ * 채우는 이유: 여기서는 없는 것과 false가 같은 사실이다(아무도 켜지 않았다 = 꺼져 있다). 아직 아무도 이 값을 읽지 않는다
+ * (merge-stage의 거부권 창은 S4a-2).
+ */
+export const SELF_CHANGE_DEFAULTS = Object.freeze({ auto_merge_non_judge: false, auto_merge_judge: false, veto_minutes: 60 });
+/**
+ * #189 (S4c) — `self_change.breaker`: 자동 머지 회로차단기의 임계. 키는 **`revert_streak` 하나**다(판정 경로 자동 머지의 연속
+ * revert 수). 이슈 초안의 `window`·`bad_ratio`·`cooldown_hours`는 이 엔진이 구현하지 않으므로(plan non_goals — bad-ratio 신호를
+ * 낼 생산자가 없고, 차단기는 사람만 닫는다) **모르는 키로 던진다**: 받아 두고 아무 일도 하지 않는 키는 "켰다고 믿는 소유자"를 만든다.
+ * 블록이 없으면 `parseSelfChange`의 결과에 `breaker` 키 자체가 없고(오늘의 모양 그대로), 임계는 `breakerThresholds`가 채운다.
+ */
+export const BREAKER_DEFAULTS = Object.freeze({ revert_streak: 2 });
+const BREAKER_KEYS = Object.keys(BREAKER_DEFAULTS);
+const SELF_CHANGE_KEYS = [...Object.keys(SELF_CHANGE_DEFAULTS), "breaker"];
+
+/** `self_change.breaker` 블록을 검증해 채운 값(새 객체)을 돌려준다. 모양이 틀리면 설정 오류로 던진다. */
+export function parseBreakerConfig(raw) {
+  if (raw === undefined) return { ...BREAKER_DEFAULTS };
+  if (raw === null || typeof raw !== "object" || Array.isArray(raw)) {
+    throw new Error(`CHARTER self_change.breaker must be a mapping of ${BREAKER_KEYS.join(", ")} — got ${JSON.stringify(raw)}`);
+  }
+  const unknown = Object.keys(raw).filter((k) => !BREAKER_KEYS.includes(k));
+  if (unknown.length) throw new Error(`CHARTER self_change.breaker has unknown key(s) ${unknown.join(", ")} (expected ${BREAKER_KEYS.join(", ")}; the bad-ratio window and cooldown are not implemented — only a person closes the breaker)`);
+  const out = { ...BREAKER_DEFAULTS };
+  if ("revert_streak" in raw) {
+    const v = raw.revert_streak;
+    if (!Number.isInteger(v) || v <= 0) throw new Error(`CHARTER self_change.breaker.revert_streak must be a positive integer — got ${JSON.stringify(v)}`);
+    out.revert_streak = v;
+  }
+  return out;
+}
+
+/** 검증된 `self_change`(또는 없음)에서 차단기 임계를 꺼낸다 — 블록이 없으면 기본값. 언제나 새 객체다. */
+export function breakerThresholds(selfChange) {
+  return parseBreakerConfig(selfChange?.breaker);
+}
+
+/**
+ * `self_change`를 검증해 채운 값을 돌려준다. 모양이 틀린 값(불리언이 아닌 스위치, 양의 정수가 아닌 분, 모르는 키, 맵이 아닌
+ * 값)은 **기본값으로 접지 않고 설정 오류로 던진다** — 조용한 기본값은 "켰다고 믿는 소유자"와 "꺼진 엔진"을 만든다.
+ */
+export function parseSelfChange(raw) {
+  if (raw === undefined) return { ...SELF_CHANGE_DEFAULTS };
+  if (raw === null || typeof raw !== "object" || Array.isArray(raw)) {
+    throw new Error(`CHARTER self_change must be a mapping of ${SELF_CHANGE_KEYS.join(", ")} — got ${JSON.stringify(raw)}`);
+  }
+  const unknown = Object.keys(raw).filter((k) => !SELF_CHANGE_KEYS.includes(k));
+  if (unknown.length) throw new Error(`CHARTER self_change has unknown key(s) ${unknown.join(", ")} (expected ${SELF_CHANGE_KEYS.join(", ")})`);
+  const out = { ...SELF_CHANGE_DEFAULTS };
+  for (const k of ["auto_merge_non_judge", "auto_merge_judge"]) {
+    if (!(k in raw)) continue;
+    if (typeof raw[k] !== "boolean") throw new Error(`CHARTER self_change.${k} must be true or false — got ${JSON.stringify(raw[k])}`);
+    out[k] = raw[k];
+  }
+  if ("veto_minutes" in raw) {
+    const v = raw.veto_minutes;
+    if (!Number.isInteger(v) || v <= 0) throw new Error(`CHARTER self_change.veto_minutes must be a positive integer — got ${JSON.stringify(v)}`);
+    out.veto_minutes = v;
+  }
+  if ("breaker" in raw) out.breaker = parseBreakerConfig(raw.breaker);
+  return out;
+}
+
 export function loadCharter(root) {
   const { data, body } = parseFrontmatter(readFileSync(join(root, "docs/factory/CHARTER.md"), "utf8"));
   if (data.schema !== "factory.charter.v1") throw new Error("CHARTER.md frontmatter must declare schema: factory.charter.v1");
@@ -145,6 +210,8 @@ export function loadCharter(root) {
     never_automate_qualified: neverAutomateQualified(body),
     budget: data.budget || {},
     retro: data.retro || { every_merges: { initial: 1, min: 1, max: 20 }, light_on_merge: true },
+    /** #178 — 검증된 `self_change`(`parseSelfChange`). 모양이 틀리면 여기서 설정 오류로 던진다. */
+    self_change: parseSelfChange(data.self_change),
   };
 }
 

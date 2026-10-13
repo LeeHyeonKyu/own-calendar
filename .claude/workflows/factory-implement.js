@@ -126,7 +126,12 @@ phase('Load');
 // 디스패처가 그것을 그대로 Workflow의 `args.loaded`로 넘긴다(워크플로 스크립트는 파일을 읽을 수 없다,
 // §4.2.3). 역할 에이전트가 **스스로** 읽는 경로는 그대로 남는다 — 바뀐 것은 스크립트가 제 제어 흐름을
 // 위해 쓰던 재료의 출처뿐이다.
-const loaded = args.loaded ?? null;
+// 2026-10-02 (KTB #170 실측) — 디스패처(LLM)가 args를 **JSON 문자열**로 넘긴 적이 있다(`"args": "{\"raw\":…}"`): 그러면 `args.loaded`가
+// undefined라 "context payload missing"으로 14초 만에 끝났고, 빌더는 뜨지도 않았다. 문자열이면 파싱한다 — 문자열로 온 `loaded`도 같다.
+// 파싱이 안 되면 그대로 두어 아래 fail-closed가 이름 있는 에러를 낸다.
+const parseIfString = (v) => { if (typeof v !== 'string') return v; try { return JSON.parse(v); } catch { return v; } };
+args = parseIfString(args) ?? {};
+const loaded = parseIfString(args.loaded) ?? null;
 
 // KTB-27: Claude Code does not substitute positional `$1`/`$2` in a command md — only `$ARGUMENTS`
 // is filled in, as one string (verified live: `claude -p "/argtest 42 true"` turned `$ARGUMENTS`
@@ -391,8 +396,12 @@ const buildRules =
   `added line (commands, dependency names, file paths). The runner checks this mechanically as the ` +
   `\`must-not\` gate and merge refuses on it — a prohibition in the issue is a contract, not a suggestion; ` +
   `if the work honestly cannot be done within it, stop and say so in the PR body instead of working around it.\n` +
-  `4. Stay inside \`handoffs.plan.files_expected\`. If the work honestly needs a path outside it, record ` +
-  `the path and the reason in the PR body under a "Scope change" heading.\n` +
+  `4. Stay inside \`handoffs.plan.files_expected\`. If the work honestly needs a path outside it, write the ` +
+  `reason IN THE DIFF, not in the PR body: a comment line at the top of that file reading ` +
+  `\`Scope change (#${issue}): <why — tied to a done_when, a non_goal or a must_fix>\` (for a deleted file, put ` +
+  `the line, naming the path, in the nearest changed file). The spec-conformance reviewer reads the diff and ` +
+  `never the PR body — a reason that lives only in the PR body was rejected on #149, #156, #157, #170 and ` +
+  `#178, one full review round each (KTB #200 makes the runner's self-gate refuse the round before review).\n` +
   `5. Run \`[commands].lint\` and \`[commands].unit\` from \`harness.commands\` yourself (plus the full ` +
   `level if the harness declares one) before you push. Do not hand a red tree to the verifier.\n` +
   `6. Commit in logical units with real messages, push the branch, and open a draft PR. Write the PR body ` +
@@ -420,6 +429,11 @@ const reworkBlock = mustFix.length > 0
     `Respond to EVERY id above — a silent omission reads as an unaddressed reject. For each item: ` +
     `status "fixed" with the commit sha that fixed it, or status "disputed" with a reason that cites the ` +
     `plan handoff (\`non_goals\`, \`files_expected\`) or a concrete file path. Opinion is not a dispute.\n` +
+    `A rework round SUBTRACTS (ADR-037 §5): fix what the must_fix items name and nothing else. Do not add a ` +
+    `new file, a new export, a second parser or list, a new done_when, or gate evidence for paths the review ` +
+    `did not raise — every K-exhaustion in the 2026-10 census (#149, #157, #170) was a builder that added in ` +
+    `rework and was rightly rejected again. If a finding genuinely needs new code, keep it inside the files the ` +
+    `must_fix \`where\` names (KTB #199 makes the self-gate refuse anything else from round 2 on).\n` +
     `Post the whole response as a comment on PR #${priorPr === null ? '<pr>' : priorPr}: write it to ` +
     `\`/tmp/factory-rework-${issue}.md\` with the Write tool and run ` +
     `\`gh pr comment ${priorPr === null ? '<pr>' : priorPr} --body-file /tmp/factory-rework-${issue}.md\` ` +

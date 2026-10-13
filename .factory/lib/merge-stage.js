@@ -1,10 +1,35 @@
-import { gatesDetailLines, verdictLine } from "./gates.js";
+import { relative } from "node:path";
+import { gatesDetailLines, verdictLine, DETAIL_MAX_FAILING, GATES_DETAIL_PREFIX } from "./gates.js";
+import { parseVitestJson } from "./parsers/vitest-json.js";
 import { isMergeBaseError, MERGE_BASE_BLOCKED_REASON, GIT_DIFF_BLOCKED_REASON } from "./blocked-errors.js";
 import { isGitDiffError } from "./changed-files.js";
 import { LESSONS_POLICY_RULE as LESSONS_RULE_RE, HARNESS_SECTION_POLICY_RULE as HARNESS_SECTION_RULE_RE, TESTS_MODIFIED_POLICY_RULE as TESTS_RULE_RE } from "./integrity.js";
 import { blockedOriginMarker } from "./retro/issue-comments.js";
 import { parseBlocks } from "./harness-request.js";
 import { verifyReviewQuorum, verifyReviewProvenance, NOT_BOUND } from "./review-quorum.js";
+import { classifyProtected } from "./non-judge-paths.js";
+import { matchesAny } from "./glob.js";
+import { VETO_LABEL } from "./label-catalog.js";
+import { selfMergeLine, selfMergeVoidLine, BREAKER_RESET_COMMAND } from "./breaker.js";
+
+/**
+ * #189 (S4c) — 자기 변경 경로로 머지한 사실의 run 기록 줄. 생산자는 이것 하나이고(`lib/breaker.js`가 같은 모듈에서 읽는다),
+ * merge 스테이지가 **머지 순간에** 판정 비트와 함께 쓴다. 테스트 픽스처는 이 함수로 만든다.
+ */
+export { selfMergeLine };
+
+/**
+ * ── #179 (S4a-2, ADR-033) — 자기 변경 경로의 거부권 창 ──────────────────────────────────────────────────────
+ * 창은 PR head에 붙는 commit status 하나(`factory/veto-window`, pending, description `closes=<iso>`)와 PR 코멘트 하나로
+ * 소유자에게 보인다. 창의 시각은 **이 런이 연 순간**(`d.now()`)에서만 온다 — 이미 붙어 있는 상태는 공유 봇 계정으로도
+ * 쓸 수 있으므로(감사 H1b) 그 `closes=`를 믿으면 위조가 기다림을 줄인다. 그래서 런은 언제나 자기 창을 열고 끝까지 기다린다.
+ * 폴링 간격은 5분, 창은 잡 안에서 기다린다(sweeper 불의존).
+ */
+export const VETO_WINDOW_CONTEXT = "factory/veto-window";
+export const VETO_POLL_MS = 5 * 60 * 1000;
+/** #179 — 창이 닫힌 뒤 리뷰 재검증·승인·머지·전이에 남겨 둘 잡 시간. 이만큼이 창 위에 더 남아야 창을 연다. */
+export const VETO_POST_WINDOW_MARGIN_MS = 10 * 60 * 1000;
+export const vetoWindowDescription = (closesAtIso) => `closes=${closesAtIso}`;
 
 /**
  * 외부 감사 2026-09-14 H1b — 머지 직전에 **게시자까지** 확인하는 두 상태. `factory/integrity`는 빠져
@@ -87,9 +112,194 @@ export function humanGateNote(humanGate) {
   return "dark merge — CHARTER declares no merge.human_gate, so no per-PR human signature was required (run `factory doctor`: charter.merge-human-gate-unset)";
 }
 
+/**
+ * ── #157 — a merge-gate RED on a test **outside the PR's diff** is re-run once (ADR-034, amends ADR-011) ─────
+ *
+ * own-calendar #111: a client-only PR with 3/3 approvals went to needs-human because one server integration
+ * test flaked at merge. The only thing a human could do was re-run it. So, at merge only, when the RED can be
+ * **proven** to come from tests this PR did not touch, the same `d.gates()` runs exactly once more:
+ *   - whole-GREEN re-run → merge continues on the re-run's result (status re-posted from it);
+ *   - the same failing id set RED again → needs-human with `FLAKY_CANDIDATE_TEXT` + a stamped marker per id;
+ *   - a different set / unreported RED → needs-human naming both runs; BLOCKED, a typed base/diff error, or no
+ *     verdict at all → factory:blocked (the re-run could not decide anything).
+ * Everything that cannot be proven "outside" is today's single-run transition and reason (fail closed); the record
+ * gets exactly one extra, stamped `merge: no gates rerun — <reason>` line so a refusal is never silent (review sec-s1).
+ * At most one re-run per `runMergeStage` invocation — no loop, no third run.
+ */
+export const FLAKY_CANDIDATE_TEXT = "PR 밖의 테스트가 두 번 RED — flaky 후보";
+/** Run-record line prefix; the rest is one-line JSON (`test`, `outcome`, `run_id`, `runner`, `round?`) — the
+ * same stamp binding as `gates-detail:` so a later reader can trust only lines bound to their run. No reader
+ * exists yet (#157 non-goal). */
+export const FLAKY_CANDIDATE_PREFIX = "factory-flaky-candidate: ";
+/** Run-record line prefix for a RED (or other non-GREEN verdict) the stage did NOT re-run; the rest is the reason + stamp tag. */
+export const NO_RERUN_PREFIX = "merge: no gates rerun — ";
+/** #184 dw6 — the mark on the `merge: merged …` record line when the merge happened only because the one re-run was GREEN. */
+export const MERGED_ON_RERUN_TEXT = "merged on rerun";
+/**
+ * Conventional test roots (review cf-s3). A failing test whose TOP-LEVEL directory is one of these counts as touched by
+ * any non-empty diff: in a single-package `src/** + tests/**` layout every tests/** failure would otherwise sit
+ * "outside" every src-only PR, the heuristic would filter nothing, and a deterministic break the PR caused would be
+ * re-run (and, on a second RED, called a flaky candidate). Trade-off, accepted for an irreversible merge: such
+ * single-package repos get no re-run (ADR-034). Defined here only — nothing else in the engine carries this list.
+ */
+export const TEST_ROOT_DIRS = Object.freeze(["test", "tests", "__tests__", "spec", "e2e"]);
+
+/** A repo-relative path in canonical form, or null when it cannot be compared safely (absolute, `..`, `\`, empty segment). */
+function normRelPath(p) {
+  if (typeof p !== "string") return null;
+  let s = p.trim();
+  while (s.startsWith("./")) s = s.slice(2);
+  if (!s || s.startsWith("/") || s.includes("\\")) return null;
+  const segs = s.split("/");
+  if (segs.some((x) => x === "" || x === "." || x === "..")) return null;
+  return s;
+}
+
+const sameIdSet = (a, b) => Array.isArray(a) && Array.isArray(b) && a.length === b.length && a.every((x) => b.includes(x));
+
+/**
+ * Test FILES that failed with no failed assertion (did not load, a suite-level hook threw), read from the report each
+ * RED test gate of `gates` left behind. Vitest writes such a file as a `testResults` entry with `status:"failed"` and a
+ * `message` but no failed assertion — `failing_ids` (assertions only) never names it, so without this the merge stage
+ * would take `failing_ids` for the whole RED. Read here, not added to factory.gates.v1 (#157 plan non-goal: the schema
+ * and gates.js code stay as they are). `readReport(gateName)` returns the report text or null.
+ * `{ ok:true, files }`, or `{ ok:false, reason }` when it cannot vouch: report missing/unparseable, or the report's
+ * failing assertions are not the gate's `failing_ids` (the file on disk is not the one that gate read).
+ */
+export function idlessFailedSuites({ gates, readReport, root }) {
+  const no = (reason) => ({ ok: false, files: [], reason });
+  const files = [];
+  for (const [name, g] of Object.entries(gates?.gates || {})) {
+    if (g?.status !== "RED" || typeof g.parsed !== "boolean") continue;       // only test gates carry `parsed`
+    const text = readReport(name);
+    if (typeof text !== "string") return no(`${name} report not readable`);
+    let j;
+    try { j = JSON.parse(text); } catch { return no(`${name} report unparseable`); }
+    const parsed = parseVitestJson(text, root);
+    if (parsed.error) return no(`${name} report unparseable`);
+    if (!sameIdSet([...new Set(parsed.failing.map((f) => f.id))], [...new Set(g.failing_ids || [])])) return no(`${name} report on disk is not the one this gate read`);
+    for (const tr of Array.isArray(j?.testResults) ? j.testResults : []) {
+      const failedAssertion = (tr?.assertionResults || []).some((a) => a?.status === "failed");
+      if (tr?.status === "failed" && !failedAssertion) {
+        const f = relative(root, String(tr.name ?? ""));
+        if (!files.includes(f)) files.push(f);
+      }
+    }
+  }
+  return { ok: true, files };
+}
+
+/**
+ * Pure: may this RED gates result be re-run once at merge? `{ ok:true, ids }` only when ALL of these hold:
+ *   - status is RED (not MISCONFIGURED/BLOCKED/missing — RED already implies no MISCONFIGURED gate);
+ *   - every RED gate is a test gate whose report was parsed (`parsed === true`) with non-empty `failing_ids`
+ *     (a RED lint next to a RED test is not a flake);
+ *   - `suites` (§idlessFailedSuites) vouches that no test file failed without a failed assertion — such a file has
+ *     no id, so `failing_ids` would not be the whole RED and the rest could not be placed outside the diff;
+ *   - the diff was read (`ok`, a non-empty list) and every path in it normalises;
+ *   - no diff file sits at the repo root (a root file — package.json, a lockfile, a config — touches every package);
+ *   - for every failing id `path::name`: the path normalises, is not at the repo root, its top-level directory is
+ *     not a conventional test root (§TEST_ROOT_DIRS), and no diff file shares its top-level directory (which also
+ *     covers the test file itself being in the diff).
+ * Anything else is `{ ok:false, reason }` — "outside the diff" was not proven.
+ */
+export function rerunEligibility(gates, diff, suites) {
+  const no = (reason) => ({ ok: false, reason });
+  // RED (not MISCONFIGURED) already means no gate is misconfigured and no required gate is missing —
+  // `recomputeStatus` (gates.js) ranks MISCONFIGURED above RED — so this one check covers both.
+  if (!gates || gates.status !== "RED") return no(`gates ${gates?.status ?? "missing"}`);
+  const red = Object.entries(gates.gates || {}).filter(([, g]) => g?.status === "RED");
+  if (!red.length) return no("no RED gate entry");
+  const ids = [];
+  for (const [name, g] of red) {
+    if (g.parsed !== true) return no(`${name} is RED without a parsed test report`);
+    if (!Array.isArray(g.failing_ids) || !g.failing_ids.length) return no(`${name} is RED with no failing test ids`);
+    for (const id of g.failing_ids) if (!ids.includes(id)) ids.push(id);
+  }
+  if (!suites?.ok || !Array.isArray(suites.files)) return no(`suite-level failures not vouched for${suites?.reason ? `: ${suites.reason}` : ""}`);
+  if (suites.files.length) return no(`test files failed without a failing test: ${suites.files.join(", ")}`);
+  if (!diff?.ok || !Array.isArray(diff.files) || !diff.files.length) return no(`PR diff unreadable or empty${diff?.reason ? `: ${diff.reason}` : ""}`);
+  const tops = new Set();
+  for (const f of diff.files) {
+    const n = normRelPath(f);
+    if (!n) return no(`diff path not normalisable: ${f}`);
+    const segs = n.split("/");
+    if (segs.length === 1) return no(`diff touches a repo-root file: ${n}`);
+    tops.add(segs[0]);
+  }
+  for (const id of ids) {
+    const at = typeof id === "string" ? id.indexOf("::") : -1;
+    const path = at > 0 ? normRelPath(id.slice(0, at)) : null;
+    if (!path) return no(`failing test path not normalisable: ${id}`);
+    const segs = path.split("/");
+    if (segs.length === 1) return no(`failing test at the repo root: ${path}`);
+    if (TEST_ROOT_DIRS.includes(segs[0])) return no(`failing test ${path} sits under the test root ${segs[0]}/ and the diff is non-empty`);
+    if (tops.has(segs[0])) return no(`diff touches ${segs[0]}/, where ${path} lives`);
+  }
+  return { ok: true, ids };
+}
+
+/** The failing test ids of a RED result, when every RED gate is a parsed test gate and `suites` vouches for no id-less suite failure — else null (not comparable). */
+function redTestIds(gates, suites) {
+  if (!gates || gates.status !== "RED") return null;
+  const red = Object.values(gates.gates || {}).filter((g) => g?.status === "RED");
+  if (!red.length || red.some((g) => g.parsed !== true || !Array.isArray(g.failing_ids) || !g.failing_ids.length)) return null;
+  if (!suites?.ok || !Array.isArray(suites.files) || suites.files.length) return null;
+  return [...new Set(red.flatMap((g) => g.failing_ids))];
+}
+/**
+ * Test ids go to public places (run record, issue comment). Their names are not scrubbed here: they are the
+ * `failing` names gates.js's own `gates-detail` projection (`gatesDetailLines`) writes — the one rule, run on a
+ * one-gate projection — so a `factory-flaky-candidate` line and the `gates-detail` line beside it always carry the
+ * same name (review arch1). A projection that fails yields a placeholder, never the raw id.
+ */
+function publicTestNames(ids) {
+  const [line] = gatesDetailLines({ gates: { names: { status: "RED", detail: { failing: ids, snippet: "" } } } });
+  try {
+    const failing = JSON.parse(String(line).slice(GATES_DETAIL_PREFIX.length)).failing;
+    if (Array.isArray(failing) && failing.length === ids.length) return failing;
+  } catch { /* fall through */ }
+  return ids.map(() => "[name unavailable]");
+}
+const idList = (ids) => {
+  const shown = publicTestNames(ids.slice(0, DETAIL_MAX_FAILING));
+  return shown.join(", ") + (ids.length > shown.length ? ` (+${ids.length - shown.length} more)` : "");
+};
+/** `[run_id=<id> runner=<r>( round=<n>)]` — binds a plain-text record line to its run, the way gates-detail's JSON fields do. */
+export function stampTag({ runId = null, runnerId = null, round = null } = {}) {
+  return `[run_id=${runId ?? null} runner=${runnerId ?? null}${Number.isInteger(round) ? ` round=${round}` : ""}]`;
+}
+/**
+ * A refusal reason carries paths, test ids and dep error text (a git error can echo a remote URL) into the public run
+ * record, so it goes through the gates-detail projection's own scrub (`gatesDetailLines` — the one rule, run on a
+ * one-gate projection; never a copy of it). A projection that fails yields a placeholder, never the raw text.
+ */
+function publicReason(reason) {
+  const [line] = gatesDetailLines({ gates: { reason: { status: "RED", reason: String(reason ?? ""), detail: { failing: [], snippet: "" } } } });
+  try {
+    const r = JSON.parse(String(line).slice(GATES_DETAIL_PREFIX.length)).reason;
+    if (typeof r === "string") return r;
+  } catch { /* fall through */ }
+  return "[reason unavailable]";
+}
+/** The one stamped line a refused re-run leaves (review sec-s1): an on-call reader can tell "refused, because X" from "broken". */
+export function noRerunLine(reason, stamp) {
+  return `${NO_RERUN_PREFIX}${publicReason(reason)} ${stampTag(stamp)}`;
+}
+export function flakyCandidateLines(ids, outcome, { runId = null, runnerId = null, round = null } = {}) {
+  const names = publicTestNames(ids);
+  return names.map((test) => FLAKY_CANDIDATE_PREFIX + JSON.stringify({
+    test, outcome, run_id: runId ?? null, runner: runnerId ?? null, ...(Number.isInteger(round) ? { round } : {}),
+  }));
+}
+
 /** GitHub은 mergeable을 비동기로 계산한다 — UNKNOWN은 "영영 모름"이 아니라 "아직 안 끝남"이다.
  * 한 번만 재확인한다: 그사이 끝나면 믿고, 아니면 사람이 본다(무한정 기다리지 않는다). */
 const MERGEABILITY_REPOLL_MS = 5000;
+/** #195 — the PR-evidence step's own bound: it may delay the merge or the hand-off by at most this much (no retry). */
+export const EVIDENCE_TIMEOUT_MS = 60 * 1000;
+/** #195 — a reason that already names its evidence step (run-stage's dep renames its rejections to `read: …` / `build: …` / `edit: …`). */
+const EVIDENCE_STEP_PREFIX = /^(read|build|edit|comment): /;
 
 /**
  * KTB-15b I1 / KTB-19 — draft→ready 플립(`gh pr ready`, 아래 (6a))은 GitHub의 `ready_for_review` PR
@@ -172,10 +382,15 @@ async function waitForChecksSettled({ prChecks, pr, required, sleep, waitSec = D
  *      commitStatuses(sha) → [{ context, state, creatorLogin }] — **최신순**
  *      factoryLogins()  → { ok, logins: string[], reason? }  팩토리 자신의 계정 이름(값이 아니라 이름)
  *    humanGate?       → CHARTER `merge.human_gate`(boolean|undefined) — 머지 전이 텍스트에만 쓴다.
+ *    #179 자기 변경 경로(ADR-033): selfChange?(CHARTER `self_change`), engine?(base에서 계산), neverAutomate?(CHARTER
+ *    NEVER_AUTOMATE 글롭 — 경로를 탈 때 필수, 없으면 blocked), vetoWindow·vetoLabel·now·sleep?·jobStartedAt·jobTimeoutMinutes.
+ *    그 경로의 머지는 `mergePr(pr, { matchHeadCommit })`로 창 뒤에 재검증한 head를 못 박는다.
  * headSha: review·merge가 checkoutHead로 고정한 PR head — 없으면 gates().head_sha로 대신한다(둘 다
  * 없으면 "unknown"으로 남긴다. 아무것도 지어내지 않는다).
  * postStatus({context,state,description,sha}): run-stage의 상태 게시 헬퍼(no-sha skip + best-effort 포함) —
  * 여기서 다시 구현하지 않고 그대로 주입받는다.
+ * persistSelfMerge({line,issue,pr,sha}) — #189 rework r5 cf1: 자기 변경 경로의 자동 머지 줄을 mergePr **전에** factory/records에 올려
+ *    확인한다(→ {ok}|{ok:false,reason}). ok가 아니거나 없으면 머지하지 않고 blocked.
  * record(lines): run-record 한 줄(들)을 남긴다. refusal(t): 거부된 전이를 record 줄로 바꾼다(runStage와 동일 계약).
  * retryFromBlocked(KTB-15b, KTB-19 review I-2): run-stage가 이미 "이 blocked이 approved에서 왔다"를
  * 이슈 코멘트로 확인했을 때, 그 origin 라벨(`"factory:approved"`) 그대로 넘긴다 — falsy(`false`)면
@@ -250,9 +465,15 @@ export async function runMergeStage({ issue, defaultBranch, headSha, d, record, 
   // 사람은 할 수 있다"는 구분을 여기, 자동 머지 경로 안에 둔다.
   //
   // **게이트보다 먼저다**(fix round 1). `d.gates()`는 `harness.commands`를 bash로 실행한다 — 곧 PR이
-  // 쓴 코드를 머지 잡 안에서 돌린다. 보호 경로를 실은 PR은 애초에 자동 머지 후보가 아니므로, 그
+  // 쓴 코드를 머지 잡 안에서 돌린다. 스위치가 꺼진 보호 경로 PR은 자동 머지 후보가 아니므로, 그
   // 코드를 **한 줄도 실행하기 전에** 거른다. (게이트가 돌 때도 자격증명은 자식 env에서 빠진다 —
   // `lib/exec.js`의 `scrubEnv`, `lib/gates.js`가 감싼다.)
+  //
+  // #179 (ADR-033) — 예외 하나: CHARTER `self_change` 스위치가 켜졌고 이 체크아웃이 엔진(`d.engine`, base에서 계산)이면
+  // 보호 경로를 `classifyProtected`로 가른다. 판정 경로가 없고 `auto_merge_non_judge`가 켜졌거나, 판정 경로가 있고
+  // `auto_merge_judge`가 켜졌으면(그리고 load-bearing 로스터의 만장일치 리뷰가 있으면) 그 PR은 사람에게 가지 않고 **자기
+  // 변경 경로**를 탄다 — 곧 그 PR의 코드가 아래 `d.gates()`로 머지 잡 안에서 돈다(같은 env scrub 아래). 그 경로는 정책 검사·
+  // 게이트·(6b) 리뷰 검증을 전부 지난 뒤 머지 직전에 거부권 창을 연다. 스위치가 꺼져 있으면 여기는 오늘과 바이트 단위로 같다.
   //
   // 이 판정은 **base 브랜치의 코드**로 계산된다: 이 프로세스의 모듈은 checkoutHead보다 먼저,
   // 워크플로의 기본 체크아웃(base) 상태에서 로드됐고 harness도 그때 읽혔다(run-stage.js의
@@ -272,7 +493,91 @@ export async function runMergeStage({ issue, defaultBranch, headSha, d, record, 
   //
   // `sections`는 **규칙별로** 하나씩이다(KTB-10 I3): 한 PR이 두 규칙을 동시에 어길 수 있고(역할 파일
   // 편집 + lessons 삭제), 그때 한 제목으로 뭉치면 사람이 목록의 절반을 엉뚱한 설명으로 읽는다.
+  /**
+   * #195 (re-landed by #208; ADR-037 §2) — the runner's "Factory evidence" section on the PR body (`d.publishPrEvidence`,
+   * run-stage's gh.js wiring; named apart from feedback's `appendEvidence`). It is published at exactly two points: right
+   * before mergePr (after the two-actor approval and the self-merge evidence write succeeded — on the self-change path, after
+   * the veto window closed), and as the first act of handToHuman. Nowhere else: needs-human / blocked exits that bypass
+   * handToHuman publish nothing (#208 non_goal). It never blocks or reorders anything: a throw, a rejection, an `ok:false` or a
+   * timeout becomes exactly one `evidence: FAIL — <step>: <reason> (issue #<n>)` record line naming the failing step (read,
+   * build, edit — or comment for the issue comment after a merge) and the issue, and the merge or transition goes on. The dep reports the step it is in through `onStep`, so a
+   * timeout that fires here before the dep's own step-named rejection can arrive still names the step; a dep that never
+   * reports one failed in the step it was handed first, `read` — the FAIL line names one of read, build, edit or comment, never
+   * anything else. A MISSING dep — the wiring has the `publishPrEvidence` slot (run-stage's always does)
+   * but no function in it — is that same one FAIL line (step `read`: nothing could be read), never a silent no-op. A wiring that predates the slot entirely (no `publishPrEvidence` key) is left byte-identical: existing tests pin
+   * that record exactly (test_179_switch_off_is_byte_identical and its neighbours), and tests are load-bearing.
+   *
+   * A timeout CANCELS, it does not abandon: the dep gets an AbortSignal and the timer aborts it before this function returns,
+   * i.e. before mergePr / the needs-human transition. The dep checks it before its write and hands it to the `gh pr edit`
+   * child (lib/exec.js kills an aborted child), so a late-settling dep cannot rewrite the PR body after the merge or the
+   * transition while the record says FAIL.
+   */
+  /**
+   * #208 dw5 — a merge run publishes EXACTLY ONCE: the two points are on exits that exclude each other (handToHuman returns
+   * the run's exit code; mergePr is reached only when no hand-off happened). That layout is the whole rule — there is no
+   * "already published" flag, because no run reaches both points and a flag nothing can trip would only hide a refactor that
+   * adds a second publish site on one route: test_208_evidence_publish_count_across_merge_exits pins the count per exit
+   * instead, so such a site fails there. A failed publish is not retried. The veto window publishes nothing itself: a
+   * veto, or an open breaker after the window, hands off through handToHuman (one publish there); a clean window goes on to
+   * the publish before mergePr. Needs-human / blocked routes that bypass handToHuman (mergeGates, the re-check after ready,
+   * review verification, two-actor refusals, the self-merge evidence refusal, undecidable) do not publish. A run records at
+   * most ONE FAIL line for the PR-body step (`evidenceFailed`).
+   */
+  let evidenceFailed = false;
+  let evidenceMarkdown = null, evidenceGates = null, evidenceRerun = false, evidenceLoginsUnresolved = false;
+  const evidenceMs = Number.isFinite(d.evidenceTimeoutMs) && d.evidenceTimeoutMs > 0 ? d.evidenceTimeoutMs : EVIDENCE_TIMEOUT_MS;
+  /**
+   * `start(signal)` raced against the evidence bound; on timeout the signal is aborted BEFORE this returns (cancel, not
+   * abandon). `stepNow()` is the step the dep last reported — the timeout's message names it.
+   */
+  const boundedEvidence = async (start, stepNow) => {
+    const ac = new AbortController();
+    let timer;
+    try {
+      return await Promise.race([
+        Promise.resolve().then(() => start(ac.signal)),
+        new Promise((_, reject) => {
+          timer = setTimeout(() => {
+            const step = stepNow();
+            const e = new Error(`${step}: timed out after ${evidenceMs} ms — the ${step} step was cancelled`);
+            ac.abort(e);
+            reject(e);
+          }, evidenceMs);
+        }),
+      ]);
+    } finally { clearTimeout(timer); }
+  };
+  /** #208 dw3 — every evidence FAIL line names the issue it is about (the run record is read beside other issues' records). */
+  const failLine = (text) => `evidence: FAIL — ${text} (issue #${issue})`;
+  /** One FAIL line's text: the reason, prefixed with `step` unless it already names an evidence step. */
+  const evidenceFail = (step, e) => {
+    const msg = publicReason(e?.message || e);
+    return failLine(EVIDENCE_STEP_PREFIX.test(msg) ? msg : `${step}: ${msg}`);
+  };
+  const failOnce = (line) => { if (evidenceFailed) return; evidenceFailed = true; record([line]); };
+  const publishEvidence = async ({ route, reason = null }) => {
+    if (!Object.prototype.hasOwnProperty.call(d, "publishPrEvidence")) return;   // pre-#195 wiring: no slot, record unchanged
+    if (typeof d.publishPrEvidence !== "function") {
+      failOnce(failLine("read: no publishPrEvidence dep is wired — nothing was read and no evidence section was written"));
+      return;
+    }
+    let step = "read";
+    const onStep = (s) => { if (typeof s === "string" && EVIDENCE_STEP_PREFIX.test(`${s}: `)) step = s; };
+    try {
+      const r = await boundedEvidence((signal) => d.publishPrEvidence({ pr, route, gates: evidenceGates, gatesRerun: evidenceRerun, reason, signal, onStep }), () => step);
+      if (r?.ok === false) throw new Error(r.reason || "publishPrEvidence answered ok:false");
+      evidenceMarkdown = typeof r?.markdown === "string" ? r.markdown : null;
+      record([`evidence: published to PR #${pr} (${route})`]);
+      // The factory's logins could not be resolved (part of the read step): the section went out failing closed — no row from
+      // any comment, a note saying why; the record says so too, as the one FAIL line for this step — never silently empty.
+      evidenceLoginsUnresolved = r?.logins?.ok === false;
+      if (evidenceLoginsUnresolved) failOnce(failLine(`read: factory logins not resolved (${publicReason(r.logins.reason || "not resolved")}) — nothing from issue or PR comments was shown`));
+    } catch (e) {
+      failOnce(evidenceFail(step, e));
+    }
+  };
   const handToHuman = async ({ reason, sections }) => {
+    await publishEvidence({ route: "hand-off", reason });
     try {
       await d.comment?.(pr, [
         ...sections.flatMap(({ heading, why, files }) => [
@@ -296,7 +601,31 @@ export async function runMergeStage({ issue, defaultBranch, headSha, d, record, 
 
   const prot = d.protectedPaths ? await d.protectedPaths() : { ok: false, files: [], reason: "protectedPaths dep not wired" };
   if (!prot?.ok) return await undecidable("protected-path check", prot?.reason);
-  if (prot.files.length) {
+  // #179 — 자기 변경 경로("non_judge" | "judge" | null). null이면 아래는 오늘의 코드 그대로다.
+  let selfPath = null;
+  if (prot.files.length && d.engine === true && d.selfChange) {
+    const cls = classifyProtected(prot.files, { engine: true });
+    const nonJudgeOn = d.selfChange.auto_merge_non_judge === true, judgeOn = d.selfChange.auto_merge_judge === true;
+    if (!cls.judge.length && nonJudgeOn) selfPath = "non_judge";
+    else if (cls.judge.length && judgeOn) {
+      // 섞인 PR의 비판정 파일은 판정 경로의 스위치를 빌리지 않는다 — 파일마다 자기 스위치가 켜져 있어야 한다.
+      if (cls.non_judge.length && !nonJudgeOn) {
+        record([`merge: self-change path not taken — the PR also changes non-judge protected paths (${cls.non_judge.join(", ")}) and CHARTER self_change.auto_merge_non_judge is false`]);
+      } else selfPath = "judge";
+    }
+  }
+  // CHARTER NEVER_AUTOMATE는 자기 변경 경로 안에서도 이긴다: 비판정 목록(예: `templates/factory/docs/**`)과 겹치는 글롭
+  // (`templates/factory/**`)에 걸린 PR은 오늘처럼 사람이 머지한다. 목록을 모르면 "걸린 것 없음"이 아니라 판정 불가다.
+  if (selfPath) {
+    if (!Array.isArray(d.neverAutomate)) return await undecidable("NEVER_AUTOMATE check", `the CHARTER NEVER_AUTOMATE globs are not wired (${JSON.stringify(d.neverAutomate ?? null)}) — the self-change path cannot prove this PR is automatable`);
+    const globs = d.neverAutomate.filter((g) => typeof g === "string" && g);
+    const hits = prot.files.flatMap((f) => { const g = globs.find((x) => matchesAny([x], f)); return g ? [`${f} (${g})`] : []; });
+    if (hits.length) {
+      record([`merge: self-change path refused — CHARTER NEVER_AUTOMATE matches ${hits.join(", ")}; a NEVER_AUTOMATE path is always human-merged`]);
+      selfPath = null;
+    }
+  }
+  if (prot.files.length && !selfPath) {
     return await handToHuman({
       reason: `protected paths changed — ${HUMAN_MERGE_REQUIRED_TEXT}: ${prot.files.join(", ")}`,
       sections: [{
@@ -310,7 +639,8 @@ export async function runMergeStage({ issue, defaultBranch, headSha, d, record, 
       }],
     });
   }
-  record(["merge: no protected paths in the PR range"]);
+  if (selfPath) record([`merge: protected paths (${selfPath === "judge" ? "judge path" : "non-judge only"}) — self-change path, CHARTER self_change.auto_merge_${selfPath}=true: ${prot.files.join(", ")}`]);
+  else record(["merge: no protected paths in the PR range"]);
 
   // 역할 파일의 섹션 규칙(KTB-6). `[protected].additive_only`는 "`.claude/agents/*.md`는 `## Examples`·
   // `## Perspectives`에 **추가만**"이라는 정책이다 — retro의 다크 추가(§8.1)가 통과하는 좁은 문이고,
@@ -399,7 +729,42 @@ export async function runMergeStage({ issue, defaultBranch, headSha, d, record, 
   }
   record(["merge: agent role sections within policy"]);
 
-  // (4) 게이트: BLOCKED은 판정 불가(사람이 본다), 그 외 GREEN이 아니면 needs-human. base/diff를 못 구한
+  // #179 (dw5) — 판정 경로의 자기 변경은 **load-bearing 로스터의 만장일치 리뷰**가 있을 때만이다. 판정은 새로 정의하지 않는다:
+  // (6b)와 같은 `verifyReviewQuorum`을 같은 deps(reviewEvidence/reviewRoster)로 미리 한 번 돌려, 거부될 PR의 코드를
+  // 게이트로 돌리기 전에 사람에게 넘긴다. 출처 증명(러너 기록과의 대조)은 아래 (6b)가 그대로 하고, 창은 그 뒤에야 열린다.
+  if (selfPath === "judge") {
+    const files = prot.files;
+    const judgeRefused = (detail) => handToHuman({
+      reason: `judge path needs a unanimous review — ${HUMAN_MERGE_REQUIRED_TEXT}: ${detail}`,
+      sections: [{
+        heading: "판정 경로 변경 — 만장일치 리뷰 없음",
+        why: [
+          "이 PR은 판정 경로(머지·게이트·전이를 판정하는 코드)를 바꿉니다. CHARTER `self_change.auto_merge_judge`가",
+          "켜져 있어도 판정 경로는 load-bearing 로스터 **전원의 approve**가 있을 때만 팩토리가 스스로 머지합니다(ADR-033).",
+          "", `사유: ${detail}`, "", "변경된 보호 경로:",
+        ],
+        files,
+      }],
+    });
+    if (!d.reviewEvidence || !d.reviewRoster) return await judgeRefused("review-evidence deps not wired (reviewEvidence, reviewRoster)");
+    let ev, ros;
+    try { ev = await d.reviewEvidence(); } catch (e) { return await judgeRefused(`review handoff unreadable: ${e?.message || e}`); }
+    if (!ev?.ok) return await judgeRefused(ev?.reason || "review handoff missing or invalid");
+    try { ros = await d.reviewRoster(); } catch (e) { return await judgeRefused(`review roster unresolvable: ${e?.message || e}`); }
+    if (!ros?.ok || !Array.isArray(ros.roles) || !ros.roles.length) return await judgeRefused(ros?.reason || "review roster unresolvable — quorum cannot be checked");
+    if (ros.tier !== "load-bearing") return await judgeRefused(`the review roster tier is ${ros.tier ?? "unknown"}, not load-bearing`);
+    const q = verifyReviewQuorum({ data: ev.data, rosterSize: ros.roles.length, rosterRoles: ros.roles, maxRounds: d.maxRounds ?? null, prHeadSha: headSha || null });
+    if (!q.ok) {
+      const dissent = (Array.isArray(ev.data?.verdicts) ? ev.data.verdicts : [])
+        .filter((v) => v?.verdict !== "approve").map((v) => `${v?.role ?? "?"}: ${v?.verdict ?? "none"}`);
+      return await judgeRefused(dissent.length ? `${dissent.join(", ")} (${q.reason})` : q.reason);
+    }
+    record([`merge: judge path — ${ros.roles.length}/${ros.roles.length} approve on the load-bearing roster (pre-check; provenance is verified at (6b))`]);
+  }
+
+  // (4) 게이트: BLOCKED은 판정 불가(사람이 본다), 그 외 GREEN이 아니면 needs-human — 단 하나의 예외(#157, ADR-034):
+  // RED가 전부 PR diff 밖의 파싱된 테스트 실패로 **증명**되면(rerunEligibility) 같은 d.gates()를 정확히 한 번 더 돌고,
+  // 그 런 전체가 GREEN일 때만 머지로 간다(같은 id 집합의 두 번째 RED는 flaky 후보 마커와 함께 needs-human). base/diff를 못 구한
   // 것도 판정 불가다(run-stage의 나머지 스테이지와 같은 typed-error 계약). 상태 게시는 부수 효과라
   // 실패해도(또는 diagnostic 결과여도) 머지 판단을 막지 않는다 — postStatus 자체가 best-effort다.
   let gates;
@@ -419,9 +784,10 @@ export async function runMergeStage({ issue, defaultBranch, headSha, d, record, 
   // 명령을 돌리기 전에 env를 한 번 더 re-up했다(멱등) — 성공/실패 둘 다 run 기록에 남긴다. `ran`이
   // 없으면(=이 하네스는 compose를 안 쓴다) 아무 줄도 붙지 않는다. merge에도 같은 dep(gates())이
   // 붙어 있으므로 결과를 흘려버리지 않는다 — 아래 세 갈래(BLOCKED/비-GREEN/GREEN) 모두에 붙인다.
-  const testEnvNote = gates?.test_env_reup?.ran
-    ? [`test-env: re-up ${gates.test_env_reup.ok ? "ok" : `failed — ${gates.test_env_reup.detail}`}`]
-    : [];
+  const envNoteOf = (g) => (g?.test_env_reup?.ran
+    ? [`test-env: re-up ${g.test_env_reup.ok ? "ok" : `failed — ${g.test_env_reup.detail}`}`]
+    : []);
+  let testEnvNote = envNoteOf(gates);
   if (gates?.status === "BLOCKED") {
     const reason = gates.blocked_reason || "gates could not be decided";
     const t = await toBlocked(reason);
@@ -431,16 +797,107 @@ export async function runMergeStage({ issue, defaultBranch, headSha, d, record, 
   // gates가 아예 없는 것(null/undefined)은 "통과"가 아니라 **판정 없음**이다 — 게이트 파일이
   // 만들어지지 않았거나 이 런에서 게이트가 돌지 않았다는 뜻이고, 머지는 되돌릴 수 없으므로
   // 확인되지 않은 것을 통과로 읽지 않는다(fail closed, §merge gate와 같은 원칙).
+  // #157 — before handing a RED to a human, ask whether it is provably outside this PR's diff (§rerunEligibility).
+  // The diff is read only for a RED; an absent/throwing/not-ok `diffFiles` is "not proven" — today's path.
+  // The test reports are read right after the run that wrote them (the re-run overwrites them) — an absent/throwing
+  // `suiteFailures` is "not vouched for", never "none".
+  const suitesOf = async (g) => {
+    if (!d.suiteFailures) return { ok: false, files: [], reason: "suiteFailures dep not wired" };
+    try { return await d.suiteFailures(g); }
+    catch (e) { return { ok: false, files: [], reason: `${e?.message || e}` }; }
+  };
+  // Every non-GREEN verdict that reaches here gets an eligibility answer — a RED is examined in full; any other status
+  // (MISCONFIGURED, missing) is refused by `rerunEligibility` itself — so the refusal line below always has a reason.
+  let eligible;
+  // #184 dw6: the ids a GREEN re-run let through — set only on that path, read only by the `merge: merged …` line (§(6)).
+  let mergedOnRerunIds = null;
+  if (gates?.status !== "RED") eligible = rerunEligibility(gates);
+  else {
+    let diff;
+    if (!d.diffFiles) diff = { ok: false, reason: "diffFiles dep not wired" };
+    else {
+      try { diff = await d.diffFiles(); }
+      catch (e) { diff = { ok: false, reason: `${e?.message || e}` }; }
+    }
+    eligible = rerunEligibility(gates, diff, await suitesOf(gates));
+    // #184 (cf1, fail closed): without resetGates the re-run could parse the FIRST run's report and brand a test that never
+    // ran again a flaky candidate. An unwired resetGates is "the re-run cannot be trusted" — refused like an unwired diffFiles.
+    if (eligible.ok && typeof d.resetGates !== "function") {
+      eligible = { ok: false, reason: "resetGates dep not wired — a re-run could read the first run's test report" };
+    }
+  }
+  if (eligible.ok) {
+    const ids = eligible.ids;
+    // The first run's evidence survives only here — the re-run overwrites `.factory/out/gates.json`. Written BEFORE the second gates run starts: a job killed during the re-run (merge job timeout) is told apart from
+    // one killed in the first run by this line, and the first RED's gates-detail lines survive the re-run's overwrite.
+    record([`merge: gates RED outside the PR diff — rerun 1/1 (${idList(ids)}) ${stampTag(stamp)}`, ...gatesDetailLines(gates, stamp), ...testEnvNote]);
+    let again;
+    try {
+      // cf1 (review round 2, two reviewers): the re-run must not be able to read the FIRST run's test report. `d.gates()` parses
+      // whatever report file the test command left behind; if the re-run's command writes none (crash, runner killed), the stale
+      // report would make the same id set look RED twice and a test that never ran again would be branded a flaky candidate.
+      // `resetGates` is the stage's own "last run's verdict material must not stand in for this run" (run-stage.js) — same
+      // function, called once more here. After it, a re-run that writes no report shows `parsed:false`, which `redTestIds`
+      // already refuses to turn into ids — so it can never equal the first set. That holds only for a report resetGates may
+      // delete: one outside the repo root is left alone, so run-stage's `suiteFailures` refuses to vouch for it and such a
+      // RED never reaches this re-run (#157 cf2).
+      await d.resetGates();
+      again = await d.gates();
+    } catch (e) {
+      if (!isMergeBaseError(e) && !isGitDiffError(e)) throw e;
+      const reason = isMergeBaseError(e) ? MERGE_BASE_BLOCKED_REASON : GIT_DIFF_BLOCKED_REASON;
+      const t = await toBlocked(reason);
+      record([`merge: gates rerun BLOCKED — ${e.message}`, ...refusal(t)]);
+      return 2;
+    }
+    // The required `factory/gates` status must follow the final verdict — a stale failure would refuse a GREEN re-run at (5).
+    if (again && again.diagnostic !== true && postStatus) {
+      await postStatus({ context: "factory/gates", state: again.status === "GREEN" ? "success" : "failure", description: verdictLine(again), sha: again.head_sha });
+    }
+    const againEnvNote = envNoteOf(again);
+    // BLOCKED, or no verdict at all: the re-run could not decide anything — blocked (plan dw2), never a merge, never a
+    // third run. A missing verdict on the FIRST run stays needs-human (F7); here the first run already said RED and the
+    // re-run is what failed to happen, which is the "could not decide" case blocked exists for.
+    if (!again || again.status === "BLOCKED") {
+      const reason = again ? (again.blocked_reason || "gates could not be decided") : `gates rerun gave no verdict (first run RED on ${idList(ids)}, outside the PR diff)`;
+      const t = await toBlocked(reason);
+      record([`merge: gates rerun BLOCKED — ${reason}`, ...refusal(t), ...againEnvNote]);
+      return 2;
+    }
+    if (again.status !== "GREEN") {
+      const ids2 = again.status === "RED" ? redTestIds(again, await suitesOf(again)) : null;
+      const candidate = sameIdSet(ids, ids2);
+      const status2 = again.status;
+      // cf1: a RED re-run whose test gate wrote no report is not "RED twice" — it is a re-run that did not happen. Say so.
+      const unreported = again.status === "RED" && Object.values(again.gates || {}).some((g) => g?.status === "RED" && g.parsed === false);
+      const reason = candidate
+        ? `gates RED at merge — ${FLAKY_CANDIDATE_TEXT}: ${idList(ids)}`
+        : unreported
+          ? `gates rerun inconclusive — the re-run wrote no test report (first run RED on ${idList(ids)}, outside the PR diff); not a flaky candidate`
+          : `gates ${status2} at merge after one rerun — first run RED on ${idList(ids)} (outside the PR diff), rerun ${status2}${ids2 ? ` on ${idList(ids2)}` : again.failing?.length ? ` (failing gates: ${again.failing.join(", ")})` : ""}`;
+      const t = await d.transition({ to: "factory:needs-human", reason });
+      record([`merge: gates ${status2} on rerun`, ...gatesDetailLines(again, stamp), ...(candidate ? flakyCandidateLines(ids, "RED", stamp) : []), ...refusal(t), ...againEnvNote]);
+      return 2;
+    }
+    record([`merge: gates GREEN on rerun — first run RED on ${idList(ids)}, outside the PR diff`, ...flakyCandidateLines(ids, "GREEN", stamp)]);
+    gates = again;
+    mergedOnRerunIds = ids;
+    testEnvNote = againEnvNote;
+  }
   if (!gates || gates.status !== "GREEN") {
     const reason = `gates ${gates?.status ?? "missing"} at merge`;
     const t = await d.transition({ to: "factory:needs-human", reason });
     // Feedback loop Task 1/3 — 이름뿐인 `merge: gates RED`는 **왜** 빨간지를 말하지 않는다. run-stage가
     // 이미 닫은 그 구멍(7일짜리 아티팩트에만 남던 뿌리)이 머지 직전의 게이트에서만 열려 있었다.
     // `stamp`가 이 줄을 이 런에 묶는다 — 묶이지 않은 줄은 Task 3의 harvester가 증거로 세지 않는다.
-    record([`merge: gates ${gates?.status ?? "missing"}`, ...gatesDetailLines(gates, stamp), ...refusal(t), ...testEnvNote]);
+    // #157 review sec-s1: the one line a refused re-run adds, right after the verdict line — the rest is today's record.
+    const noRerun = eligible.ok ? [] : [noRerunLine(eligible.reason, stamp)];
+    record([`merge: gates ${gates?.status ?? "missing"}`, ...noRerun, ...gatesDetailLines(gates, stamp), ...refusal(t), ...testEnvNote]);
     return 2;
   }
   record([`merge: gates ${gates.status}`, ...testEnvNote]);
+  evidenceGates = gates;                     // #195 — this run's own verdict (the re-run's, when it ran) is the gates row
+  evidenceRerun = mergedOnRerunIds !== null;
 
   // (4b) KTB-15b: blocked에서 재시도된 런이면, 게이트가 방금 다시 GREEN으로 확인된 지금이 라벨을
   // approved로 되돌릴 유일하게 정당한 시점이다(위 doc comment 참고) — 아래 mergeGates·prReady·mergePr는
@@ -609,7 +1066,8 @@ export async function runMergeStage({ issue, defaultBranch, headSha, d, record, 
     record([`merge: ${line}`, ...refusal(t)]);
     return 2;
   };
-  {
+  // #179 — 같은 검증을 거부권 창 뒤에 한 번 더 돌린다(라이브 head·정족수·출처·게시자). 그래서 함수다; 실패면 종료 코드, 통과면 null.
+  const verifyReview = async () => {
     const missingDeps = ["reviewEvidence", "reviewRoster", "reviewRecord", "reviewRunId", "prHeadShaLive", "commitStatuses", "factoryLogins"].filter((k) => !d[k]);
     if (missingDeps.length) {
       return await reviewRefused(`review-evidence deps not wired (${missingDeps.join(", ")}) — the merge stage cannot prove a review happened, and an unverified review is not a passed review`);
@@ -698,6 +1156,154 @@ export async function runMergeStage({ issue, defaultBranch, headSha, d, record, 
     const posted = verifyFactoryStatuses({ sha: live, statuses, logins: logins.logins });
     if (!posted.ok) return await reviewRefused(posted.reason);
     record([`merge: ${REVIEW_EVIDENCE_STATUSES.join(" + ")} on ${live.slice(0, 7)} posted by the factory`]);
+    return null;
+  };
+  {
+    const refused = await verifyReview();
+    if (refused !== null) return refused;
+  }
+
+  // (6b') #179 (ADR-033) — 자기 변경 경로의 거부권 창. 보호 경로·정책·게이트·필수 체크·(6b) 리뷰 검증이 **전부** 통과한 뒤,
+  // 승인·머지 직전이다: 앞에 두면 어차피 사람에게 갈 PR이 60분을 기다리고 "곧 머지합니다"를 알린다. 창이 닫힌 뒤 (6b)를
+  // 다시 돌려 그사이 head가 움직였거나 정족수가 무너졌으면 머지하지 않는다(게이트 재실행 대신 — 같은 head면 같은 트리다).
+  //
+  // 모든 미지(dep 미배선·ok:false·throw·로그인 미해결·잡 시각 미상)는 "거부권 없음"이나 "창 닫힘"이 아니라 판정 불가(blocked)다.
+  // 남은 잡 시간이 창보다 짧으면 창을 아예 열지 않는다(상태·코멘트 없음) — 그 사유는 소유자가 고칠 두 숫자를 댄다.
+  const vetoWindow = async ({ selfPath: kind, files }) => {
+    const what = "veto window";
+    const missing = ["vetoWindow", "vetoLabel", "now", "factoryLogins"].filter((k) => !d[k]);
+    if (missing.length) return await undecidable(what, `deps not wired (${missing.join(", ")})`);
+    const vetoMinutes = d.selfChange?.veto_minutes;
+    if (!Number.isInteger(vetoMinutes) || vetoMinutes <= 0) return await undecidable(what, `CHARTER self_change.veto_minutes is not a positive integer (${JSON.stringify(vetoMinutes)})`);
+    const started = d.jobStartedAt, timeout = d.jobTimeoutMinutes;
+    if (!Number.isFinite(started) || started <= 0) return await undecidable(what, "the job start time is unknown (FACTORY_JOB_STARTED is not set) — the remaining job time cannot be checked against the window");
+    if (!Number.isFinite(timeout) || timeout <= 0) return await undecidable(what, "the job's timeout-minutes is unknown (FACTORY_JOB_TIMEOUT_MINUTES is not set) — the remaining job time cannot be checked against the window");
+    let openedAt;
+    try { openedAt = Number(d.now()); } catch (e) { return await undecidable(what, `clock unreadable: ${e?.message || e}`); }
+    if (!Number.isFinite(openedAt)) return await undecidable(what, "clock returned no time");
+    const windowMs = vetoMinutes * 60 * 1000;
+    const remainingMs = started + timeout * 60 * 1000 - openedAt;
+    // 창 뒤의 일(리뷰 재검증·승인·머지·전이)도 같은 잡 안에서 끝나야 한다 — 잡이 창 끝에서 죽으면 finally가 돌지 않는다(KTB-24).
+    if (remainingMs < windowMs + VETO_POST_WINDOW_MARGIN_MS) {
+      const marginMin = VETO_POST_WINDOW_MARGIN_MS / 60000;
+      const reason = `veto window does not fit in this merge job — timeout-minutes: ${timeout} leaves ${Math.max(0, Math.floor(remainingMs / 60000))} min, CHARTER self_change.veto_minutes: ${vetoMinutes} plus a ${marginMin} min margin for the post-window re-verify and merge; raise timeout-minutes in .github/workflows/factory-merge.yml above ${vetoMinutes + marginMin} (plus the gate time) or lower veto_minutes — no window was opened`;
+      const t = await toBlocked(reason);
+      record([`merge: veto window not started — ${reason}`, ...refusal(t)]);
+      return 2;
+    }
+    const closesAt = new Date(openedAt + windowMs).toISOString();
+    const description = vetoWindowDescription(closesAt);
+
+    // 상태는 best-effort가 아니다(postStatus와 다르다): 게시되지 않은 창은 소유자에게 보이지 않는 창이다.
+    let w;
+    try { w = await d.vetoWindow.open({ sha, description }); }
+    catch (e) { return await undecidable(what, `the ${VETO_WINDOW_CONTEXT} status could not be posted: ${e?.message || e}`); }
+    if (!w?.ok) return await undecidable(what, `the ${VETO_WINDOW_CONTEXT} status could not be posted: ${w?.reason || "unknown"}`);
+    // 올라간 것이 **이 런의 창**이고 팩토리 계정이 올렸는가 — `verifyFactoryStatuses`와 같은 로그인 집합으로 대조한다.
+    let logins, posted;
+    try { logins = await d.factoryLogins(); } catch (e) { logins = { ok: false, reason: `${e?.message || e}` }; }
+    if (!logins?.ok || !Array.isArray(logins.logins) || !logins.logins.length) return await undecidable(what, `the factory's own account could not be resolved — there is no way to tell who posted ${VETO_WINDOW_CONTEXT}: ${logins?.reason || "unknown"}`);
+    try { posted = await d.vetoWindow.read({ sha }); } catch (e) { posted = { ok: false, reason: `${e?.message || e}` }; }
+    if (!posted?.ok) return await undecidable(what, `the ${VETO_WINDOW_CONTEXT} status could not be read back: ${posted?.reason || "unknown"}`);
+    const st = posted.status;
+    const known = new Set(logins.logins.filter(Boolean).map((l) => String(l).toLowerCase()));
+    if (!st || st.description !== description || String(st.state).toLowerCase() !== "pending") {
+      return await undecidable(what, `the latest ${VETO_WINDOW_CONTEXT} status on ${String(sha).slice(0, 7)} is not the window this run opened (${st ? `"${st.state}" ${st.description}` : "none"})`);
+    }
+    if (!known.has(String(st.creatorLogin || "").toLowerCase())) {
+      return await undecidable(what, `${VETO_WINDOW_CONTEXT} on ${String(sha).slice(0, 7)} was posted by @${st.creatorLogin || "unknown"}, which is not a factory account (${[...known].map((l) => `@${l}`).join(", ")})`);
+    }
+
+    // 코멘트도 best-effort가 아니다: 소유자가 찾을 수 없는 창은 창이 아니다.
+    const body = [
+      `**거부권 창 — 팩토리가 이 PR을 자동 머지합니다(ADR-033, ${kind === "judge" ? "판정 경로 · 만장일치 리뷰" : "비판정 경로"}).**`,
+      "",
+      `멈추려면 **${closesAt}**(UTC)까지 추적 이슈 #${issue}에 \`${VETO_LABEL}\` 라벨을 붙이세요 — 이 PR이 아니라 이슈 #${issue}입니다(팩토리는 그 이슈의 라벨 이벤트를 읽습니다).`,
+      "붙였다가 떼어도 거부권은 남습니다. 거부하면 팩토리는 머지하지 않고 사람에게 넘깁니다.",
+      `창이 닫힐 때까지 거부가 없으면 head \`${String(sha).slice(0, 7)}\`를 squash 머지합니다(CHARTER \`self_change.auto_merge_${kind}\`, \`veto_minutes: ${vetoMinutes}\`).`,
+      "",
+      "바뀐 보호 경로:",
+      "",
+      ...files.map((f) => `- \`${f}\``),
+    ].join("\n");
+    if (!d.comment) return await undecidable(what, "comment dep not wired — the owner could not be told how to veto");
+    try { await d.comment(pr, body); }
+    catch (e) { return await undecidable(what, `the veto-window announcement could not be posted on PR #${pr}: ${e?.message || e}`); }
+    record([`merge: veto window opened — ${description} (${vetoMinutes} min, ${kind === "judge" ? "judge" : "non-judge"} path) on ${String(sha).slice(0, 7)}`]);
+
+    const since = new Date(openedAt).toISOString();
+    const deadline = openedAt + windowMs;
+    for (;;) {
+      let lab;
+      try { lab = await d.vetoLabel({ since }); } catch (e) { lab = { ok: false, reason: `${e?.message || e}` }; }
+      if (!lab?.ok || !Array.isArray(lab.vetoes)) return await undecidable(what, `${VETO_LABEL} label poll failed: ${lab?.reason || "no event list returned"}`);
+      if (lab.vetoes.length) {
+        const by = lab.vetoes.map((v) => String(v?.login || "").trim()).find(Boolean);
+        const who = by ? `@${by}` : `an unidentified account (the ${VETO_LABEL} label event names no actor)`;
+        return await handToHuman({
+          reason: `vetoed by ${who} — ${HUMAN_MERGE_REQUIRED_TEXT}`,
+          sections: [{
+            heading: "거부권 행사",
+            why: [`거부권 창 안에서 ${who}가 추적 이슈 #${issue}에 \`${VETO_LABEL}\`를 붙였습니다. 팩토리는 이 PR을 머지하지 않습니다.`, "", "바뀐 보호 경로:"],
+            files,
+          }],
+        });
+      }
+      let now;
+      try { now = Number(d.now()); } catch (e) { return await undecidable(what, `clock unreadable: ${e?.message || e}`); }
+      if (!Number.isFinite(now)) return await undecidable(what, "clock returned no time");
+      if (now >= deadline) break;
+      try { await sleep(Math.min(VETO_POLL_MS, deadline - now)); }
+      catch (e) { return await undecidable(what, `the wait failed: ${e?.message || e}`); }
+    }
+    record([`merge: veto window closed — no ${VETO_LABEL} on #${issue} by ${closesAt}`]);
+    return null;
+  };
+  /**
+   * (6b'') #189 (S4c, ADR-033) — **자동 머지 회로차단기.** 자기 변경 경로(판정·비판정 둘 다)는 창을 열기 **전에** 한 번, 창이 닫혀
+   * (6b)를 다시 돈 **뒤에** 한 번 더 묻는다(창 60분 사이에 두 번째 revert가 들어올 수 있다). 열려 있으면 창을 열지 않고(상태·알림
+   * 코멘트 없음) 사람에게 넘기며, 사유는 언제부터·왜·어느 명령이 닫는지를 말한다. 모르는 상태(ok:false·throw·함수가 아닌 dep·
+   * 열림도 닫힘도 아닌 답)는 닫힘이 아니라 판정 불가(blocked)다. 값은 저장된 워터마크가 아니라 `d.breaker()`가 그때그때 계산한다.
+   *
+   * `d.breaker`가 **아예 없는** 호출자도 예외가 아니다(키가 없음·undefined·null 모두): 배선을 잊은 호출자가 차단기를 묻지 않고
+   * 자동 머지하는 길은 없다 — 그것이 곧 fail-open이다. 프로덕션 배선(run-stage `main()`의 `breaker: makeMergeBreakerDep(…)`)은
+   * 언제나 함수를 싣는다.
+   */
+  const breakerGate = async (when) => {
+    const what = `auto-merge breaker (${when})`;
+    if (typeof d.breaker !== "function") return await undecidable(what, "the breaker dep is not wired (not a function) — an unknown breaker is not a closed breaker");
+    let b;
+    try { b = await d.breaker(); } catch (e) { return await undecidable(what, `${e?.message || e}`); }
+    if (!b?.ok) return await undecidable(what, b?.reason || "the breaker state could not be read");
+    if (b.open === true) {
+      return await handToHuman({
+        reason: `breaker open since ${b.since}: ${b.reason} — ${HUMAN_MERGE_REQUIRED_TEXT}; only a person closes it: \`${BREAKER_RESET_COMMAND}\``,
+        sections: [{
+          heading: "자동 머지 차단기 열림",
+          why: [
+            `팩토리가 자동 머지한 판정 경로 PR이 main에서 연속으로 revert되어 차단기가 열려 있습니다(ADR-033, since ${b.since}).`,
+            `사유: ${b.reason}`,
+            "",
+            `차단기는 시간이 지나도 닫히지 않습니다 — 사람만 닫습니다: \`${BREAKER_RESET_COMMAND}\`.`,
+            "", "바뀐 보호 경로:",
+          ],
+          files: prot.files,
+        }],
+      });
+    }
+    if (b.open !== false) return await undecidable(what, `the breaker answered neither open nor closed (${JSON.stringify(b.open ?? null)})`);
+    record([`merge: auto-merge breaker closed ${when} — ${b.detail || "no detail"}`]);
+    return null;
+  };
+  if (selfPath) {
+    const shut = await breakerGate("before the veto window");
+    if (shut !== null) return shut;
+    const stopped = await vetoWindow({ selfPath, files: prot.files });
+    if (stopped !== null) return stopped;
+    const refused = await verifyReview();
+    if (refused !== null) return refused;
+    const shutAfter = await breakerGate("after the veto window");
+    if (shutAfter !== null) return shutAfter;
   }
 
   // (6c) ADR-021 — **두 배우 모드에서는 승인이 머지보다 먼저다.** 두 배우 모드의 base 브랜치는
@@ -732,15 +1338,87 @@ export async function runMergeStage({ issue, defaultBranch, headSha, d, record, 
     }
   }
 
+  // #189 rework r5 cf1 — **자동 머지의 증거를 머지 전에 굳힌다.** 차단기가 판정 자동 머지를 아는 길은 `factory/records`의 이 줄
+  // 하나뿐이다. 스테이지 끝 동기화(최선 노력)에만 맡기면, 그 동기화를 잃은 머지는 나중에 revert돼도 세어지지 않는다(fail-open).
+  // 그래서 줄을 run 기록에 쓰고(`record` — 가드가 이 줄을 trust한다) `d.persistSelfMerge`로 브랜치에 올려 **다시 읽어 확인한** 뒤에만
+  // 머지한다. 못 올리면(ok:false·던짐·배선 누락) 머지하지 않는다 — blocked(재시도는 sweeper가 민다). 판정 비트는 지금(`selfPath`) 적는다.
+  // skeptic r5 f1 — 머지가 일어나지 않았으면(거부·실패) 그 줄을 **무효 줄**로 지운다(`voidSelfMerge`): 그러지 않으면 사람이 나중에 그 PR을
+  // 손으로 머지했을 때 main의 squash 커밋이 그 줄을 "확인"해, 사람의 머지가 판정 자동 머지로 세어진다.
+  let voidSelfMerge = null;
+  if (selfPath) {
+    const nowIso = () => { try { return new Date(Number(d.now())).toISOString(); } catch { return new Date().toISOString(); } };
+    const at = nowIso();
+    const line = selfMergeLine({ issue, pr, kind: selfPath, sha, at });
+    record([line]);
+    voidSelfMerge = async (why) => {
+      const v = selfMergeVoidLine({ issue, pr, sha, at: nowIso(), voids: at });
+      record([v]);                                                    // 가드가 trust한다 — 스테이지 끝 동기화도 이 줄을 싣는다
+      let q;
+      if (typeof d.persistSelfMerge !== "function") q = { ok: false, reason: "the persistSelfMerge dep is not wired" };
+      else { try { q = await d.persistSelfMerge({ line: v, issue, pr, sha }); } catch (e) { q = { ok: false, reason: `${e?.message || e}` }; } }
+      record([q?.ok
+        ? `merge: self-merge evidence for PR #${pr} voided on factory/records — ${why}`
+        : `merge: self-merge void for PR #${pr} NOT confirmed on factory/records (${q?.reason || "no answer"}) — ${why}; it rides the stage-end sync, and if that is lost too a later person-merge of PR #${pr} counts as a judge-path auto-merge (the breaker can open early, never miss one)`]);
+    };
+    const refuse = async (why) => {
+      const reason = `self-merge evidence could not be made durable on factory/records before the merge — ${why}; PR #${pr} was not merged (a revert of a merge the breaker cannot see would never count)`;
+      await voidSelfMerge(`PR #${pr} was not merged (the evidence was refused before the merge)`);
+      const t = await toBlocked(reason);
+      record([`merge: ${reason}`, ...refusal(t)]);
+      return 2;
+    };
+    if (typeof d.persistSelfMerge !== "function") return await refuse("the persistSelfMerge dep is not wired");
+    let p;
+    try { p = await d.persistSelfMerge({ line, issue, pr, sha }); } catch (e) { return await refuse(`${e?.message || e}`); }
+    if (!p?.ok) return await refuse(p?.reason || "the writer gave no answer");
+    record([`merge: self-merge evidence for PR #${pr} confirmed on factory/records before the merge`]);
+  }
+
+  // #195/#208 — the evidence lands on the PR body right before the squash: after the two-actor approval and the self-merge
+  // evidence write succeeded (their refusals above publish nothing), and on the self-change path after the window closed.
+  await publishEvidence({ route: "merge" });
   try {
-    await d.mergePr(pr);
+    // #179 — 자기 변경 경로는 창 뒤에 다시 검증한 head를 머지 호출에 못 박는다(`--match-head-commit`): 재검증과 머지 사이의
+    // push는 GitHub이 거부한다. 오늘의 경로는 호출 모양 그대로다.
+    if (selfPath) await d.mergePr(pr, { matchHeadCommit: sha });
+    else await d.mergePr(pr);
   } catch (e) {
     const reason = `merge API failed: ${e?.message || e}`;
+    // skeptic r5 f1 — 머지 호출이 실패했다. 머지가 정말 일어나지 않았는지는 GitHub에 묻는다: OPEN/CLOSED라고 답하면 그 줄을 무효로
+    // 지운다. MERGED(응답만 잃은 머지)이거나 답을 못 얻으면 지우지 않는다 — 모르는 것을 "머지 안 됨"으로 읽지 않는다(틀려도 여는 쪽).
+    if (voidSelfMerge) {
+      let after = null;
+      try { after = await d.prInfo(); } catch { after = null; }
+      const state = after && Number(after.number) === Number(pr) && typeof after.state === "string" ? after.state : null;
+      if (state && state !== "MERGED") await voidSelfMerge(`mergePr failed and GitHub reports PR #${pr} ${state}`);
+      else record([`merge: self-merge evidence for PR #${pr} kept — ${state === "MERGED" ? "GitHub reports the PR MERGED despite the failed call" : "GitHub could not say whether the PR merged"}`]);
+    }
     const t = await toBlocked(reason);
     record([`merge: mergePr FAIL — ${reason}`, ...refusal(t)]);
     return 2;
   }
-  record([`merge: merged ${sha ? sha.slice(0, 7) : "unknown"} via PR #${pr}`]);
+  // #184 dw6 (plan d1): a merge that went through only because the one re-run was GREEN says so on its own merged line, naming
+  // the retried tests (the same scrubbed names as the rerun/flaky-candidate lines) — the one trace left of "this test failed,
+  // passed on retry, and the PR merged". Written after mergePr returned, so the mark never sits on a merge that did not happen.
+  const rerunMark = mergedOnRerunIds ? ` — ${MERGED_ON_RERUN_TEXT} (first run RED on ${idList(mergedOnRerunIds)}, rerun GREEN)` : "";
+  record([`merge: merged ${sha ? sha.slice(0, 7) : "unknown"} via PR #${pr}${rerunMark}`]);
+
+  // #195 — after a merge, the same evidence once on the tracking issue (the dep updates the runner's existing marked comment
+  // instead of posting a second one). Best-effort and bounded like the PR-body step (a hung gh here must not hold the
+  // transition below); a failure is one record line, and the line says what the dep reported doing.
+  // Logins that could not be resolved already gave the run its one FAIL line, and the comment step would fail closed on the
+  // same cause: it is not attempted, and the record says so plainly.
+  if (evidenceMarkdown !== null && evidenceLoginsUnresolved) record(["evidence: issue comment not posted — factory logins not resolved (see the FAIL line)"]);
+  else if (evidenceMarkdown !== null && typeof d.postEvidenceComment === "function") {
+    try {
+      const r = await boundedEvidence((signal) => d.postEvidenceComment(evidenceMarkdown, { signal }), () => "comment");
+      if (r?.ok === false) throw new Error(r.reason || "postEvidenceComment answered ok:false");
+      record([r?.posted === true ? "evidence: issue comment posted"
+        : r?.posted === false ? `evidence: issue comment already present — not posted again (${Number.isInteger(r.updated) ? r.updated : 0} updated in place)`
+          : "evidence: issue comment dep returned without saying whether it posted"]);
+    } catch (e) { record([evidenceFail("comment", e)]); }
+  }
+  // #189 — 자기 변경 경로의 머지만 차단기의 증거가 된다. 그 줄은 위에서(머지 전에) 이미 적고 브랜치에서 확인했다(rework r5 cf1).
 
   // (7) 라벨 전이. 이 시점부터는 되돌릴 수 없다 — 거부돼도 needs-human 코멘트는 transition() 자신이
   // 남기므로 여기서는 record만 하고 계속 진행한다(이슈는 그래도 닫는다).
