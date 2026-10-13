@@ -16,8 +16,6 @@ import 'screens/theme_settings_screen.dart';
 import 'screens/category_settings_screen.dart';
 import 'screens/holiday_settings_screen.dart';
 import 'screens/import_screen.dart';
-import 'screens/routine_screen.dart';
-import 'screens/routine_form_screen.dart';
 import 'screens/group_screen.dart';
 import 'screens/group_detail_screen.dart';
 import 'screens/follow_search_screen.dart';
@@ -148,20 +146,6 @@ GoRouter createRouter(AuthProvider authProvider) {
       GoRoute(
         path: '/import',
         builder: (context, state) => const ImportScreen(),
-      ),
-      GoRoute(
-        path: '/routines',
-        builder: (context, state) => const RoutineScreen(),
-      ),
-      GoRoute(
-        path: '/routine/new',
-        builder: (context, state) => const RoutineFormScreen(),
-      ),
-      GoRoute(
-        path: '/routine/:id/edit',
-        builder: (context, state) => RoutineFormScreen(
-          routineId: state.pathParameters['id'],
-        ),
       ),
       GoRoute(
         path: '/groups',
