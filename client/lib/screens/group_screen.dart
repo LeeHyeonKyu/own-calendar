@@ -420,9 +420,24 @@ class _GroupScreenState extends State<GroupScreen>
                     ),
                     title: Text(f.user.name),
                     subtitle: Text(f.user.email),
-                    trailing: TextButton(
-                      onPressed: () => _showUnfollowConfirm(f.user),
-                      child: const Text('언팔로우'),
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        IconButton(
+                          icon: const Icon(Icons.calendar_month),
+                          tooltip: '일정 보기',
+                          onPressed: () => context.push(
+                            '/follows/${f.user.id}/events?name=${Uri.encodeComponent(f.user.name)}',
+                          ),
+                        ),
+                        TextButton(
+                          onPressed: () => _showUnfollowConfirm(f.user),
+                          child: const Text('언팔로우'),
+                        ),
+                      ],
+                    ),
+                    onTap: () => context.push(
+                      '/follows/${f.user.id}/events?name=${Uri.encodeComponent(f.user.name)}',
                     ),
                   ),
                 )),

@@ -18,6 +18,7 @@ import 'screens/import_screen.dart';
 import 'screens/group_screen.dart';
 import 'screens/group_detail_screen.dart';
 import 'screens/follow_search_screen.dart';
+import 'screens/followee_events_screen.dart';
 import 'widgets/navigation_shell.dart';
 
 GoRouter createRouter(AuthProvider authProvider) {
@@ -150,6 +151,13 @@ GoRouter createRouter(AuthProvider authProvider) {
         path: '/groups/:id',
         builder: (context, state) => GroupDetailScreen(
           groupId: state.pathParameters['id']!,
+        ),
+      ),
+      GoRoute(
+        path: '/follows/:id/events',
+        builder: (context, state) => FolloweeEventsScreen(
+          followeeId: state.pathParameters['id']!,
+          followeeName: state.uri.queryParameters['name'] ?? '',
         ),
       ),
       GoRoute(
