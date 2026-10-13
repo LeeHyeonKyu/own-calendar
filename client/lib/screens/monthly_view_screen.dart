@@ -15,6 +15,8 @@ void showCategoryFilterDialog(BuildContext context) {
       return StatefulBuilder(
         builder: (ctx, setSheetState) {
           final calProvider = ctx.watch<CalendarProvider>();
+          final categories = calProvider.categories;
+          final hiddenIds = calProvider.hiddenCategoryIds;
           return SafeArea(
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -29,27 +31,41 @@ void showCategoryFilterDialog(BuildContext context) {
                       ),
                       const Spacer(),
                       TextButton(
-                        onPressed: () => calProvider.selectAllCategories(),
+                        onPressed: () => calProvider.showAllCategories(),
                         child: const Text('전체 선택'),
                       ),
                     ],
                   ),
                 ),
-                ...EventModel.categoryLabels.entries.map(
-                  (e) => CheckboxListTile(
-                    value: calProvider.selectedCategories.contains(e.key),
-                    onChanged: (_) => calProvider.toggleCategory(e.key),
+                ...categories.map(
+                  (cat) => CheckboxListTile(
+                    value: !hiddenIds.contains(cat.id),
+                    onChanged: (_) => calProvider.toggleCategoryVisibility(cat.id),
                     secondary: Container(
                       width: Spacing.lg,
                       height: Spacing.lg,
                       decoration: BoxDecoration(
-                        color: Color(EventModel.categoryColors[e.key]!),
+                        color: cat.colorValue,
                         shape: BoxShape.circle,
                       ),
                     ),
-                    title: Text(e.value),
+                    title: Text(cat.displayName),
                     dense: true,
                   ),
+                ),
+                CheckboxListTile(
+                  value: !calProvider.hideUncategorized,
+                  onChanged: (_) => calProvider.toggleUncategorized(),
+                  secondary: Container(
+                    width: Spacing.lg,
+                    height: Spacing.lg,
+                    decoration: BoxDecoration(
+                      color: Colors.grey,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                  title: const Text('미분류'),
+                  dense: true,
                 ),
                 SizedBox(height: Spacing.sm),
               ],
@@ -90,8 +106,9 @@ class _MonthlyViewScreenState extends State<MonthlyViewScreen> {
     final start = _currentMonth;
     final end = DateTime(_currentMonth.year, _currentMonth.month + 1);
     final provider = context.read<CalendarProvider>();
+    await provider.loadCategories();
     await provider.loadEvents(start: start, end: end);
-    await provider.loadFamilyEvents(start: start, end: end);
+    await provider.loadGroupEvents(start: start, end: end);
     await provider.loadTasks(start: start, end: end);
   }
 
@@ -283,7 +300,7 @@ class _MonthlyViewScreenState extends State<MonthlyViewScreen> {
         actions: [
           IconButton(
             icon: Icon(
-              calProvider.isAllCategoriesSelected
+              calProvider.isAllCategoriesVisible
                   ? Icons.filter_list
                   : Icons.filter_list_off,
             ),
@@ -292,10 +309,10 @@ class _MonthlyViewScreenState extends State<MonthlyViewScreen> {
           ),
           IconButton(
             icon: Icon(
-              calProvider.showFamilyEvents ? Icons.people : Icons.people_outline,
+              calProvider.showGroupEvents ? Icons.people : Icons.people_outline,
             ),
-            tooltip: calProvider.showFamilyEvents ? '가족 일정 숨기기' : '가족 일정 보기',
-            onPressed: () => calProvider.toggleFamilyEvents(),
+            tooltip: calProvider.showGroupEvents ? '그룹 일정 숨기기' : '그룹 일정 보기',
+            onPressed: () => calProvider.toggleGroupEvents(),
           ),
           IconButton(
             icon: const Icon(Icons.search),

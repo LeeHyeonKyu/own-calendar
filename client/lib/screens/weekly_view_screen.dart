@@ -65,7 +65,7 @@ class _WeeklyViewScreenState extends State<WeeklyViewScreen> {
     final provider = context.read<CalendarProvider>();
     await Future.wait([
       provider.loadEvents(start: _weekStart, end: weekEnd),
-      provider.loadFamilyEvents(start: _weekStart, end: weekEnd),
+      provider.loadGroupEvents(start: _weekStart, end: weekEnd),
     ]);
   }
 

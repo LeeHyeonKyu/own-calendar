@@ -51,7 +51,7 @@ class _DailyViewScreenState extends State<DailyViewScreen> {
     final provider = context.read<CalendarProvider>();
     await Future.wait([
       provider.loadEvents(start: start, end: end),
-      provider.loadFamilyEvents(start: start, end: end),
+      provider.loadGroupEvents(start: start, end: end),
       provider.loadTasks(start: start, end: end),
     ]);
   }

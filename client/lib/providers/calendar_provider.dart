@@ -2,7 +2,9 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:home_widget/home_widget.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../models/calendar.dart';
+import '../models/category.dart';
 import '../models/event.dart';
 import '../models/task.dart';
 import '../services/api_service.dart';
@@ -11,17 +13,20 @@ class CalendarProvider extends ChangeNotifier {
   CalendarProvider({ApiService? api})
       : _api = api ?? ApiService();
 
+  static const _kHiddenCategoryIds = 'hidden_category_ids';
+  static const _kHideUncategorized = 'hide_uncategorized';
+
   final ApiService _api;
   List<CalendarModel> _calendars = [];
   List<EventModel> _events = [];
-  List<EventModel> _familyEvents = [];
+  List<EventModel> _groupEvents = [];
+  List<CategoryModel> _categories = [];
   List<TaskModel> _tasks = [];
   bool _isLoading = false;
   String? _error;
-  bool _showFamilyEvents = true;
-  Set<String> _selectedCategories = {
-    'WORK', 'PERSONAL', 'FAMILY', 'HEALTH', 'SOCIAL', 'FINANCE', 'OTHER',
-  };
+  bool _showGroupEvents = true;
+  Set<String> _hiddenCategoryIds = {};
+  bool _hideUncategorized = false;
 
   /// Pending deferred deletes: event id -> timer.
   final Map<String, Timer> _pendingDeleteTimers = {};
@@ -40,43 +45,85 @@ class CalendarProvider extends ChangeNotifier {
 
   List<CalendarModel> get calendars => _calendars;
   List<EventModel> get events => _events;
-  List<EventModel> get familyEvents => _familyEvents;
+  List<EventModel> get groupEvents => _groupEvents;
+  List<CategoryModel> get categories => _categories;
   List<TaskModel> get tasks => _tasks;
   List<EventModel> get allVisibleEvents {
-    final merged = _showFamilyEvents ? [..._events, ..._familyEvents] : _events;
-    if (_selectedCategories.length == EventModel.categoryLabels.length) {
+    final merged = _showGroupEvents ? [..._events, ..._groupEvents] : _events;
+    if (_hiddenCategoryIds.isEmpty && !_hideUncategorized) {
       return merged;
     }
-    return merged.where((e) => _selectedCategories.contains(e.category)).toList();
+    return merged.where((e) {
+      if (e.categoryId == null) return !_hideUncategorized;
+      return !_hiddenCategoryIds.contains(e.categoryId);
+    }).toList();
   }
   bool get isLoading => _isLoading;
   String? get error => _error;
-  bool get showFamilyEvents => _showFamilyEvents;
-  Set<String> get selectedCategories => _selectedCategories;
-  bool get isAllCategoriesSelected =>
-      _selectedCategories.length == EventModel.categoryLabels.length;
+  bool get showGroupEvents => _showGroupEvents;
+  Set<String> get hiddenCategoryIds => _hiddenCategoryIds;
+  bool get hideUncategorized => _hideUncategorized;
+  bool get isAllCategoriesVisible =>
+      _hiddenCategoryIds.isEmpty && !_hideUncategorized;
 
-  void toggleFamilyEvents() {
-    _showFamilyEvents = !_showFamilyEvents;
+  void toggleGroupEvents() {
+    _showGroupEvents = !_showGroupEvents;
     notifyListeners();
   }
 
-  void toggleCategory(String category) {
-    if (_selectedCategories.contains(category)) {
-      if (_selectedCategories.length > 1) {
-        _selectedCategories.remove(category);
-      }
+  void toggleCategoryVisibility(String categoryId) {
+    if (_hiddenCategoryIds.contains(categoryId)) {
+      _hiddenCategoryIds.remove(categoryId);
     } else {
-      _selectedCategories.add(category);
+      _hiddenCategoryIds.add(categoryId);
     }
+    _persistFilterState();
     notifyListeners();
   }
 
-  void selectAllCategories() {
-    _selectedCategories = {
-      'WORK', 'PERSONAL', 'FAMILY', 'HEALTH', 'SOCIAL', 'FINANCE', 'OTHER',
-    };
+  void toggleUncategorized() {
+    _hideUncategorized = !_hideUncategorized;
+    _persistFilterState();
     notifyListeners();
+  }
+
+  void showAllCategories() {
+    _hiddenCategoryIds.clear();
+    _hideUncategorized = false;
+    _persistFilterState();
+    notifyListeners();
+  }
+
+  Future<void> _persistFilterState() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setStringList(_kHiddenCategoryIds, _hiddenCategoryIds.toList());
+    await prefs.setBool(_kHideUncategorized, _hideUncategorized);
+  }
+
+  Future<void> _restoreFilterState() async {
+    final prefs = await SharedPreferences.getInstance();
+    final hidden = prefs.getStringList(_kHiddenCategoryIds);
+    if (hidden != null) {
+      _hiddenCategoryIds = hidden.toSet();
+    }
+    _hideUncategorized = prefs.getBool(_kHideUncategorized) ?? false;
+  }
+
+  Future<void> loadCategories() async {
+    final res = await _api.get('/categories');
+    if (res.statusCode == 200) {
+      final list = jsonDecode(res.body) as List;
+      _categories = list.map((j) => CategoryModel.fromJson(j)).toList();
+      await _restoreFilterState();
+      // Remove hidden IDs that no longer exist in the DB
+      final validIds = _categories.map((c) => c.id).toSet();
+      final removed = _hiddenCategoryIds.difference(validIds);
+      if (removed.isNotEmpty) {
+        _hiddenCategoryIds.removeAll(removed);
+        _persistFilterState();
+      }
+      notifyListeners();
+    }
   }
 
   Future<void> _updateMonthlyWidget() async {
@@ -85,7 +132,7 @@ class CalendarProvider extends ChangeNotifier {
       // Build events map: day number -> list of event data
       final Map<String, List<Map<String, dynamic>>> eventsMap = {};
 
-      final allEvents = [..._events, ..._familyEvents];
+      final allEvents = [..._events, ..._groupEvents];
       for (final event in allEvents) {
         // Include events that fall within the current display month
         final monthStart = DateTime(now.year, now.month, 1);
@@ -120,7 +167,7 @@ class CalendarProvider extends ChangeNotifier {
                 ? null
                 : '${event.endTime.hour.toString().padLeft(2, '0')}:${event.endTime.minute.toString().padLeft(2, '0')}',
             'category': event.category,
-            'isFamily': _familyEvents.contains(event),
+            'isGroup': _groupEvents.contains(event),
           });
         }
       }
@@ -270,7 +317,7 @@ class CalendarProvider extends ChangeNotifier {
     }
   }
 
-  Future<void> loadFamilyEvents({DateTime? start, DateTime? end}) async {
+  Future<void> loadGroupEvents({DateTime? start, DateTime? end}) async {
     String query = '';
     if (start != null) query += 'start=${start.toIso8601String()}&';
     if (end != null) query += 'end=${end.toIso8601String()}&';
@@ -279,14 +326,14 @@ class CalendarProvider extends ChangeNotifier {
     );
     if (res.statusCode == 200) {
       final data = jsonDecode(res.body) as List;
-      _familyEvents = [];
+      _groupEvents = [];
       for (final member in data) {
         if (member['calendars'] != null) {
           for (final cal in member['calendars']) {
             if (cal['events'] != null) {
               for (final evt in cal['events']) {
                 evt['calendar'] = {'name': cal['name'], 'color': cal['color']};
-                _familyEvents.add(EventModel.fromJson(evt));
+                _groupEvents.add(EventModel.fromJson(evt));
               }
             }
           }
