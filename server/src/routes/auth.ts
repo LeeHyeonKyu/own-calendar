@@ -30,8 +30,8 @@ router.post('/register', validate(registerSchema), async (req: Request, res: Res
 
 router.post('/login', validate(loginSchema), async (req: Request, res: Response) => {
   try {
-    const { email, password } = req.body;
-    const result = await authService.login(email, password);
+    const { email, password, rememberMe } = req.body;
+    const result = await authService.login(email, password, !!rememberMe);
     res.json(result);
   } catch (error: any) {
     const statusCode = error.statusCode || 500;

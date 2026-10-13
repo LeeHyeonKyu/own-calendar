@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
 import '../models/task.dart';
+import '../providers/calendar_provider.dart';
 import '../themes/spacing.dart';
 
-class TaskCard extends StatelessWidget {
+class TaskCard extends StatefulWidget {
   final TaskModel task;
   final VoidCallback? onTap;
   final VoidCallback? onToggleComplete;
@@ -15,6 +17,15 @@ class TaskCard extends StatelessWidget {
     this.onToggleComplete,
   });
 
+  @override
+  State<TaskCard> createState() => _TaskCardState();
+}
+
+class _TaskCardState extends State<TaskCard> {
+  bool _checklistExpanded = false;
+
+  TaskModel get task => widget.task;
+
   Color get _statusColor {
     if (task.isDone) return AppColors.taskDone;
     if (task.isOverdue) return AppColors.taskOverdue;
@@ -24,6 +35,18 @@ class TaskCard extends StatelessWidget {
   Color get _borderColor {
     if (task.priority != 'NONE') return Color(task.priorityColorValue);
     return _statusColor;
+  }
+
+  void _toggleChecklistItem(int index) {
+    final updated = List<ChecklistItem>.from(task.checklist!);
+    updated[index] = updated[index].copyWith(done: !updated[index].done);
+    final checklistJson = updated.map((e) => e.toJson()).toList();
+    context.read<CalendarProvider>().updateTask(
+      task.baseId,
+      {'checklist': checklistJson},
+      editMode: task.isVirtualInstance ? 'this' : null,
+      instanceDate: task.instanceDateString,
+    );
   }
 
   @override
@@ -38,98 +61,259 @@ class TaskCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(AppRadius.sm),
       ),
       clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(AppRadius.sm),
-        child: Opacity(
-          opacity: task.isDone ? 0.55 : 1.0,
-          child: Padding(
-            padding: const EdgeInsets.all(Spacing.md),
-            child: Row(
-              children: [
-                Container(
-                  width: 4,
-                  height: 48,
-                  decoration: BoxDecoration(
-                    color: _borderColor,
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-                const SizedBox(width: Spacing.sm),
-                GestureDetector(
-                  onTap: onToggleComplete,
-                  child: Container(
-                    width: 20,
-                    height: 20,
-                    decoration: BoxDecoration(
-                      border: Border.all(
-                        color: _statusColor,
-                        width: 2,
+      child: Opacity(
+        opacity: task.isDone ? 0.55 : 1.0,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Main card content
+            InkWell(
+              onTap: widget.onTap,
+              child: Padding(
+                padding: const EdgeInsets.all(Spacing.md),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 4,
+                      height: 48,
+                      decoration: BoxDecoration(
+                        color: _borderColor,
+                        borderRadius: BorderRadius.circular(2),
                       ),
-                      borderRadius: BorderRadius.circular(3),
-                      color: task.isDone ? AppColors.taskDone : null,
                     ),
-                    child: task.isDone
-                        ? const Icon(Icons.check, size: 14, color: Colors.white)
-                        : null,
-                  ),
-                ),
-                const SizedBox(width: Spacing.sm),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        task.title,
-                        style: TextStyle(
-                          fontSize: AppTypography.body,
-                          fontWeight: FontWeight.w500,
-                          decoration: task.isDone ? TextDecoration.lineThrough : null,
-                          color: task.isDone ? cs.outline : null,
+                    const SizedBox(width: Spacing.sm),
+                    GestureDetector(
+                      onTap: widget.onToggleComplete,
+                      child: Container(
+                        width: 20,
+                        height: 20,
+                        decoration: BoxDecoration(
+                          border: Border.all(
+                            color: _statusColor,
+                            width: 2,
+                          ),
+                          borderRadius: BorderRadius.circular(3),
+                          color: task.isDone ? AppColors.taskDone : null,
+                        ),
+                        child: task.isDone
+                            ? const Icon(Icons.check, size: 14, color: Colors.white)
+                            : null,
+                      ),
+                    ),
+                    const SizedBox(width: Spacing.sm),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            task.title,
+                            style: TextStyle(
+                              fontSize: AppTypography.body,
+                              fontWeight: FontWeight.w500,
+                              decoration: task.isDone ? TextDecoration.lineThrough : null,
+                              color: task.isDone ? cs.outline : null,
+                            ),
+                          ),
+                          const SizedBox(height: Spacing.xs),
+                          Row(
+                            children: [
+                              if (task.hasTime) ...[
+                                Text(
+                                  task.scheduledTime!,
+                                  style: TextStyle(
+                                    fontSize: AppTypography.bodySmall,
+                                    color: AppColors.taskPending,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                                const SizedBox(width: Spacing.sm),
+                              ],
+                              if (task.hasDueDate)
+                                _DueTag(task: task),
+                              if (task.hasEvent) ...[
+                                if (task.hasDueDate) const SizedBox(width: Spacing.sm),
+                                _RelatedBadge(eventTitle: task.eventTitle ?? ''),
+                              ],
+                              if (task.isRecurring) ...[
+                                const SizedBox(width: Spacing.sm),
+                                Flexible(child: _RecurrenceBadge(summary: task.rruleSummary)),
+                              ],
+                              if (task.hasChecklist) ...[
+                                const SizedBox(width: Spacing.sm),
+                                _ChecklistBadge(
+                                  done: task.checklistDoneCount,
+                                  total: task.checklistTotalCount,
+                                ),
+                              ],
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                    if (task.priority != 'NONE')
+                      Container(
+                        width: 8,
+                        height: 8,
+                        decoration: BoxDecoration(
+                          color: Color(task.priorityColorValue),
+                          shape: BoxShape.circle,
                         ),
                       ),
-                      const SizedBox(height: Spacing.xs),
-                      Row(
-                        children: [
-                          if (task.hasTime) ...[
-                            Text(
-                              task.scheduledTime!,
-                              style: TextStyle(
-                                fontSize: AppTypography.bodySmall,
-                                color: AppColors.taskPending,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                            const SizedBox(width: Spacing.sm),
-                          ],
-                          if (task.hasDueDate)
-                            _DueTag(task: task),
-                          if (task.hasEvent) ...[
-                            if (task.hasDueDate) const SizedBox(width: Spacing.sm),
-                            _RelatedBadge(eventTitle: task.eventTitle ?? ''),
-                          ],
-                          if (task.isRecurring) ...[
-                            const SizedBox(width: Spacing.sm),
-                            Flexible(child: _RecurrenceBadge(summary: task.rruleSummary)),
-                          ],
-                        ],
+                  ],
+                ),
+              ),
+            ),
+            // Checklist section
+            if (task.hasChecklist) ...[
+              Divider(height: 1, color: cs.outlineVariant.withAlpha(80)),
+              InkWell(
+                onTap: () => setState(() => _checklistExpanded = !_checklistExpanded),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: Spacing.lg,
+                    vertical: Spacing.sm,
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.checklist,
+                        size: 16,
+                        color: cs.outline,
+                      ),
+                      const SizedBox(width: Spacing.sm),
+                      Text(
+                        '${task.checklistDoneCount}/${task.checklistTotalCount} 완료',
+                        style: TextStyle(
+                          fontSize: AppTypography.caption,
+                          color: cs.outline,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      const Spacer(),
+                      Icon(
+                        _checklistExpanded ? Icons.expand_less : Icons.expand_more,
+                        size: 18,
+                        color: cs.outline,
                       ),
                     ],
                   ),
                 ),
-                if (task.priority != 'NONE')
-                  Container(
-                    width: 8,
-                    height: 8,
-                    decoration: BoxDecoration(
-                      color: Color(task.priorityColorValue),
-                      shape: BoxShape.circle,
-                    ),
+              ),
+              if (_checklistExpanded)
+                Padding(
+                  padding: const EdgeInsets.only(
+                    left: Spacing.md,
+                    right: Spacing.md,
+                    bottom: Spacing.sm,
                   ),
-              ],
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: List.generate(task.checklist!.length, (i) {
+                      final item = task.checklist![i];
+                      return _ChecklistItemRow(
+                        item: item,
+                        onToggle: () => _toggleChecklistItem(i),
+                      );
+                    }),
+                  ),
+                ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ChecklistBadge extends StatelessWidget {
+  final int done;
+  final int total;
+  const _ChecklistBadge({required this.done, required this.total});
+
+  @override
+  Widget build(BuildContext context) {
+    final allDone = done == total;
+    final color = allDone
+        ? AppColors.taskDone
+        : Theme.of(context).colorScheme.outline;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: Spacing.sm, vertical: 1),
+      decoration: BoxDecoration(
+        color: color.withAlpha(25),
+        borderRadius: BorderRadius.circular(AppRadius.sm),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.checklist, size: 10, color: color),
+          const SizedBox(width: 2),
+          Text(
+            '$done/$total',
+            style: TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.w600,
+              color: color,
             ),
           ),
-        ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ChecklistItemRow extends StatelessWidget {
+  final ChecklistItem item;
+  final VoidCallback onToggle;
+
+  const _ChecklistItemRow({required this.item, required this.onToggle});
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Padding(
+      padding: EdgeInsets.only(
+        left: item.indent * 20.0,
+        top: 2,
+        bottom: 2,
+      ),
+      child: Row(
+        children: [
+          GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: onToggle,
+            child: SizedBox(
+              width: 48,
+              height: 32,
+              child: Center(
+                child: Container(
+                  width: 16,
+                  height: 16,
+                  decoration: BoxDecoration(
+                    border: Border.all(
+                      color: item.done ? AppColors.taskDone : cs.outline,
+                      width: 1.5,
+                    ),
+                    borderRadius: BorderRadius.circular(3),
+                    color: item.done ? AppColors.taskDone : null,
+                  ),
+                  child: item.done
+                      ? const Icon(Icons.check, size: 10, color: Colors.white)
+                      : null,
+                ),
+              ),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              item.text,
+              style: TextStyle(
+                fontSize: AppTypography.eventTitle,
+                decoration: item.done ? TextDecoration.lineThrough : null,
+                color: item.done ? cs.outline : null,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

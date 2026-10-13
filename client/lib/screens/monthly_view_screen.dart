@@ -11,48 +11,87 @@ import '../themes/spacing.dart';
 void showCategoryFilterDialog(BuildContext context) {
   showModalBottomSheet(
     context: context,
+    isScrollControlled: true,
     builder: (ctx) {
       return StatefulBuilder(
         builder: (ctx, setSheetState) {
           final calProvider = ctx.watch<CalendarProvider>();
-          return SafeArea(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Padding(
-                  padding: EdgeInsets.fromLTRB(Spacing.lg, Spacing.lg, Spacing.lg, Spacing.sm),
-                  child: Row(
-                    children: [
-                      Text(
-                        '카테고리 필터',
-                        style: TextStyle(fontSize: AppTypography.h2, fontWeight: FontWeight.bold),
-                      ),
-                      const Spacer(),
-                      TextButton(
-                        onPressed: () => calProvider.selectAllCategories(),
-                        child: const Text('전체 선택'),
-                      ),
-                    ],
-                  ),
-                ),
-                ...EventModel.categoryLabels.entries.map(
-                  (e) => CheckboxListTile(
-                    value: calProvider.selectedCategories.contains(e.key),
-                    onChanged: (_) => calProvider.toggleCategory(e.key),
-                    secondary: Container(
-                      width: Spacing.lg,
-                      height: Spacing.lg,
-                      decoration: BoxDecoration(
-                        color: Color(EventModel.categoryColors[e.key]!),
-                        shape: BoxShape.circle,
-                      ),
+          final categories = calProvider.categories;
+          return DraggableScrollableSheet(
+            initialChildSize: 0.5,
+            minChildSize: 0.3,
+            maxChildSize: 0.8,
+            expand: false,
+            builder: (ctx, scrollController) => SafeArea(
+              child: Column(
+                children: [
+                  Padding(
+                    padding: EdgeInsets.fromLTRB(Spacing.lg, Spacing.lg, Spacing.lg, Spacing.sm),
+                    child: Row(
+                      children: [
+                        Text(
+                          '카테고리 필터',
+                          style: TextStyle(fontSize: AppTypography.h2, fontWeight: FontWeight.bold),
+                        ),
+                        const Spacer(),
+                        TextButton(
+                          onPressed: () => calProvider.selectAllCategories(),
+                          child: const Text('전체 선택'),
+                        ),
+                      ],
                     ),
-                    title: Text(e.value),
-                    dense: true,
                   ),
-                ),
-                SizedBox(height: Spacing.sm),
-              ],
+                  Expanded(
+                    child: ListView(
+                      controller: scrollController,
+                      children: [
+                        ...categories.map(
+                          (cat) => CheckboxListTile(
+                            value: calProvider.isCategoryVisible(cat.id),
+                            onChanged: (_) => calProvider.toggleCategoryVisibility(cat.id),
+                            secondary: Container(
+                              width: Spacing.lg,
+                              height: Spacing.lg,
+                              decoration: BoxDecoration(
+                                color: cat.colorValue,
+                                shape: BoxShape.circle,
+                              ),
+                              child: cat.emoji != null && cat.emoji!.isNotEmpty
+                                  ? Center(
+                                      child: Text(
+                                        cat.emoji!,
+                                        style: const TextStyle(fontSize: 12),
+                                      ),
+                                    )
+                                  : null,
+                            ),
+                            title: Text(cat.name),
+                            dense: true,
+                          ),
+                        ),
+                        CheckboxListTile(
+                          value: !calProvider.hideUncategorized,
+                          onChanged: (_) => calProvider.toggleUncategorized(),
+                          secondary: Container(
+                            width: Spacing.lg,
+                            height: Spacing.lg,
+                            decoration: BoxDecoration(
+                              color: Colors.grey,
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Center(
+                              child: Text('?', style: TextStyle(fontSize: 12, color: Colors.white, fontWeight: FontWeight.bold)),
+                            ),
+                          ),
+                          title: const Text('미분류'),
+                          dense: true,
+                        ),
+                        SizedBox(height: Spacing.sm),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
             ),
           );
         },
@@ -90,9 +129,13 @@ class _MonthlyViewScreenState extends State<MonthlyViewScreen> {
     final start = _currentMonth;
     final end = DateTime(_currentMonth.year, _currentMonth.month + 1);
     final provider = context.read<CalendarProvider>();
-    await provider.loadEvents(start: start, end: end);
-    await provider.loadFamilyEvents(start: start, end: end);
-    await provider.loadTasks(start: start, end: end);
+    await Future.wait([
+      provider.loadEvents(start: start, end: end),
+      provider.loadGroupEvents(start: start, end: end),
+      provider.loadTasks(start: start, end: end),
+      provider.loadHolidays(year: _currentMonth.year, month: _currentMonth.month),
+      provider.loadCategories(),
+    ]);
   }
 
   void _previousMonth() {
@@ -139,12 +182,23 @@ class _MonthlyViewScreenState extends State<MonthlyViewScreen> {
     }).toList();
   }
 
-  /// Get up to 3 unique calendar colors from a day's events.
+  /// Resolve an event's display color: DB category color > calendar color > default.
+  Color _eventDisplayColor(EventModel event) {
+    if (event.categoryColor != null && event.categoryColor!.isNotEmpty) {
+      return _parseColor(event.categoryColor);
+    }
+    if (event.calendarColor != null && event.calendarColor!.isNotEmpty) {
+      return _parseColor(event.calendarColor);
+    }
+    return Colors.blue;
+  }
+
+  /// Get up to 3 unique display colors from a day's events.
   List<Color> _uniqueEventColors(List<EventModel> dayEvents) {
     final seen = <int>{};
     final colors = <Color>[];
     for (final event in dayEvents) {
-      final color = _parseColor(event.calendarColor);
+      final color = _eventDisplayColor(event);
       if (seen.add(color.toARGB32()) && colors.length < 3) {
         colors.add(color);
       }
@@ -156,6 +210,7 @@ class _MonthlyViewScreenState extends State<MonthlyViewScreen> {
     final day = _selectedDay!;
     final dayEvents = _eventsForDay(day, allEvents);
     final dayTasks = _tasksForDay(day, allTasks);
+    final dayHolidays = calProvider.holidaysForDay(day);
     final dateStr = DateFormat('M월 d일 (E)', 'ko').format(day);
     final theme = Theme.of(context);
 
@@ -213,6 +268,28 @@ class _MonthlyViewScreenState extends State<MonthlyViewScreen> {
               ],
             ),
           ),
+          if (dayHolidays.isNotEmpty)
+            Padding(
+              padding: EdgeInsets.symmetric(horizontal: Spacing.lg),
+              child: Wrap(
+                spacing: Spacing.sm,
+                children: dayHolidays.map((h) => Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: AppColors.sundayText.withAlpha(25),
+                    borderRadius: BorderRadius.circular(AppRadius.md),
+                  ),
+                  child: Text(
+                    h.name,
+                    style: TextStyle(
+                      fontSize: AppTypography.bodySmall,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.sundayText,
+                    ),
+                  ),
+                )).toList(),
+              ),
+            ),
           Expanded(
             child: (dayEvents.isEmpty && dayTasks.isEmpty)
                 ? Center(
@@ -257,7 +334,7 @@ class _MonthlyViewScreenState extends State<MonthlyViewScreen> {
   Widget build(BuildContext context) {
     final calProvider = context.watch<CalendarProvider>();
     final allEvents = calProvider.allVisibleEvents;
-    final allTasks = calProvider.tasks;
+    final allTasks = calProvider.tasks.where((t) => !t.isHabit).toList();
     final today = DateTime.now();
     final monthLabel = DateFormat('yyyy년 M월', 'ko').format(_currentMonth);
     final theme = Theme.of(context);
@@ -292,10 +369,10 @@ class _MonthlyViewScreenState extends State<MonthlyViewScreen> {
           ),
           IconButton(
             icon: Icon(
-              calProvider.showFamilyEvents ? Icons.people : Icons.people_outline,
+              calProvider.showGroupEvents ? Icons.people : Icons.people_outline,
             ),
-            tooltip: calProvider.showFamilyEvents ? '가족 일정 숨기기' : '가족 일정 보기',
-            onPressed: () => calProvider.toggleFamilyEvents(),
+            tooltip: calProvider.showGroupEvents ? '그룹 일정 숨기기' : '그룹 일정 보기',
+            onPressed: () => calProvider.toggleGroupEvents(),
           ),
           IconButton(
             icon: const Icon(Icons.search),
@@ -446,6 +523,8 @@ class _MonthlyViewScreenState extends State<MonthlyViewScreen> {
                           day.day == _selectedDay!.day;
                       final dayEvents = _eventsForDay(day, allEvents);
                       final dayTasks = _tasksForDay(day, allTasks);
+                      final dayHolidays = calProvider.holidaysForDay(day);
+                      final isHoliday = dayHolidays.isNotEmpty;
                       final hasEvents = dayEvents.isNotEmpty;
                       final hasTasks = dayTasks.isNotEmpty;
                       final eventColors = _uniqueEventColors(dayEvents);
@@ -488,7 +567,7 @@ class _MonthlyViewScreenState extends State<MonthlyViewScreen> {
                                       fontWeight: FontWeight.w500,
                                       color: isToday
                                           ? Colors.white
-                                          : col == 0
+                                          : isHoliday || col == 0
                                               ? AppColors.sundayText
                                               : col == 6
                                                   ? AppColors.saturdayText
@@ -564,7 +643,10 @@ class _EventCardWithTasks extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final timeFormat = DateFormat('HH:mm');
-    final eventColor = parseColor(event.calendarColor);
+    // Prefer category color > calendar color > default blue
+    final eventColor = (event.categoryColor != null && event.categoryColor!.isNotEmpty)
+        ? parseColor(event.categoryColor)
+        : parseColor(event.calendarColor);
     final theme = Theme.of(context);
 
     return Container(

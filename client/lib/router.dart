@@ -5,7 +5,6 @@ import 'screens/monthly_view_screen.dart';
 import 'screens/daily_view_screen.dart';
 import 'screens/weekly_view_screen.dart';
 import 'screens/yearly_view_screen.dart';
-import 'screens/family_screen.dart';
 import 'screens/event_form_screen.dart';
 import 'screens/task_form_screen.dart';
 import 'screens/search_screen.dart';
@@ -15,11 +14,11 @@ import 'screens/theme_settings_screen.dart';
 import 'screens/category_settings_screen.dart';
 import 'screens/holiday_settings_screen.dart';
 import 'screens/import_screen.dart';
-import 'screens/routine_screen.dart';
-import 'screens/routine_form_screen.dart';
 import 'screens/group_screen.dart';
+import 'screens/habit_screen.dart';
 import 'screens/group_detail_screen.dart';
 import 'screens/follow_search_screen.dart';
+import 'screens/followee_events_screen.dart';
 import 'widgets/navigation_shell.dart';
 
 GoRouter createRouter(AuthProvider authProvider) {
@@ -75,8 +74,12 @@ GoRouter createRouter(AuthProvider authProvider) {
             builder: (context, state) => const YearlyViewScreen(),
           ),
           GoRoute(
-            path: '/family',
-            builder: (context, state) => const FamilyScreen(),
+            path: '/groups',
+            builder: (context, state) => const GroupScreen(),
+          ),
+          GoRoute(
+            path: '/habits',
+            builder: (context, state) => const HabitScreen(),
           ),
           GoRoute(
             path: '/settings',
@@ -106,7 +109,8 @@ GoRouter createRouter(AuthProvider authProvider) {
           final dateStr = state.uri.queryParameters['date'];
           final date = dateStr != null ? DateTime.tryParse(dateStr) : null;
           final eventId = state.uri.queryParameters['eventId'];
-          return TaskFormScreen(initialDate: date, initialEventId: eventId);
+          final isHabit = state.uri.queryParameters['isHabit'] == 'true';
+          return TaskFormScreen(initialDate: date, initialEventId: eventId, initialIsHabit: isHabit);
         },
       ),
       GoRoute(
@@ -140,24 +144,6 @@ GoRouter createRouter(AuthProvider authProvider) {
         builder: (context, state) => const ImportScreen(),
       ),
       GoRoute(
-        path: '/routines',
-        builder: (context, state) => const RoutineScreen(),
-      ),
-      GoRoute(
-        path: '/routine/new',
-        builder: (context, state) => const RoutineFormScreen(),
-      ),
-      GoRoute(
-        path: '/routine/:id/edit',
-        builder: (context, state) => RoutineFormScreen(
-          routineId: state.pathParameters['id'],
-        ),
-      ),
-      GoRoute(
-        path: '/groups',
-        builder: (context, state) => const GroupScreen(),
-      ),
-      GoRoute(
         path: '/groups/:id',
         builder: (context, state) => GroupDetailScreen(
           groupId: state.pathParameters['id']!,
@@ -166,6 +152,16 @@ GoRouter createRouter(AuthProvider authProvider) {
       GoRoute(
         path: '/follow/search',
         builder: (context, state) => const FollowSearchScreen(),
+      ),
+      GoRoute(
+        path: '/follow/:id/events',
+        builder: (context, state) {
+          final name = state.uri.queryParameters['name'] ?? '';
+          return FolloweeEventsScreen(
+            followeeId: state.pathParameters['id']!,
+            followeeName: name,
+          );
+        },
       ),
 
       // Deep link routes for widget interactions

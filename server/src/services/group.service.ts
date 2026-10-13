@@ -274,17 +274,8 @@ export const groupService = {
 
       const calendars = await prisma.calendar.findMany({
         where: {
-          OR: [
-            {
-              ownerId: member.userId,
-              visibility: 'PUBLIC',
-              type: 'PERSONAL',
-            },
-            {
-              groupId,
-              type: 'FAMILY',
-            },
-          ],
+          groupId,
+          type: 'FAMILY',
         },
         include: {
           events: {

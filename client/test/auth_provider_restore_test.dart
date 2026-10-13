@@ -28,6 +28,9 @@ class _FakeApiService implements ApiService {
   String? lastSavedCachedUser;
 
   @override
+  void Function()? onSessionExpired;
+
+  @override
   Future<String?> get accessToken async => _access;
 
   @override

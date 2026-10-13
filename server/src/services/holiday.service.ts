@@ -27,18 +27,42 @@ export const holidayService = {
   },
 
   async listSubscriptions(userId: string) {
-    return prisma.holidaySubscription.findMany({
+    let subs = await prisma.holidaySubscription.findMany({
       where: { userId },
       orderBy: { createdAt: 'asc' },
     });
+
+    // Auto-subscribe KR for existing users who have no subscriptions
+    if (subs.length === 0) {
+      const created = await prisma.holidaySubscription.create({
+        data: { userId, countryCode: 'KR' },
+      }).catch(() => null);
+      if (created) {
+        const year = new Date().getFullYear();
+        await holidayService.refreshHolidays('KR', year).catch(() => {});
+        subs = [created];
+      }
+    }
+
+    return subs;
   },
 
   async getHolidays(userId: string, year: number, month?: number) {
-    const subscriptions = await prisma.holidaySubscription.findMany({
+    let subscriptions = await prisma.holidaySubscription.findMany({
       where: { userId },
     });
 
-    if (subscriptions.length === 0) return [];
+    // Auto-subscribe KR for users with no subscriptions
+    if (subscriptions.length === 0) {
+      const created = await prisma.holidaySubscription.create({
+        data: { userId, countryCode: 'KR' },
+      }).catch(() => null);
+      if (created) {
+        subscriptions = [created];
+      } else {
+        return [];
+      }
+    }
 
     const countryCodes = subscriptions.map((s) => s.countryCode);
 
@@ -135,6 +159,37 @@ async function fetchKoreanHolidays(year: number): Promise<Array<{ date: Date; na
   return holidays;
 }
 
+// Fixed dates for Korean holidays (month is 1-indexed)
+const KOREAN_FIXED_HOLIDAYS: Record<string, { month: number; day: number }> = {
+  '새해': { month: 1, day: 1 },
+  '3·1절': { month: 3, day: 1 },
+  '삼일절': { month: 3, day: 1 },
+  '어린이날': { month: 5, day: 5 },
+  '현충일': { month: 6, day: 6 },
+  '광복절': { month: 8, day: 15 },
+  '개천절': { month: 10, day: 3 },
+  '한글날': { month: 10, day: 9 },
+  '크리스마스': { month: 12, day: 25 },
+};
+
+function labelSubstituteHolidays(
+  holidays: Array<{ date: Date; name: string }>,
+  countryCode: string,
+): Array<{ date: Date; name: string }> {
+  if (countryCode !== 'KR') return holidays;
+
+  return holidays.map((h) => {
+    const fixed = KOREAN_FIXED_HOLIDAYS[h.name];
+    if (!fixed) return h;
+    const actualMonth = h.date.getMonth() + 1;
+    const actualDay = h.date.getDate();
+    if (actualMonth !== fixed.month || actualDay !== fixed.day) {
+      return { ...h, name: `대체공휴일(${h.name})` };
+    }
+    return h;
+  });
+}
+
 async function fetchNagerHolidays(countryCode: string, year: number): Promise<Array<{ date: Date; name: string }>> {
   const url = `https://date.nager.at/api/v3/PublicHolidays/${year}/${countryCode}`;
 
@@ -143,10 +198,12 @@ async function fetchNagerHolidays(countryCode: string, year: number): Promise<Ar
     if (!res.ok) return [];
     const data = await res.json() as Array<{ date: string; localName: string; name: string }>;
 
-    return data.map((h) => ({
+    const holidays = data.map((h) => ({
       date: new Date(h.date),
       name: h.localName || h.name,
     }));
+
+    return labelSubstituteHolidays(holidays, countryCode);
   } catch {
     return [];
   }

@@ -1,8 +1,11 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:home_widget/home_widget.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../models/calendar.dart';
+import '../models/category.dart';
 import '../models/event.dart';
+import '../models/holiday.dart';
 import '../models/task.dart';
 import '../services/api_service.dart';
 
@@ -10,52 +13,137 @@ class CalendarProvider extends ChangeNotifier {
   final ApiService _api = ApiService();
   List<CalendarModel> _calendars = [];
   List<EventModel> _events = [];
-  List<EventModel> _familyEvents = [];
+  List<EventModel> _groupEvents = [];
+  Set<String> _groupCalendarIds = {};
+  List<HolidayModel> _holidays = [];
   List<TaskModel> _tasks = [];
   bool _isLoading = false;
-  bool _showFamilyEvents = true;
-  Set<String> _selectedCategories = {
-    'WORK', 'PERSONAL', 'FAMILY', 'HEALTH', 'SOCIAL', 'FINANCE', 'OTHER',
-  };
+  bool _showGroupEvents = true;
+
+  /// DB categories loaded from /api/categories
+  List<CategoryModel> _categories = [];
+
+  /// Category IDs the user has chosen to hide. Persisted in SharedPreferences.
+  Set<String> _hiddenCategoryIds = {};
+
+  /// Whether to hide events/tasks with no categoryId ("uncategorized").
+  bool _hideUncategorized = false;
+
+  static const _kHiddenCategoryIds = 'hidden_category_ids';
+  static const _kHideUncategorized = 'hide_uncategorized';
 
   List<CalendarModel> get calendars => _calendars;
   List<EventModel> get events => _events;
-  List<EventModel> get familyEvents => _familyEvents;
-  List<TaskModel> get tasks => _tasks;
+  List<EventModel> get groupEvents => _groupEvents;
+  List<HolidayModel> get holidays => _holidays;
+  List<CategoryModel> get categories => _categories;
+  Set<String> get hiddenCategoryIds => _hiddenCategoryIds;
+  bool get hideUncategorized => _hideUncategorized;
+
+  List<TaskModel> get tasks {
+    var result = _showGroupEvents
+        ? _tasks
+        : _tasks.where((t) => !_groupCalendarIds.contains(t.calendarId)).toList();
+    if (_hiddenCategoryIds.isNotEmpty || _hideUncategorized) {
+      result = result.where((t) {
+        if (t.categoryId == null) return !_hideUncategorized;
+        return !_hiddenCategoryIds.contains(t.categoryId);
+      }).toList();
+    }
+    return result;
+  }
+
   List<EventModel> get allVisibleEvents {
-    final merged = _showFamilyEvents ? [..._events, ..._familyEvents] : _events;
-    if (_selectedCategories.length == EventModel.categoryLabels.length) {
+    final merged = _showGroupEvents ? [..._events, ..._groupEvents] : _events;
+    if (_hiddenCategoryIds.isEmpty && !_hideUncategorized) {
       return merged;
     }
-    return merged.where((e) => _selectedCategories.contains(e.category)).toList();
+    return merged.where((e) {
+      if (e.categoryId == null) return !_hideUncategorized;
+      return !_hiddenCategoryIds.contains(e.categoryId);
+    }).toList();
   }
+
   bool get isLoading => _isLoading;
-  bool get showFamilyEvents => _showFamilyEvents;
-  Set<String> get selectedCategories => _selectedCategories;
+  bool get showGroupEvents => _showGroupEvents;
   bool get isAllCategoriesSelected =>
-      _selectedCategories.length == EventModel.categoryLabels.length;
+      _hiddenCategoryIds.isEmpty && !_hideUncategorized;
 
-  void toggleFamilyEvents() {
-    _showFamilyEvents = !_showFamilyEvents;
+  void toggleGroupEvents() {
+    _showGroupEvents = !_showGroupEvents;
     notifyListeners();
   }
 
-  void toggleCategory(String category) {
-    if (_selectedCategories.contains(category)) {
-      if (_selectedCategories.length > 1) {
-        _selectedCategories.remove(category);
-      }
+  /// Toggle visibility of a specific DB category by its id.
+  void toggleCategoryVisibility(String categoryId) {
+    if (_hiddenCategoryIds.contains(categoryId)) {
+      _hiddenCategoryIds.remove(categoryId);
     } else {
-      _selectedCategories.add(category);
+      _hiddenCategoryIds.add(categoryId);
     }
+    _saveHiddenCategories();
     notifyListeners();
   }
 
-  void selectAllCategories() {
-    _selectedCategories = {
-      'WORK', 'PERSONAL', 'FAMILY', 'HEALTH', 'SOCIAL', 'FINANCE', 'OTHER',
-    };
+  /// Toggle visibility of uncategorized events/tasks.
+  void toggleUncategorized() {
+    _hideUncategorized = !_hideUncategorized;
+    _saveHiddenCategories();
     notifyListeners();
+  }
+
+  /// Show all categories (clear hidden set).
+  void selectAllCategories() {
+    _hiddenCategoryIds.clear();
+    _hideUncategorized = false;
+    _saveHiddenCategories();
+    notifyListeners();
+  }
+
+  /// Load DB categories from the server and restore hidden state from prefs.
+  Future<void> loadCategories() async {
+    try {
+      final res = await _api.get('/categories');
+      if (res.statusCode == 200) {
+        final list = jsonDecode(res.body) as List;
+        _categories = list.map((j) => CategoryModel.fromJson(j as Map<String, dynamic>)).toList();
+      }
+    } catch (_) {}
+    // Restore hidden state from SharedPreferences
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final hiddenJson = prefs.getString(_kHiddenCategoryIds);
+      if (hiddenJson != null) {
+        final decoded = jsonDecode(hiddenJson) as List;
+        final validIds = _categories.map((c) => c.id).toSet();
+        _hiddenCategoryIds = decoded.cast<String>().where((id) => validIds.contains(id)).toSet();
+      }
+      _hideUncategorized = prefs.getBool(_kHideUncategorized) ?? false;
+    } catch (_) {}
+    notifyListeners();
+  }
+
+  Future<void> _saveHiddenCategories() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_kHiddenCategoryIds, jsonEncode(_hiddenCategoryIds.toList()));
+      await prefs.setBool(_kHideUncategorized, _hideUncategorized);
+    } catch (_) {}
+  }
+
+  /// Check if a specific category is visible (not hidden).
+  bool isCategoryVisible(String categoryId) {
+    return !_hiddenCategoryIds.contains(categoryId);
+  }
+
+  /// Find a category by id.
+  CategoryModel? getCategoryById(String? id) {
+    if (id == null) return null;
+    try {
+      return _categories.firstWhere((c) => c.id == id);
+    } catch (_) {
+      return null;
+    }
   }
 
   Future<void> _updateMonthlyWidget() async {
@@ -64,7 +152,7 @@ class CalendarProvider extends ChangeNotifier {
       // Build events map: day number -> list of event data
       final Map<String, List<Map<String, dynamic>>> eventsMap = {};
 
-      final allEvents = [..._events, ..._familyEvents];
+      final allEvents = [..._events, ..._groupEvents];
       for (final event in allEvents) {
         // Include events that fall within the current display month
         final monthStart = DateTime(now.year, now.month, 1);
@@ -99,7 +187,7 @@ class CalendarProvider extends ChangeNotifier {
                 ? null
                 : '${event.endTime.hour.toString().padLeft(2, '0')}:${event.endTime.minute.toString().padLeft(2, '0')}',
             'category': event.category,
-            'isFamily': _familyEvents.contains(event),
+            'isGroup': _groupEvents.contains(event),
           });
         }
       }
@@ -196,6 +284,23 @@ class CalendarProvider extends ChangeNotifier {
     } catch (_) {}
   }
 
+  Future<void> loadHolidays({required int year, int? month}) async {
+    String query = 'year=$year';
+    if (month != null) query += '&month=$month';
+    final res = await _api.get('/holidays/holidays?$query');
+    if (res.statusCode == 200) {
+      final list = jsonDecode(res.body) as List;
+      _holidays = list.map((j) => HolidayModel.fromJson(j as Map<String, dynamic>)).toList();
+      notifyListeners();
+    }
+  }
+
+  List<HolidayModel> holidaysForDay(DateTime day) {
+    return _holidays.where((h) =>
+      h.date.year == day.year && h.date.month == day.month && h.date.day == day.day
+    ).toList();
+  }
+
   Future<void> loadCalendars() async {
     final res = await _api.get('/calendars');
     if (res.statusCode == 200) {
@@ -222,23 +327,25 @@ class CalendarProvider extends ChangeNotifier {
     _updateMonthlyWidget();
   }
 
-  Future<void> loadFamilyEvents({DateTime? start, DateTime? end}) async {
+  Future<void> loadGroupEvents({DateTime? start, DateTime? end}) async {
     String query = '';
     if (start != null) query += 'start=${start.toIso8601String()}&';
     if (end != null) query += 'end=${end.toIso8601String()}&';
     final res = await _api.get(
-      '/family/calendars${query.isNotEmpty ? "?$query" : ""}',
+      '/groups/calendars${query.isNotEmpty ? "?$query" : ""}',
     );
     if (res.statusCode == 200) {
       final data = jsonDecode(res.body) as List;
-      _familyEvents = [];
+      _groupEvents = [];
+      _groupCalendarIds = {};
       for (final member in data) {
         if (member['calendars'] != null) {
           for (final cal in member['calendars']) {
+            _groupCalendarIds.add(cal['id'] as String);
             if (cal['events'] != null) {
               for (final evt in cal['events']) {
                 evt['calendar'] = {'name': cal['name'], 'color': cal['color']};
-                _familyEvents.add(EventModel.fromJson(evt));
+                _groupEvents.add(EventModel.fromJson(evt));
               }
             }
           }
@@ -343,7 +450,15 @@ class CalendarProvider extends ChangeNotifier {
     final path = _withEditModeQuery('/tasks/$id', editMode: editMode, instanceDate: instanceDate);
     final res = await _api.put(path, data);
     if (res.statusCode == 200) {
-      await loadTasks();
+      final json = jsonDecode(res.body);
+      final updated = TaskModel.fromJson(json);
+      final idx = _tasks.indexWhere((t) => t.id == id);
+      if (idx >= 0) {
+        _tasks[idx] = updated;
+        notifyListeners();
+      } else {
+        await loadTasks();
+      }
       _updateHomeWidget();
       _updateMonthlyWidget();
       return true;

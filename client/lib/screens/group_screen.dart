@@ -103,7 +103,6 @@ class _GroupScreenState extends State<GroupScreen>
     if (res.statusCode == 201) {
       _nameController.clear();
       _loadGroups();
-      if (mounted) Navigator.pop(context);
     } else {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -121,7 +120,6 @@ class _GroupScreenState extends State<GroupScreen>
     if (res.statusCode == 200) {
       _codeController.clear();
       _loadGroups();
-      if (mounted) Navigator.pop(context);
     } else {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -180,6 +178,7 @@ class _GroupScreenState extends State<GroupScreen>
           ),
           autofocus: true,
           onSubmitted: (_) {
+            Navigator.pop(ctx);
             _createGroup();
           },
         ),
@@ -189,7 +188,10 @@ class _GroupScreenState extends State<GroupScreen>
             child: const Text('취소'),
           ),
           FilledButton(
-            onPressed: _createGroup,
+            onPressed: () {
+              Navigator.pop(ctx);
+              _createGroup();
+            },
             child: const Text('만들기'),
           ),
         ],
@@ -211,6 +213,7 @@ class _GroupScreenState extends State<GroupScreen>
           ),
           autofocus: true,
           onSubmitted: (_) {
+            Navigator.pop(ctx);
             _joinGroup();
           },
         ),
@@ -220,7 +223,10 @@ class _GroupScreenState extends State<GroupScreen>
             child: const Text('취소'),
           ),
           FilledButton(
-            onPressed: _joinGroup,
+            onPressed: () {
+              Navigator.pop(ctx);
+              _joinGroup();
+            },
             child: const Text('합류'),
           ),
         ],
@@ -420,9 +426,21 @@ class _GroupScreenState extends State<GroupScreen>
                     ),
                     title: Text(f.user.name),
                     subtitle: Text(f.user.email),
-                    trailing: TextButton(
-                      onPressed: () => _showUnfollowConfirm(f.user),
-                      child: const Text('언팔로우'),
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        IconButton(
+                          icon: const Icon(Icons.calendar_month),
+                          tooltip: '일정 보기',
+                          onPressed: () => context.push(
+                            '/follow/${f.user.id}/events?name=${Uri.encodeComponent(f.user.name)}',
+                          ),
+                        ),
+                        TextButton(
+                          onPressed: () => _showUnfollowConfirm(f.user),
+                          child: const Text('언팔로우'),
+                        ),
+                      ],
                     ),
                   ),
                 )),

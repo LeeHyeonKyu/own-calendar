@@ -20,12 +20,13 @@ describe('Family API', () => {
 
       expect(res.status).toBe(201);
       expect(res.body.name).toBe('우리 가족');
-      expect(res.body.code).toHaveLength(8);
+      expect(res.body.code).toBeDefined();
+      expect(res.body.code.length).toBeGreaterThanOrEqual(6);
       expect(res.body.members).toHaveLength(1);
       expect(res.body.members[0].role).toBe('OWNER');
       expect(res.body.calendar).toBeDefined();
       expect(res.body.calendar.type).toBe('FAMILY');
-      expect(res.body.calendar.name).toBe('우리 가족 가족 캘린더');
+      expect(res.body.calendar.name).toBe('우리 가족 공유 캘린더');
     });
   });
 

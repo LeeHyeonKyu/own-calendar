@@ -1,3 +1,5 @@
+// @deprecated — Use /api/groups instead. Kept for backwards compatibility.
+// All handlers delegate to groupService via familyService wrapper.
 import { Router, Response } from 'express';
 import { familyService } from '../services/family.service';
 import { authenticate } from '../middleware/auth';

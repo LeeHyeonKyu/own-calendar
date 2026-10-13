@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import '../providers/calendar_provider.dart';
 import '../models/event.dart';
+import '../themes/spacing.dart';
 
 const _hourHeight = 60.0;
 // ignore: unused_element
@@ -65,7 +66,9 @@ class _WeeklyViewScreenState extends State<WeeklyViewScreen> {
     final provider = context.read<CalendarProvider>();
     await Future.wait([
       provider.loadEvents(start: _weekStart, end: weekEnd),
-      provider.loadFamilyEvents(start: _weekStart, end: weekEnd),
+      provider.loadGroupEvents(start: _weekStart, end: weekEnd),
+      provider.loadHolidays(year: _weekStart.year, month: _weekStart.month),
+      provider.loadCategories(),
     ]);
   }
 
@@ -124,6 +127,11 @@ class _WeeklyViewScreenState extends State<WeeklyViewScreen> {
   }
 
   Color _eventColor(EventModel event) {
+    // Prefer DB category color > calendar color > legacy enum color > hash fallback
+    if (event.categoryColor != null && event.categoryColor!.isNotEmpty) {
+      final hex = event.categoryColor!.replaceFirst('#', '');
+      if (hex.length == 6) return Color(int.parse('FF$hex', radix: 16));
+    }
     if (event.calendarColor != null) {
       final hex = event.calendarColor!.replaceFirst('#', '');
       if (hex.length == 6) return Color(int.parse('FF$hex', radix: 16));
@@ -196,6 +204,8 @@ class _WeeklyViewScreenState extends State<WeeklyViewScreen> {
                 day.day == now.day;
             final isSunday = day.weekday == DateTime.sunday;
             final isSaturday = day.weekday == DateTime.saturday;
+            final calProvider = context.read<CalendarProvider>();
+            final isHoliday = calProvider.holidaysForDay(day).isNotEmpty;
 
             return Expanded(
               child: GestureDetector(
@@ -210,11 +220,11 @@ class _WeeklyViewScreenState extends State<WeeklyViewScreen> {
                           fontSize: 11,
                           fontWeight: FontWeight.w500,
                           color: isToday
-                              ? _nowColor
-                              : isSunday
-                                  ? Colors.red[400]
+                              ? Theme.of(context).colorScheme.primary
+                              : isHoliday || isSunday
+                                  ? AppColors.sundayText
                                   : isSaturday
-                                      ? Colors.blue[400]
+                                      ? AppColors.saturdayText
                                       : Colors.grey[500],
                         ),
                       ),
@@ -223,7 +233,7 @@ class _WeeklyViewScreenState extends State<WeeklyViewScreen> {
                         width: 28,
                         height: 28,
                         decoration: BoxDecoration(
-                          color: isToday ? _nowColor : null,
+                          color: isToday ? Theme.of(context).colorScheme.primary : null,
                           shape: BoxShape.circle,
                         ),
                         alignment: Alignment.center,
@@ -233,7 +243,13 @@ class _WeeklyViewScreenState extends State<WeeklyViewScreen> {
                             fontSize: 14,
                             fontWeight:
                                 isToday ? FontWeight.bold : FontWeight.w500,
-                            color: isToday ? Colors.white : null,
+                            color: isToday
+                                ? Colors.white
+                                : isHoliday || isSunday
+                                    ? AppColors.sundayText
+                                    : isSaturday
+                                        ? AppColors.saturdayText
+                                        : null,
                           ),
                         ),
                       ),

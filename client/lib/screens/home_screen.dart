@@ -27,7 +27,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final todayStart = DateTime(now.year, now.month, now.day);
     final todayEnd = todayStart.add(const Duration(days: 1));
     await provider.loadEvents(start: todayStart, end: todayEnd);
-    await provider.loadFamilyEvents(start: todayStart, end: todayEnd);
+    await provider.loadGroupEvents(start: todayStart, end: todayEnd);
   }
 
   @override
@@ -36,7 +36,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final now = DateTime.now();
     final dateStr = DateFormat('yyyy년 M월 d일 (E)', 'ko').format(now);
 
-    final allEvents = [...calProvider.events, ...calProvider.familyEvents];
+    final allEvents = [...calProvider.events, ...calProvider.groupEvents];
     allEvents.sort((a, b) => a.startTime.compareTo(b.startTime));
 
     return Scaffold(

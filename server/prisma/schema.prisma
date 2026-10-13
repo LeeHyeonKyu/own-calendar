@@ -1,6 +1,7 @@
 generator client {
-  provider = "prisma-client"
-  output   = "../src/generated/prisma"
+  provider      = "prisma-client"
+  output        = "../src/generated/prisma"
+  binaryTargets = ["native", "debian-openssl-3.0.x"]
 }
 
 datasource db {
@@ -27,8 +28,6 @@ model User {
   sentFollows         Follow[]           @relation("FollowSent")
   receivedFollows     Follow[]           @relation("FollowReceived")
   eventInvites        EventInvite[]
-  routines            Routine[]
-  routineGroups       RoutineGroup[]
   categories          Category[]
   holidaySubscriptions HolidaySubscription[]
   createdAt           DateTime           @default(now())
@@ -226,7 +225,9 @@ model Task {
   calendar       Calendar       @relation(fields: [calendarId], references: [id], onDelete: Cascade)
   createdById    String
   createdBy      User           @relation("CreatedTasks", fields: [createdById], references: [id])
+  checklist      Json?
   sortOrder      Int            @default(0)
+  isHabit        Boolean        @default(false)
   exceptions     RecurrenceException[] @relation("TaskExceptions")
   createdAt      DateTime       @default(now())
   updatedAt      DateTime       @updatedAt
@@ -235,6 +236,7 @@ model Task {
   @@index([eventId])
   @@index([status])
   @@index([dueDate])
+  @@index([isHabit])
 }
 
 model RecurrenceException {
@@ -252,6 +254,7 @@ model RecurrenceException {
   isAllDay       Boolean?
   status         TaskStatus?
   completedAt    DateTime?
+  checklist      Json?
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
 
@@ -325,44 +328,6 @@ model GroupMembership {
   joinedAt DateTime  @default(now())
 
   @@unique([userId, groupId])
-}
-
-model RoutineGroup {
-  id        String    @id @default(cuid())
-  name      String
-  sortOrder Int       @default(0)
-  userId    String
-  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  routines  Routine[]
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-}
-
-model Routine {
-  id          String              @id @default(cuid())
-  name        String
-  time        String?
-  repeatDays  Json
-  sortOrder   Int                 @default(0)
-  groupId     String?
-  group       RoutineGroup?       @relation(fields: [groupId], references: [id], onDelete: SetNull)
-  userId      String
-  user        User                @relation(fields: [userId], references: [id], onDelete: Cascade)
-  completions RoutineCompletion[]
-  createdAt   DateTime            @default(now())
-  updatedAt   DateTime            @updatedAt
-}
-
-model RoutineCompletion {
-  id          String   @id @default(cuid())
-  routineId   String
-  routine     Routine  @relation(fields: [routineId], references: [id], onDelete: Cascade)
-  date        DateTime
-  completedAt DateTime @default(now())
-  createdAt   DateTime @default(now())
-
-  @@unique([routineId, date])
-  @@index([routineId])
 }
 
 model Category {

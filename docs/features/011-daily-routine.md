@@ -1,152 +1,67 @@
 ---
 id: 11
-title: Daily Routine (습관/루틴)
-status: complete
+title: Daily Routine (습관/루틴) — DEPRECATED
+status: deprecated
 priority: P1
 class: Architectural
 depends_on: [1, 10]
 persona: 현규
 gate:
   worktree: null
-  architect: pending
-  designer: pending
-  qa: pending
-assumptions:
-  - "습관 항목 수가 가족 규모에서 수십 개 이내로 유지될 것"
+  architect: fail
+  designer: fail
+  qa: skipped
+deprecated_reason: "루틴 = 반복 Task. 별도 엔티티(Routine/RoutineGroup/RoutineCompletion) 불필요. Feature 012에 흡수."
+superseded_by: 12
 date: 2026-09-08
 generatedBy: know-thy-build-feature
 ---
 
-# Daily Routine (습관/루틴)
+# Daily Routine (습관/루틴) — DEPRECATED
 
-매일 반복되는 습관/루틴을 별도로 관리하고 완료 여부를 추적한다.
+> **이 Feature는 폐기되었습니다.** Feature 012 (반복 규칙 엔진)에 흡수됨.
 
-## Problem
+## 폐기 사유
 
-일기 쓰기, 영양제 섭취, 명상 같은 습관은 캘린더 일정과 성격이 다르다. 월별 뷰에 매일 반복되면 노이즈가 되고, "했는지/안 했는지"를 추적하는 것이 핵심인데 일정 시스템에는 완료 개념이 없다. 현재 이런 루틴을 관리할 방법이 Own Calendar에 없다.
+Gate Review (2026-09-10)에서 Architect FAIL + Designer FAIL 판정.
 
-## Value
+근본 원인: **루틴은 반복 Task와 동일한 개념**이다.
 
-습관/루틴이 캘린더와 같은 앱에서 관리되면, 일정 확인과 루틴 체크를 한 곳에서 할 수 있다. Daily view / Timeline view에서 일정과 루틴이 함께 보이되, 월별 뷰에는 노이즈를 주지 않는다. TickTick 등에서 별도 feature로 분리하는 것과 동일한 접근.
+| 루틴 개념 | Task로 표현 |
+|-----------|------------|
+| 이름 | `title` |
+| 시간 | `scheduledTime` |
+| 반복 요일 | `rrule` (FREQ=WEEKLY;BYDAY=MO,WE,FR 등) |
+| 완료 체크 | `RecurrenceException` (status=DONE) |
+| 그룹 | `Category` (Feature 017) |
 
-## Solution
+별도 엔티티(Routine, RoutineGroup, RoutineCompletion)를 만든 것은 불필요한 중복이었다.
 
-- 별도 엔티티: Routine(습관 항목), RoutineGroup(루틴 그룹), RoutineCompletion(완료 기록)
-- 캘린더 월별 뷰에는 표시하지 않음. Daily Task view / Daily Timeline view에서만 표시
-- 완료 추적: 오늘 했는지/안 했는지 체크. 어제 기록도 확인 가능
-- 루틴 그룹: "모닝 루틴" 같은 그룹으로 묶기 가능 (순서 보장 없음)
-- 시간 바인딩: 특정 시간 설정 가능, 010(알람)과 연동하여 알림 발송
-- 반복 규칙: 매일 / 평일만 / 특정 요일 선택
+## 제거 대상
 
-## Scope
+### Server
+- `server/src/services/routine.service.ts`
+- `server/src/routes/routines.ts`
+- `server/src/schemas/routine.schema.ts`
+- `server/prisma/migrations/20260908010000_add_routines/`
+- `server/prisma/schema.prisma` — Routine, RoutineGroup, RoutineCompletion 모델
+- `server/src/app.ts` — routines 라우트 등록
 
-**Includes:**
-- Routine CRUD (이름, 시간, 반복 요일, 그룹)
-- RoutineGroup CRUD (그룹 이름, 소속 루틴 목록)
-- 완료 체크/해제 (오늘 + 어제 확인 가능)
-- Daily Task view / Daily Timeline view에 표시
-- 시간 바인딩 시 010(알람) 연동
-- 반복 규칙: 매일 / 평일 / 특정 요일
+### Client
+- `client/lib/screens/routine_screen.dart`
+- `client/lib/screens/routine_form_screen.dart`
+- `client/lib/providers/routine_provider.dart`
+- `client/lib/models/routine.dart`
+- `client/lib/router.dart` — /routines, /routine/new, /routine/:id/edit 라우트
+- `client/lib/main.dart` — RoutineProvider 등록
 
-**Excludes:**
-- 월별 캘린더 뷰에 표시
-- 연속 달성일(streak) 추적 — P2 backlog
-- 주별/월별 달성률 통계/차트 — P2 backlog
-- 루틴 내 순서 보장 (step 1 → step 2 강제)
-- 가족 공유 루틴
+## 대체 구현
 
-## User Stories & Acceptance Criteria
-
-### Story 1: 루틴 생성
-
-**As a** 현규, **I want** "영양제 섭취 — 매일 10시" 같은 루틴을 만드는 것 **so that** 매일 할 일을 체계적으로 관리한다.
-
-**Scenario:**
-- Given: 루틴이 없는 상태
-- When: 루틴 추가에서 이름, 반복 요일, 시간을 설정
-- Then: 루틴이 생성되고 해당 요일의 daily view에 표시된다
-
-**Acceptance Criteria:**
-- [ ] 루틴 생성 시 이름, 반복 요일(매일/평일/특정 요일), 시간(선택) 설정 가능 — verify: UI 확인
-- [ ] 생성된 루틴이 해당 요일의 daily view에 표시 — verify: daily view 확인
-- [ ] 시간 설정 시 010(알람) 연동하여 알림 발송 — verify: 알림 수신 확인
-- [ ] 월별 뷰에는 표시되지 않음 — verify: 월별 뷰 확인
-
-**Edge Cases & Errors:**
-- [ ] 반복 요일 없이 생성 시도 — verify: 최소 1일 필수 안내
-- [ ] 동일 이름 루틴 생성 — verify: 허용 (이름 중복 가능)
-
-### Story 2: 루틴 완료 체크
-
-**As a** 현규, **I want** 오늘 루틴을 체크하고 어제 기록도 확인하는 것 **so that** 습관 이행 여부를 추적한다.
-
-**Scenario:**
-- Given: 오늘 해야 할 루틴이 있는 상태
-- When: daily view에서 루틴 항목을 체크
-- Then: 완료로 표시되고, 날짜별 완료 기록이 저장된다
-
-**Acceptance Criteria:**
-- [ ] 루틴 항목 탭으로 완료 체크/해제 — verify: UI 상태 변화 확인
-- [ ] 완료 기록이 날짜별로 저장 (RoutineCompletion) — verify: DB 확인
-- [ ] 어제 날짜의 루틴 완료 여부 확인 가능 — verify: 어제 daily view에서 확인
-- [ ] 오늘 완료한 루틴과 미완료 루틴 구분 표시 — verify: UI 구분 확인
-
-**Edge Cases & Errors:**
-- [ ] 해당 요일이 아닌 루틴은 표시하지 않음 (평일 루틴은 주말에 미표시) — verify: 요일 필터 확인
-- [ ] 과거 날짜(어제 이전) 완료 수정 — verify: 정책에 따라 허용 또는 차단
-
-### Story 3: 루틴 그룹
-
-**As a** 현규, **I want** "모닝 루틴" 그룹에 여러 습관을 묶는 것 **so that** 관련 루틴을 한눈에 관리한다.
-
-**Scenario:**
-- Given: 개별 루틴이 여러 개 있는 상태
-- When: "모닝 루틴" 그룹을 만들고 루틴들을 추가
-- Then: daily view에서 그룹 단위로 묶여서 표시
-
-**Acceptance Criteria:**
-- [ ] 그룹 생성/편집/삭제 가능 — verify: UI 확인
-- [ ] 루틴을 그룹에 추가/제거 가능 — verify: 그룹 내 루틴 목록 확인
-- [ ] daily view에서 그룹 단위로 묶여서 표시 — verify: 그룹 헤더 + 소속 루틴 표시
-- [ ] 그룹에 속하지 않는 루틴도 독립 표시 — verify: 미그룹 루틴 표시 확인
-
-**Edge Cases & Errors:**
-- [ ] 빈 그룹 (루틴 0개) — verify: 그룹 헤더만 표시 또는 숨김
-- [ ] 그룹 삭제 시 소속 루틴은 보존 (그룹 해제만) — verify: 루틴 잔존 확인
-
-## Design Intent
-
-| Step | User Action | Ideal Outcome | Design Decision | QA Verification |
-|------|-------------|---------------|-----------------|-----------------|
-| 1 | Daily view 진입 | 오늘 해야 할 루틴이 그룹별로 표시 | 일정과 루틴을 같은 화면에 표시하되 영역 구분 | 루틴 섹션 표시 확인 |
-| 2 | 루틴 항목 탭 | 체크 표시 + 시각적 피드백 | 한 탭으로 완료 — 최소 마찰 원칙 | 체크 상태 변화 확인 |
-| 3 | 그룹 헤더 탭 | 그룹 접기/펼치기 | 루틴이 많을 때 정리 가능 | 접기/펼치기 동작 확인 |
-
-**Key States:**
-
-| State | Trigger | User Sees |
-|-------|---------|-----------|
-| Empty | 루틴 0개 | "루틴을 추가해보세요" 안내 + 추가 버튼 |
-| Error | 완료 저장 실패 (네트워크) | 체크 롤백 + 에러 표시 |
-
-## Approach
-
-- 새 DB 엔티티: Routine, RoutineGroup, RoutineCompletion (Prisma)
-- Routine: name, time(nullable), repeatDays(배열 or bitmask), groupId(nullable), userId
-- RoutineCompletion: routineId, date, completedAt
-- 알람 연동: 시간 있는 루틴은 010의 스케줄러에 등록
-- API: /api/routines, /api/routine-groups, /api/routines/:id/complete
-
-## Backlog (P2)
-
-- 연속 달성일(streak) 추적 및 표시
-- 주별/월별 달성률 통계 차트
-- 달성 목표 설정 (예: 주 5회)
-
-## Assumptions
-
-- 습관 항목 수가 가족 규모에서 수십 개 이내로 유지될 것 — if wrong: 페이지네이션 또는 가상 스크롤 필요
+Feature 012의 확장 스코프로 흡수:
+- 반복 Task 생성 = 루틴 생성 (rrule 설정)
+- Daily Task View에서 반복 인스턴스 완료 체크 = 루틴 완료
+- Daily Timeline에서 scheduledTime에 따라 표시
 
 ---
 
-*Generated by know-thy-build-feature | 2026-09-08*
+*Deprecated: 2026-09-10 | Superseded by Feature 012*

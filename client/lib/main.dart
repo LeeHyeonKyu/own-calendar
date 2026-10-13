@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
@@ -7,7 +8,6 @@ import 'package:home_widget/home_widget.dart';
 import 'providers/auth_provider.dart';
 import 'providers/calendar_provider.dart';
 import 'providers/category_provider.dart';
-import 'providers/routine_provider.dart';
 import 'providers/theme_provider.dart';
 import 'router.dart';
 import 'services/fcm_service.dart';
@@ -18,24 +18,32 @@ const bool kTestMode = bool.fromEnvironment('TEST_MODE', defaultValue: false);
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await initializeDateFormatting('ko');
-  try {
-    await HomeWidget.setAppGroupId('group.com.owncalendar.ownCalendar');
-  } catch (_) {}
+  if (!kIsWeb) {
+    try {
+      await HomeWidget.setAppGroupId('group.com.owncalendar.ownCalendar');
+    } catch (_) {}
+  }
 
   final authProvider = AuthProvider();
   final themeProvider = ThemeProvider();
-  await themeProvider.loadPreferences();
+  await themeProvider.loadPreferences().timeout(
+    const Duration(seconds: 3),
+    onTimeout: () {},
+  );
 
   if (kTestMode) {
     await authProvider.login('hk@test.com', 'test1234');
   } else {
-    // 저장된 토큰 + 로컬 캐시된 user로 세션을 즉시 복원.
-    // disk I/O만 await하며, /auth/me는 내부에서 unawaited로 백그라운드 실행.
-    await authProvider.tryRestore();
+    await authProvider.tryRestore().timeout(
+      const Duration(seconds: 3),
+      onTimeout: () {},
+    );
   }
 
   // Initialize FCM for push notifications (no-op until Firebase is configured)
-  unawaited(FcmService().initialize());
+  if (!kIsWeb) {
+    unawaited(FcmService().initialize());
+  }
 
   runApp(OwnCalendarApp(
     authProvider: authProvider,
@@ -68,10 +76,12 @@ class _OwnCalendarAppState extends State<OwnCalendarApp> {
     // 여기서 Consumer로 감싸 재생성할 필요가 없다.
     _router = createRouter(widget.authProvider);
 
-    try {
-      _widgetClickSub = HomeWidget.widgetClicked.listen(_handleWidgetUri);
-      HomeWidget.initiallyLaunchedFromHomeWidget().then(_handleWidgetUri);
-    } catch (_) {}
+    if (!kIsWeb) {
+      try {
+        _widgetClickSub = HomeWidget.widgetClicked.listen(_handleWidgetUri);
+        HomeWidget.initiallyLaunchedFromHomeWidget().then(_handleWidgetUri);
+      } catch (_) {}
+    }
   }
 
   @override
@@ -111,7 +121,6 @@ class _OwnCalendarAppState extends State<OwnCalendarApp> {
         ChangeNotifierProvider.value(value: widget.authProvider),
         ChangeNotifierProvider.value(value: widget.themeProvider),
         ChangeNotifierProvider(create: (_) => CalendarProvider()),
-        ChangeNotifierProvider(create: (_) => RoutineProvider()),
         ChangeNotifierProvider(create: (_) => CategoryProvider()),
       ],
       child: Consumer<ThemeProvider>(

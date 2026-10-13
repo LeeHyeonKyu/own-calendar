@@ -6,9 +6,17 @@ import '../models/user.dart';
 import '../services/api_service.dart';
 
 class AuthProvider extends ChangeNotifier {
-  AuthProvider({ApiService? api}) : _api = api ?? ApiService();
+  AuthProvider({ApiService? api}) : _api = api ?? ApiService() {
+    _api.onSessionExpired = _handleSessionExpired;
+  }
 
   final ApiService _api;
+
+  void _handleSessionExpired() {
+    _user = null;
+    _clearWidgetData();
+    notifyListeners();
+  }
   User? _user;
   bool _isLoading = false;
   bool _isInitialized = false;
@@ -75,14 +83,14 @@ class AuthProvider extends ChangeNotifier {
     return false;
   }
 
-  Future<bool> login(String email, String password) async {
+  Future<bool> login(String email, String password, {bool rememberMe = false}) async {
     _isLoading = true;
     _error = null;
     notifyListeners();
     try {
       final res = await _api.post(
         '/auth/login',
-        {'email': email, 'password': password},
+        {'email': email, 'password': password, 'rememberMe': rememberMe},
       );
       if (res.statusCode == 200) {
         final data = jsonDecode(res.body);

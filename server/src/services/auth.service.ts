@@ -72,10 +72,15 @@ export const authService = {
       },
     });
 
+    // Auto-subscribe Korean holidays for new users
+    await prisma.holidaySubscription.create({
+      data: { userId: user.id, countryCode: 'KR' },
+    }).catch(() => {});
+
     return { user, accessToken, refreshToken };
   },
 
-  async login(email: string, password: string) {
+  async login(email: string, password: string, rememberMe = false) {
     const user = await prisma.user.findUnique({ where: { email } });
     if (!user) {
       const error = new Error('Invalid email or password');
@@ -92,7 +97,9 @@ export const authService = {
 
     const { accessToken, refreshToken } = generateTokens(user.id);
 
-    const expiresMs = parseExpiresIn(config.jwt.refreshExpiresIn);
+    const expiresMs = rememberMe
+      ? 30 * 24 * 60 * 60 * 1000  // 30 days
+      : parseExpiresIn(config.jwt.refreshExpiresIn);  // default 7 days
     await prisma.refreshToken.create({
       data: {
         token: refreshToken,

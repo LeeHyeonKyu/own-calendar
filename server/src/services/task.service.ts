@@ -83,6 +83,7 @@ function expandTaskInstances(task: any, queryStart: Date, queryEnd: Date): any[]
       scheduledDate: task.scheduledDate ? occDate : null,
       status: hasStatusOverride ? exception.status : isOriginal ? task.status : 'TODO',
       completedAt: hasStatusOverride ? exception.completedAt : isOriginal ? task.completedAt : null,
+      checklist: exception?.checklist ?? task.checklist,
       exceptions: undefined,
     });
   }
@@ -99,8 +100,19 @@ export const taskService = {
     end?: string;
     includeDone?: string;
   }) {
+    const groupMemberships = await prisma.groupMembership.findMany({
+      where: { userId },
+      select: { groupId: true },
+    });
+    const groupIds = groupMemberships.map((m) => m.groupId);
+
     const where: any = {
-      calendar: { ownerId: userId },
+      calendar: {
+        OR: [
+          { ownerId: userId },
+          ...(groupIds.length > 0 ? [{ groupId: { in: groupIds } }] : []),
+        ],
+      },
     };
 
     if (query.calendarId) {
@@ -213,6 +225,8 @@ export const taskService = {
       attendees?: any;
       metaInherited?: boolean;
       categoryId?: string | null;
+      checklist?: any;
+      isHabit?: boolean;
     },
   ) {
     const calendar = await prisma.calendar.findUnique({
@@ -228,6 +242,12 @@ export const taskService = {
     if (calendar.ownerId !== userId) {
       const error = new Error('Forbidden');
       (error as any).statusCode = 403;
+      throw error;
+    }
+
+    if (data.isHabit && !data.rrule && (!data.recurrenceType || data.recurrenceType === 'NONE')) {
+      const error = new Error('Habits must have a recurrence rule (rrule)');
+      (error as any).statusCode = 400;
       throw error;
     }
 
@@ -260,6 +280,8 @@ export const taskService = {
         attendees: data.attendees || undefined,
         metaInherited: data.metaInherited ?? false,
         categoryId: data.categoryId || null,
+        checklist: data.checklist ?? undefined,
+        isHabit: data.isHabit ?? false,
       },
       include: taskIncludes,
     });
@@ -287,6 +309,8 @@ export const taskService = {
       attendees?: any;
       metaInherited?: boolean;
       categoryId?: string | null;
+      checklist?: any;
+      isHabit?: boolean;
     },
   ) {
     const { baseId } = resolveInstance(taskId);
@@ -348,6 +372,8 @@ export const taskService = {
     if (data.attendees !== undefined) updateData.attendees = data.attendees;
     if (data.metaInherited !== undefined) updateData.metaInherited = data.metaInherited;
     if (data.categoryId !== undefined) updateData.categoryId = data.categoryId;
+    if (data.checklist !== undefined) updateData.checklist = data.checklist;
+    if (data.isHabit !== undefined) updateData.isHabit = data.isHabit;
 
     return prisma.task.update({
       where: { id: baseId },
@@ -383,6 +409,7 @@ export const taskService = {
       eventId?: string | null;
       calendarId?: string;
       sortOrder?: number;
+      checklist?: any;
     },
   ) {
     const { baseId, instanceDate } = resolveInstance(taskId, instanceDateParam);
@@ -411,6 +438,7 @@ export const taskService = {
         exceptionData.status = data.status;
         exceptionData.completedAt = data.status === 'DONE' ? new Date() : null;
       }
+      if (data.checklist !== undefined) exceptionData.checklist = data.checklist;
 
       const exception = await prisma.recurrenceException.upsert({
         where: {
@@ -438,6 +466,7 @@ export const taskService = {
         scheduledDate: task.scheduledDate ? instanceDate : null,
         status: exception.status ?? task.status,
         completedAt: exception.completedAt,
+        checklist: exception.checklist ?? (task as any).checklist,
       };
     }
 
@@ -479,6 +508,7 @@ export const taskService = {
         calendarId: data.calendarId ?? task.calendarId,
         createdById: userId,
         sortOrder: task.sortOrder,
+        checklist: data.checklist !== undefined ? data.checklist : (task as any).checklist,
       },
       include: taskIncludes,
     });
@@ -673,5 +703,187 @@ export const taskService = {
         where: { masterTaskId: baseId, originalDate: { gte: instanceDate } },
       }),
     ]);
+  },
+
+  async getHabitStats(userId: string, taskId: string, year: number, month: number) {
+    const task = await prisma.task.findUnique({ where: { id: taskId } });
+
+    if (!task) {
+      const error = new Error('Task not found');
+      (error as any).statusCode = 404;
+      throw error;
+    }
+
+    if (task.createdById !== userId) {
+      const error = new Error('Forbidden');
+      (error as any).statusCode = 403;
+      throw error;
+    }
+
+    if (!task.isHabit) {
+      const error = new Error('Task is not a habit');
+      (error as any).statusCode = 400;
+      throw error;
+    }
+
+    const rruleStr = recurrenceService.resolveRRule(task);
+    if (!rruleStr) {
+      const error = new Error('Habit has no recurrence rule');
+      (error as any).statusCode = 400;
+      throw error;
+    }
+
+    const baseDate: Date | null = task.dueDate || task.scheduledDate;
+    if (!baseDate) {
+      const error = new Error('Habit has no base date');
+      (error as any).statusCode = 400;
+      throw error;
+    }
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    // --- Streak calculation ---
+    // Expand instances from up to 365 days ago to today
+    const streakStart = new Date(today);
+    streakStart.setDate(streakStart.getDate() - 365);
+    const streakEnd = new Date(today);
+    streakEnd.setHours(23, 59, 59, 999);
+
+    const streakOccurrences = recurrenceService.expandInstances(rruleStr, new Date(baseDate), streakStart, streakEnd);
+
+    // Get all DONE exceptions for streak range
+    const streakExceptions = await prisma.recurrenceException.findMany({
+      where: {
+        masterTaskId: taskId,
+        status: 'DONE',
+        originalDate: { gte: streakStart, lte: streakEnd },
+      },
+    });
+    const doneSet = new Set(streakExceptions.map((e) => new Date(e.originalDate).getTime()));
+
+    // Sort occurrences descending (most recent first)
+    const sortedOccurrences = [...streakOccurrences].sort((a, b) => b.getTime() - a.getTime());
+
+    let streak = 0;
+    for (const occ of sortedOccurrences) {
+      const occDay = new Date(occ);
+      occDay.setHours(0, 0, 0, 0);
+
+      // If today is applicable and not yet completed, skip it (count from yesterday)
+      if (occDay.getTime() === today.getTime() && !doneSet.has(occ.getTime())) {
+        continue;
+      }
+
+      // Future dates should not count
+      if (occDay.getTime() > today.getTime()) {
+        continue;
+      }
+
+      if (doneSet.has(occ.getTime())) {
+        streak++;
+      } else {
+        break;
+      }
+    }
+
+    // --- Month grid ---
+    const monthStart = new Date(year, month - 1, 1);
+    const monthEnd = new Date(year, month, 0, 23, 59, 59, 999);
+
+    const monthOccurrences = recurrenceService.expandInstances(rruleStr, new Date(baseDate), monthStart, monthEnd);
+    const applicableSet = new Set(monthOccurrences.map((o) => {
+      const d = new Date(o);
+      d.setHours(0, 0, 0, 0);
+      return d.getTime();
+    }));
+    // Map occurrence time -> boolean for quick lookup
+    const occurrenceTimeSet = new Set(monthOccurrences.map((o) => o.getTime()));
+
+    const monthExceptions = await prisma.recurrenceException.findMany({
+      where: {
+        masterTaskId: taskId,
+        status: 'DONE',
+        originalDate: { gte: monthStart, lte: monthEnd },
+      },
+    });
+    const monthDoneSet = new Set(monthExceptions.map((e) => new Date(e.originalDate).getTime()));
+
+    const daysInMonth = new Date(year, month, 0).getDate();
+    const monthGrid: Array<{ date: string; completed: boolean; applicable: boolean }> = [];
+
+    for (let day = 1; day <= daysInMonth; day++) {
+      const date = new Date(year, month - 1, day);
+      const dateKey = date.getTime();
+      const applicable = applicableSet.has(dateKey);
+
+      // Find the matching occurrence time for this day (to check done status)
+      let completed = false;
+      if (applicable) {
+        for (const occTime of occurrenceTimeSet) {
+          const occDate = new Date(occTime);
+          occDate.setHours(0, 0, 0, 0);
+          if (occDate.getTime() === dateKey && monthDoneSet.has(occTime)) {
+            completed = true;
+            break;
+          }
+        }
+      }
+
+      const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+      monthGrid.push({ date: dateStr, completed, applicable });
+    }
+
+    // --- Week summary (current week Mon-Sun) ---
+    const dayOfWeek = today.getDay(); // 0=Sun, 1=Mon, ...
+    const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+    const weekStart = new Date(today);
+    weekStart.setDate(today.getDate() + mondayOffset);
+    weekStart.setHours(0, 0, 0, 0);
+    const weekEnd = new Date(weekStart);
+    weekEnd.setDate(weekStart.getDate() + 6);
+    weekEnd.setHours(23, 59, 59, 999);
+
+    const weekOccurrences = recurrenceService.expandInstances(rruleStr, new Date(baseDate), weekStart, weekEnd);
+    const weekApplicableSet = new Set(weekOccurrences.map((o) => {
+      const d = new Date(o);
+      d.setHours(0, 0, 0, 0);
+      return d.getTime();
+    }));
+    const weekOccTimeSet = new Set(weekOccurrences.map((o) => o.getTime()));
+
+    const weekExceptions = await prisma.recurrenceException.findMany({
+      where: {
+        masterTaskId: taskId,
+        status: 'DONE',
+        originalDate: { gte: weekStart, lte: weekEnd },
+      },
+    });
+    const weekDoneSet = new Set(weekExceptions.map((e) => new Date(e.originalDate).getTime()));
+
+    const weekSummary: Array<{ date: string; dayOfWeek: number; completed: boolean }> = [];
+    for (let i = 0; i < 7; i++) {
+      const date = new Date(weekStart);
+      date.setDate(weekStart.getDate() + i);
+      const dateKey = date.getTime();
+      const applicable = weekApplicableSet.has(dateKey);
+
+      let completed = false;
+      if (applicable) {
+        for (const occTime of weekOccTimeSet) {
+          const occDate = new Date(occTime);
+          occDate.setHours(0, 0, 0, 0);
+          if (occDate.getTime() === dateKey && weekDoneSet.has(occTime)) {
+            completed = true;
+            break;
+          }
+        }
+      }
+
+      const dateStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+      weekSummary.push({ date: dateStr, dayOfWeek: date.getDay(), completed });
+    }
+
+    return { streak, weekSummary, monthGrid };
   },
 };

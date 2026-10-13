@@ -93,10 +93,10 @@ All implementation is delegated to sub-agents with explicit scope and goals.
    - Executes every acceptance criterion from the feature spec step by step
    - Verifies all 4 design states per screen: empty, loading, error, success
    - Tests user interaction flows: navigation transitions, form behavior, back navigation
-   - Tests edge cases: interruption (app background/foreground, network loss mid-action), concurrency (rapid taps, simultaneous family edits), boundary (empty, long text, special chars, midnight-crossing events), state corruption (expired session, deleted resource)
+   - Tests edge cases: interruption (app background/foreground, network loss mid-action), concurrency (rapid taps, simultaneous group member edits), boundary (empty, long text, special chars, midnight-crossing events), state corruption (expired session, deleted resource)
    - Verifies NON-NEGOTIABLE principles: data manipulation freedom (CRUD without unnecessary steps), data ownership (data persists independently of external services)
    - Captures evidence for every test: screenshots, console output, state checks
-   - Adopts the most paranoid, impatient, careless user persona — tests both primary persona (developer) and secondary persona (non-developer family member)
+   - Adopts the most paranoid, impatient, careless user persona — tests both primary persona (developer) and secondary persona (non-developer group member)
    - Produces checklist: `- [x]` passed with evidence or `- [ ]` failed with reproduction steps
 
 7. **Review loop**
@@ -121,6 +121,7 @@ Feature 구현 완료 후 배포는 반드시 `scripts/deploy.sh`를 통해 진�
 # 부분 배포
 ./scripts/deploy.sh --web-only      # 웹만
 ./scripts/deploy.sh --server-only   # 서버만
+./scripts/deploy.sh --no-docker-build  # Docker 이미지 빌드 스킵 (소스만 변경 시)
 ```
 
 파이프라인이 수행하는 것:
@@ -130,11 +131,26 @@ Feature 구현 완료 후 배포는 반드시 `scripts/deploy.sh`를 통해 진�
 4. 서버 헬스체크 (60초 타임아웃)
 5. DB Migration 확인
 6. 서버 에러 로그 확인
-7. Flutter Web 빌드 + nginx 배포
-8. Web HTTP 200 + Flutter 부트스트랩 확인
-9. Feature 브랜치 정리
+7. **Flutter `clean` + `pub get` + `build web --release`** (flutter clean 없이 빌드하면 웹 플러그인 미등록 + 아이콘 트리쉐이킹 오류. clean 후 빌드하면 트리쉐이킹 정상 동작. `--no-tree-shake-icons`는 1.6MB 폰트로 성능 저하 유발하므로 사용 금지)
+8. **웹 플러그인 등록 검증** (web_plugin_registrant.dart에서 shared_preferences_web 등 필수 플러그인 확인)
+9. **폰트 + FontManifest 캐시 버스팅** (폰트 파일명에 해시 → FontManifest.json 내 참조 갱신 → FontManifest.json 자체도 해시 rename → main.dart.js에서 참조 갱신. 이 전체 체인이 빠지면 브라우저 immutable 캐시 때문에 아이콘 누락)
+10. nginx 배포 + flutter_service_worker.js 자체해제 버전으로 교체
+11. Web HTTP 200 + Flutter 부트스트랩 확인
+12. **브라우저 콘솔 검증 (NON-NEGOTIABLE)** — Playwright로 페이지 로드 후 `console_messages(level: "error")` 확인. `MissingPluginException`, `SyntaxError`, `TypeError` 하나라도 있으면 **배포 실패**
+13. Feature 브랜치 정리
 
 **배포 없이 "구현 완료"를 선언하지 않는다.**
+**콘솔 에러 확인 없이 "배포 완료"를 선언하지 않는다.**
+**`flutter analyze` 통과는 배포 검증이 아니다 — 런타임 에러는 analyze에서 안 잡힌다.**
+
+### 테스트 DB 격리 (NON-NEGOTIABLE)
+
+**서버 테스트는 절대로 프로덕션 DB에서 실행하지 않는다.**
+- `tests/setup.ts`가 `DATABASE_URL`을 `_test` suffix DB로 자동 리다이렉트
+- `beforeEach`에서 DB 이름 재검증 (non-test DB면 throw)
+- **Docker 컨테이너 안에서 테스트 실행 금지** — 컨테이너의 DATABASE_URL이 프로덕션을 가리킴
+- 테스트 실행 전 `own_calendar_test` DB가 존재하는지 확인: `docker exec server-postgres-1 psql -U postgres -c "SELECT 1 FROM pg_database WHERE datname='own_calendar_test'"`
+- 로컬에서 `npx vitest run`으로 실행 (setup.ts가 DATABASE_URL을 자동 리다이렉트)
 
 ### iOS Build (Widget / Native)
 

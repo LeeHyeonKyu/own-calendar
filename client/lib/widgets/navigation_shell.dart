@@ -32,7 +32,8 @@ const List<TabItem> allTabs = [
   TabItem(id: 'daily', icon: Icons.today, label: '일별', route: '/daily'),
   TabItem(id: 'weekly', icon: Icons.view_week, label: '주별', route: '/weekly'),
   TabItem(id: 'yearly', icon: Icons.calendar_today, label: '연별', route: '/yearly'),
-  TabItem(id: 'family', icon: Icons.family_restroom, label: '가족', route: '/family'),
+  TabItem(id: 'group', icon: Icons.group, label: '그룹', route: '/groups'),
+  TabItem(id: 'habit', icon: Icons.self_improvement, label: '습관', route: '/habits'),
   TabItem(id: 'settings', icon: Icons.settings, label: '설정', route: '/settings'),
 ];
 
@@ -41,7 +42,8 @@ const List<String> defaultVisibleTabIds = [
   'monthly',
   'daily',
   'weekly',
-  'family',
+  'group',
+  'habit',
   'settings',
 ];
 
@@ -90,8 +92,19 @@ class _NavigationShellState extends State<NavigationShell> {
     final prefs = await SharedPreferences.getInstance();
     final saved = prefs.getStringList(tabConfigPrefsKey);
     if (saved != null && saved.length >= 2 && saved.length <= 6) {
+      // Migrate legacy 'family' tab ID to 'group'
+      var migrated = saved.map((id) => id == 'family' ? 'group' : id).toList();
+      // Ensure 'group' tab is included (was added in the family→group migration)
+      if (!migrated.contains('group')) {
+        final settingsIdx = migrated.indexOf('settings');
+        if (settingsIdx >= 0) {
+          migrated.insert(settingsIdx, 'group');
+        } else {
+          migrated.add('group');
+        }
+      }
       // Keep only IDs that exist in the registry
-      final validIds = saved.where(
+      final validIds = migrated.where(
         (id) => allTabs.any((t) => t.id == id),
       ).toList();
       if (validIds.length >= 2) {

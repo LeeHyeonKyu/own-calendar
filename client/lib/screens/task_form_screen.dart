@@ -13,8 +13,9 @@ class TaskFormScreen extends StatefulWidget {
   final String? taskId;
   final DateTime? initialDate;
   final String? initialEventId;
+  final bool initialIsHabit;
 
-  const TaskFormScreen({super.key, this.taskId, this.initialDate, this.initialEventId});
+  const TaskFormScreen({super.key, this.taskId, this.initialDate, this.initialEventId, this.initialIsHabit = false});
 
   @override
   State<TaskFormScreen> createState() => _TaskFormScreenState();
@@ -36,10 +37,15 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
   String? _rrule;
   String? _selectedCalendarId;
   String? _selectedEventId;
+  String? _categoryId;
   bool _isLoading = false;
   TaskModel? _originalTask;
   List<Map<String, dynamic>> _attendees = [];
   bool _showMetadata = false;
+  List<ChecklistItem> _checklist = [];
+  List<TextEditingController> _checklistControllers = [];
+  final _newChecklistController = TextEditingController();
+  bool _isHabit = false;
 
   bool get isEditing => widget.taskId != null;
   bool get _isEditingInstance => _originalTask?.isVirtualInstance ?? false;
@@ -49,6 +55,7 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
     super.initState();
     _scheduledDate = widget.initialDate;
     _selectedEventId = widget.initialEventId;
+    _isHabit = widget.initialIsHabit;
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _loadCalendars();
@@ -63,6 +70,10 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
     _locationController.dispose();
     _notesController.dispose();
     _attendeeController.dispose();
+    _newChecklistController.dispose();
+    for (final c in _checklistControllers) {
+      c.dispose();
+    }
     super.dispose();
   }
 
@@ -70,6 +81,9 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
     final provider = context.read<CalendarProvider>();
     if (provider.calendars.isEmpty) {
       await provider.loadCalendars();
+    }
+    if (provider.categories.isEmpty) {
+      await provider.loadCategories();
     }
     if (mounted && provider.calendars.isNotEmpty && _selectedCalendarId == null) {
       setState(() {
@@ -101,12 +115,23 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
         _rrule = task.rrule;
         _selectedCalendarId = task.calendarId;
         _selectedEventId = task.eventId;
+        _categoryId = task.categoryId;
         _locationController.text = task.location ?? '';
         _notesController.text = task.notes ?? '';
         _attendees = List.from(task.attendees);
+        _isHabit = task.isHabit;
         _showMetadata = task.location != null ||
             task.notes != null ||
             task.attendees.isNotEmpty;
+        if (task.checklist != null) {
+          _checklist = List.from(task.checklist!);
+          for (final c in _checklistControllers) {
+            c.dispose();
+          }
+          _checklistControllers = _checklist
+              .map((c) => TextEditingController(text: c.text))
+              .toList();
+        }
       });
     }
   }
@@ -174,6 +199,7 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
       'rrule': _rrule,
       'calendarId': _selectedCalendarId,
       'eventId': _selectedEventId,
+      'categoryId': _categoryId,
       'location': _locationController.text.trim().isEmpty
           ? null
           : _locationController.text.trim(),
@@ -181,6 +207,10 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
           ? null
           : _notesController.text.trim(),
       'attendees': _attendees.isEmpty ? null : _attendees,
+      'checklist': _checklist.isEmpty
+          ? null
+          : _checklist.map((e) => e.toJson()).toList(),
+      'isHabit': _isHabit,
     };
 
     if (_dueDate != null) {
@@ -256,6 +286,225 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
     if (success && mounted) context.pop();
   }
 
+  void _addChecklistItem([String text = '']) {
+    if (text.isEmpty) return;
+    setState(() {
+      _checklist.add(ChecklistItem(text: text));
+      _checklistControllers.add(TextEditingController(text: text));
+    });
+  }
+
+  void _removeChecklistItem(int index) {
+    setState(() {
+      _checklist.removeAt(index);
+      _checklistControllers[index].dispose();
+      _checklistControllers.removeAt(index);
+    });
+  }
+
+  Widget _buildChecklistSection(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Container(
+      decoration: BoxDecoration(
+        border: Border.all(color: cs.outline.withAlpha(80)),
+        borderRadius: BorderRadius.circular(AppRadius.sm),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header
+          Padding(
+            padding: const EdgeInsets.symmetric(
+              horizontal: Spacing.md,
+              vertical: Spacing.sm,
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.checklist, size: 20, color: cs.onSurface),
+                const SizedBox(width: Spacing.sm),
+                Text(
+                  '체크리스트',
+                  style: TextStyle(
+                    fontSize: AppTypography.body,
+                    fontWeight: FontWeight.w600,
+                    color: cs.onSurface,
+                  ),
+                ),
+                const Spacer(),
+                if (_checklist.isNotEmpty)
+                  Text(
+                    '${_checklist.where((c) => c.done).length}/${_checklist.length}',
+                    style: TextStyle(
+                      fontSize: AppTypography.bodySmall,
+                      color: cs.outline,
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          // Existing items
+          if (_checklist.isNotEmpty)
+            ...List.generate(_checklist.length, (i) => _buildChecklistEditItem(i, cs)),
+          // New item input
+          Padding(
+            padding: const EdgeInsets.only(
+              left: Spacing.md,
+              right: Spacing.xs,
+              bottom: Spacing.sm,
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.add, size: 18, color: cs.outline),
+                const SizedBox(width: Spacing.sm),
+                Expanded(
+                  child: TextField(
+                    controller: _newChecklistController,
+                    decoration: InputDecoration(
+                      hintText: '새 항목 추가',
+                      hintStyle: TextStyle(color: cs.outline),
+                      border: InputBorder.none,
+                      isDense: true,
+                      contentPadding: const EdgeInsets.symmetric(vertical: Spacing.sm),
+                    ),
+                    style: TextStyle(fontSize: AppTypography.body),
+                    onSubmitted: (text) {
+                      final trimmed = text.trim();
+                      if (trimmed.isNotEmpty) {
+                        _addChecklistItem(trimmed);
+                        _newChecklistController.clear();
+                      }
+                    },
+                  ),
+                ),
+                SizedBox(
+                  width: 36,
+                  height: 36,
+                  child: IconButton(
+                    padding: EdgeInsets.zero,
+                    icon: Icon(Icons.add_circle_outline, size: 20, color: cs.primary),
+                    onPressed: () {
+                      final text = _newChecklistController.text.trim();
+                      if (text.isNotEmpty) {
+                        _addChecklistItem(text);
+                        _newChecklistController.clear();
+                      }
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildChecklistEditItem(int index, ColorScheme cs) {
+    final item = _checklist[index];
+    return Padding(
+      padding: EdgeInsets.only(
+        left: Spacing.md + (item.indent * 20.0),
+        right: Spacing.xs,
+        bottom: 2,
+      ),
+      child: Row(
+        children: [
+          // Checkbox
+          GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: () {
+              setState(() {
+                _checklist[index] = item.copyWith(done: !item.done);
+              });
+            },
+            child: SizedBox(
+              width: 32,
+              height: 36,
+              child: Center(
+                child: Container(
+                  width: 18,
+                  height: 18,
+                  decoration: BoxDecoration(
+                    border: Border.all(
+                      color: item.done ? AppColors.taskDone : cs.outline,
+                      width: 1.5,
+                    ),
+                    borderRadius: BorderRadius.circular(3),
+                    color: item.done ? AppColors.taskDone : null,
+                  ),
+                  child: item.done
+                      ? const Icon(Icons.check, size: 12, color: Colors.white)
+                      : null,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: Spacing.xs),
+          // Text field
+          Expanded(
+            child: TextField(
+              controller: _checklistControllers[index],
+              onChanged: (val) {
+                _checklist[index] = _checklist[index].copyWith(text: val);
+              },
+              decoration: const InputDecoration(
+                border: InputBorder.none,
+                isDense: true,
+                contentPadding: EdgeInsets.symmetric(vertical: Spacing.xs),
+              ),
+              style: TextStyle(
+                fontSize: AppTypography.body,
+                decoration: item.done ? TextDecoration.lineThrough : null,
+                color: item.done ? cs.outline : null,
+              ),
+            ),
+          ),
+          // Indent decrease
+          if (item.indent > 0)
+            SizedBox(
+              width: 32,
+              height: 32,
+              child: IconButton(
+                padding: EdgeInsets.zero,
+                icon: Icon(Icons.format_indent_decrease, size: 16, color: cs.outline),
+                onPressed: () {
+                  setState(() {
+                    _checklist[index] = item.copyWith(indent: item.indent - 1);
+                  });
+                },
+              ),
+            ),
+          // Indent increase
+          if (item.indent < 2)
+            SizedBox(
+              width: 32,
+              height: 32,
+              child: IconButton(
+                padding: EdgeInsets.zero,
+                icon: Icon(Icons.format_indent_increase, size: 16, color: cs.outline),
+                onPressed: () {
+                  setState(() {
+                    _checklist[index] = item.copyWith(indent: item.indent + 1);
+                  });
+                },
+              ),
+            ),
+          // Delete
+          SizedBox(
+            width: 32,
+            height: 32,
+            child: IconButton(
+              padding: EdgeInsets.zero,
+              icon: Icon(Icons.close, size: 16, color: cs.error),
+              onPressed: () => _removeChecklistItem(index),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final calProvider = context.watch<CalendarProvider>();
@@ -263,7 +512,9 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(isEditing ? 'Task 수정' : '새 Task'),
+        title: Text(isEditing
+            ? (_isHabit ? '습관 수정' : 'Task 수정')
+            : (_isHabit ? '새 습관' : '새 Task')),
         actions: [
           if (isEditing)
             IconButton(icon: const Icon(Icons.delete), onPressed: _delete),
@@ -276,11 +527,34 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
           children: [
             TextFormField(
               controller: _titleController,
-              decoration: const InputDecoration(
-                labelText: '할 일',
-                border: OutlineInputBorder(),
+              decoration: InputDecoration(
+                labelText: _isHabit ? '습관 이름' : '할 일',
+                border: const OutlineInputBorder(),
               ),
-              validator: (v) => v == null || v.trim().isEmpty ? '할 일을 입력하세요' : null,
+              validator: (v) => v == null || v.trim().isEmpty
+                  ? (_isHabit ? '습관 이름을 입력하세요' : '할 일을 입력하세요')
+                  : null,
+            ),
+            const SizedBox(height: Spacing.lg),
+            SwitchListTile(
+              title: const Text('습관으로 만들기'),
+              subtitle: Text(
+                _isHabit ? '매일 반복 추적 대상' : '일반 Task',
+                style: TextStyle(
+                  fontSize: AppTypography.bodySmall,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+              ),
+              secondary: Icon(
+                Icons.self_improvement,
+                color: _isHabit ? Theme.of(context).colorScheme.primary : null,
+              ),
+              value: _isHabit,
+              onChanged: (v) => setState(() => _isHabit = v),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(AppRadius.sm),
+                side: BorderSide(color: Theme.of(context).colorScheme.outline),
+              ),
             ),
             const SizedBox(height: Spacing.lg),
             TextFormField(
@@ -291,6 +565,9 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
               ),
               maxLines: 3,
             ),
+            const SizedBox(height: Spacing.lg),
+            // ── Checklist section ──
+            _buildChecklistSection(context),
             const SizedBox(height: Spacing.lg),
             DropdownButtonFormField<String>(
               value: _priority,
@@ -319,6 +596,53 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
                   .toList(),
               onChanged: (v) {
                 if (v != null) setState(() => _priority = v);
+              },
+            ),
+            const SizedBox(height: Spacing.lg),
+            DropdownButtonFormField<String?>(
+              value: _categoryId,
+              decoration: const InputDecoration(
+                labelText: '카테고리',
+                border: OutlineInputBorder(),
+              ),
+              items: [
+                const DropdownMenuItem<String?>(
+                  value: null,
+                  child: Row(
+                    children: [
+                      Icon(Icons.label_off, size: 12, color: Colors.grey),
+                      SizedBox(width: Spacing.sm),
+                      Text('미분류'),
+                    ],
+                  ),
+                ),
+                ...calProvider.categories.map(
+                  (cat) => DropdownMenuItem<String?>(
+                    value: cat.id,
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 12,
+                          height: 12,
+                          margin: const EdgeInsets.only(right: Spacing.sm),
+                          decoration: BoxDecoration(
+                            color: cat.colorValue,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                        if (cat.emoji != null && cat.emoji!.isNotEmpty)
+                          Padding(
+                            padding: const EdgeInsets.only(right: 4),
+                            child: Text(cat.emoji!, style: const TextStyle(fontSize: 14)),
+                          ),
+                        Text(cat.name),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+              onChanged: (v) {
+                setState(() => _categoryId = v);
               },
             ),
             const SizedBox(height: Spacing.lg),

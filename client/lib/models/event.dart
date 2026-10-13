@@ -117,6 +117,8 @@ class EventModel {
     return id;
   }
 
+  /// @deprecated Use DB Category (categoryId/categoryRef) instead.
+  /// Kept for backward compatibility; will be removed when EventCategory enum is dropped.
   static const categoryLabels = {
     'WORK': '업무',
     'PERSONAL': '개인',
@@ -127,6 +129,8 @@ class EventModel {
     'OTHER': '기타',
   };
 
+  /// @deprecated Use DB Category color (categoryColor) instead.
+  /// Kept for backward compatibility; will be removed when EventCategory enum is dropped.
   static const categoryColors = {
     'WORK': 0xFF4A90D9,
     'PERSONAL': 0xFF50C878,

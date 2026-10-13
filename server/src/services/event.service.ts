@@ -428,13 +428,23 @@ export const eventService = {
     });
     const calendarIds = calendars.map((c) => c.id);
 
-    const memberships = await prisma.familyMembership.findMany({
+    const familyMemberships = await prisma.familyMembership.findMany({
       where: { userId },
       include: { familyGroup: { include: { calendar: true } } },
     });
-    for (const m of memberships) {
+    for (const m of familyMemberships) {
       if (m.familyGroup.calendar) {
         calendarIds.push(m.familyGroup.calendar.id);
+      }
+    }
+
+    const groupMemberships = await prisma.groupMembership.findMany({
+      where: { userId },
+      include: { group: { include: { calendar: true } } },
+    });
+    for (const m of groupMemberships) {
+      if (m.group.calendar && !calendarIds.includes(m.group.calendar.id)) {
+        calendarIds.push(m.group.calendar.id);
       }
     }
 

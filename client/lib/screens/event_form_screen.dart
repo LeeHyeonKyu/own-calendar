@@ -80,6 +80,9 @@ class _EventFormScreenState extends State<EventFormScreen> {
     if (provider.calendars.isEmpty) {
       await provider.loadCalendars();
     }
+    if (provider.categories.isEmpty) {
+      await provider.loadCategories();
+    }
     if (mounted && provider.calendars.isNotEmpty && _selectedCalendarId == null) {
       setState(() {
         _selectedCalendarId = provider.calendars.first.id;
@@ -325,35 +328,50 @@ class _EventFormScreenState extends State<EventFormScreen> {
                   v == null || v.trim().isEmpty ? '제목을 입력하세요' : null,
             ),
             const SizedBox(height: Spacing.lg),
-            DropdownButtonFormField<String>(
-              value: _category,
+            DropdownButtonFormField<String?>(
+              value: _categoryId,
               decoration: const InputDecoration(
                 labelText: '카테고리',
                 border: OutlineInputBorder(),
               ),
-              items: EventModel.categoryLabels.entries
-                  .map(
-                    (e) => DropdownMenuItem(
-                      value: e.key,
-                      child: Row(
-                        children: [
-                          Container(
-                            width: 12,
-                            height: 12,
-                            margin: const EdgeInsets.only(right: Spacing.sm),
-                            decoration: BoxDecoration(
-                              color: Color(EventModel.categoryColors[e.key]!),
-                              shape: BoxShape.circle,
-                            ),
+              items: [
+                const DropdownMenuItem<String?>(
+                  value: null,
+                  child: Row(
+                    children: [
+                      Icon(Icons.label_off, size: 12, color: Colors.grey),
+                      SizedBox(width: Spacing.sm),
+                      Text('미분류'),
+                    ],
+                  ),
+                ),
+                ...calProvider.categories.map(
+                  (cat) => DropdownMenuItem<String?>(
+                    value: cat.id,
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 12,
+                          height: 12,
+                          margin: const EdgeInsets.only(right: Spacing.sm),
+                          decoration: BoxDecoration(
+                            color: cat.colorValue,
+                            shape: BoxShape.circle,
                           ),
-                          Text(e.value),
-                        ],
-                      ),
+                        ),
+                        if (cat.emoji != null && cat.emoji!.isNotEmpty)
+                          Padding(
+                            padding: const EdgeInsets.only(right: 4),
+                            child: Text(cat.emoji!, style: const TextStyle(fontSize: 14)),
+                          ),
+                        Text(cat.name),
+                      ],
                     ),
-                  )
-                  .toList(),
+                  ),
+                ),
+              ],
               onChanged: (v) {
-                if (v != null) setState(() => _category = v);
+                setState(() => _categoryId = v);
               },
             ),
             const SizedBox(height: Spacing.lg),

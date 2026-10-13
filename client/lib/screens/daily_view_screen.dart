@@ -19,7 +19,7 @@ class DailyViewScreen extends StatefulWidget {
 
 class _DailyViewScreenState extends State<DailyViewScreen> {
   late DateTime _selectedDate;
-  int _subTab = 0; // 0=Timeline, 1=Task
+  int _subTab = 1; // 0=Timeline, 1=Task
   bool _unschedExpanded = true;
   bool _completedExpanded = false;
   Timer? _nowTimer;
@@ -51,8 +51,10 @@ class _DailyViewScreenState extends State<DailyViewScreen> {
     final provider = context.read<CalendarProvider>();
     await Future.wait([
       provider.loadEvents(start: start, end: end),
-      provider.loadFamilyEvents(start: start, end: end),
+      provider.loadGroupEvents(start: start, end: end),
       provider.loadTasks(start: start, end: end),
+      provider.loadHolidays(year: _selectedDate.year, month: _selectedDate.month),
+      provider.loadCategories(),
     ]);
   }
 
@@ -121,59 +123,117 @@ class _DailyViewScreenState extends State<DailyViewScreen> {
     );
   }
 
+  void _changeWeek(int delta) {
+    setState(() {
+      _selectedDate = _selectedDate.add(Duration(days: delta * 7));
+    });
+    _loadData();
+  }
+
   Widget _buildWeekStrip() {
-    final today = DateTime.now();
-    final primary = Theme.of(context).colorScheme.primary;
-    return SizedBox(
-      height: 64,
-      child: ListView.builder(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: Spacing.sm),
-        itemCount: 7,
-        itemBuilder: (context, i) {
-          final day = _weekDates[i];
-          final isSelected = day.day == _selectedDate.day &&
-              day.month == _selectedDate.month;
-          final isToday = day.day == today.day &&
-              day.month == today.month &&
-              day.year == today.year;
-          return GestureDetector(
-            onTap: () {
-              setState(() => _selectedDate = day);
-              _loadData();
-            },
-            child: Container(
-              width: Spacing.xxxl,
-              margin: const EdgeInsets.symmetric(horizontal: 2, vertical: Spacing.sm),
-              decoration: BoxDecoration(
-                color: isSelected ? primary.withAlpha(30) : null,
-                border: isToday ? Border.all(color: primary, width: 1.5) : null,
-                borderRadius: BorderRadius.circular(AppRadius.lg),
-              ),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    DateFormat('E', 'ko').format(day),
-                    style: TextStyle(
-                      fontSize: AppTypography.caption,
-                      color: isSelected ? primary : Theme.of(context).colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    '${day.day}',
-                    style: TextStyle(
-                      fontSize: AppTypography.h3,
-                      fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                      color: isSelected ? primary : null,
-                    ),
-                  ),
-                ],
+    final now = DateTime.now();
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final calProvider = context.read<CalendarProvider>();
+    return Container(
+      decoration: BoxDecoration(
+        border: Border(
+          bottom: BorderSide(
+            color: isDark ? Colors.white12 : Colors.grey[300]!,
+          ),
+        ),
+      ),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 48,
+            child: Center(
+              child: IconButton(
+                icon: const Icon(Icons.chevron_left, size: 18),
+                onPressed: () => _changeWeek(-1),
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
               ),
             ),
-          );
-        },
+          ),
+          ..._weekDates.map((day) {
+            final isSelected = day.day == _selectedDate.day &&
+                day.month == _selectedDate.month &&
+                day.year == _selectedDate.year;
+            final isToday = day.year == now.year &&
+                day.month == now.month &&
+                day.day == now.day;
+            final isSunday = day.weekday == DateTime.sunday;
+            final isSaturday = day.weekday == DateTime.saturday;
+            final isHoliday = calProvider.holidaysForDay(day).isNotEmpty;
+
+            return Expanded(
+              child: GestureDetector(
+                onTap: () {
+                  setState(() => _selectedDate = day);
+                  _loadData();
+                },
+                child: Container(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  child: Column(
+                    children: [
+                      Text(
+                        DateFormat('E', 'ko').format(day),
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w500,
+                          color: isToday
+                              ? Theme.of(context).colorScheme.primary
+                              : isHoliday || isSunday
+                                  ? AppColors.sundayText
+                                  : isSaturday
+                                      ? AppColors.saturdayText
+                                      : Colors.grey[500],
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Container(
+                        width: 28,
+                        height: 28,
+                        decoration: BoxDecoration(
+                          color: isSelected
+                              ? Theme.of(context).colorScheme.primary
+                              : isToday
+                                  ? Theme.of(context).colorScheme.primary
+                                  : null,
+                          shape: BoxShape.circle,
+                        ),
+                        alignment: Alignment.center,
+                        child: Text(
+                          '${day.day}',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: (isSelected || isToday) ? FontWeight.bold : FontWeight.w500,
+                            color: (isSelected || isToday)
+                                ? Colors.white
+                                : isHoliday || isSunday
+                                    ? AppColors.sundayText
+                                    : isSaturday
+                                        ? AppColors.saturdayText
+                                        : null,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          }),
+          SizedBox(
+            width: 32,
+            child: IconButton(
+              icon: const Icon(Icons.chevron_right, size: 18),
+              onPressed: () => _changeWeek(1),
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -495,7 +555,7 @@ class _DailyViewScreenState extends State<DailyViewScreen> {
     final overdue = allTasks.where((t) => t.isOverdue).toList();
     final eventLinked = allTasks.where((t) => t.hasEvent && !t.isDone && !t.isOverdue).toList();
     final standalone = allTasks.where((t) => !t.hasEvent && t.hasTime && !t.isDone && !t.isOverdue).toList();
-    final unscheduled = allTasks.where((t) => !t.hasTime && !t.hasDueDate && t.scheduledDate == null && !t.isDone && !t.isOverdue && !t.hasEvent).toList();
+    final unscheduled = allTasks.where((t) => !t.hasTime && !t.isDone && !t.isOverdue && !t.hasEvent).toList();
     final completed = allTasks.where((t) => t.isDone).toList();
     final totalTasks = allTasks.length;
     final doneTasks = completed.length;

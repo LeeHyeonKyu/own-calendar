@@ -52,16 +52,45 @@
     <div class="label">Own Calendar</div>
   </div>
   <script>
+    // Cache version — bump this on every deploy to bust immutable-cached assets
+    var CACHE_VERSION = '20260909b';
+    (function() {
+      var stored = localStorage.getItem('_cache_ver');
+      if (stored !== CACHE_VERSION) {
+        localStorage.setItem('_cache_ver', CACHE_VERSION);
+        if (stored !== null) {
+          // Version changed — nuke all caches and hard reload
+          if ('caches' in window) {
+            caches.keys().then(function(names) {
+              return Promise.all(names.map(function(n) { return caches.delete(n); }));
+            }).then(function() { location.reload(true); });
+            return; // stop execution, page will reload
+          }
+          location.reload(true);
+          return;
+        }
+      }
+    })();
     // Unregister any stale service workers on load
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.getRegistrations().then(function(registrations) {
         for (var reg of registrations) { reg.unregister(); }
       });
     }
-    window.addEventListener('flutter-first-frame', function () {
+    function removeLoading() {
       var el = document.getElementById('loading');
       if (el) el.remove();
-    });
+    }
+    window.addEventListener('flutter-first-frame', removeLoading);
+    // Fallback: watch for flutter-view element (fires even if first-frame event is missed)
+    new MutationObserver(function(mutations, obs) {
+      if (document.querySelector('flutter-view')) {
+        setTimeout(removeLoading, 500);
+        obs.disconnect();
+      }
+    }).observe(document.body, { childList: true, subtree: true });
+    // Hard timeout fallback
+    setTimeout(removeLoading, 8000);
   </script>
   <script src="flutter_bootstrap.js" async></script>
 </body>

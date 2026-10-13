@@ -32,6 +32,21 @@ router.get('/', async (req: AuthRequest, res: Response) => {
   }
 });
 
+// Get all groups' calendars combined
+router.get('/calendars', async (req: AuthRequest, res: Response) => {
+  try {
+    const query = {
+      start: req.query.start as string | undefined,
+      end: req.query.end as string | undefined,
+    };
+    const result = await groupService.getAllGroupCalendars(req.userId!, query);
+    res.json(result);
+  } catch (err: any) {
+    const status = err.statusCode || 500;
+    res.status(status).json({ error: err.message });
+  }
+});
+
 // Get a specific group detail
 router.get('/:groupId', async (req: AuthRequest, res: Response) => {
   try {

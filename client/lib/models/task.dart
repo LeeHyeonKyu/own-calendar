@@ -1,5 +1,31 @@
 import '../utils/rrule_utils.dart' as rrule_utils;
 
+class ChecklistItem {
+  final String text;
+  final bool done;
+  final int indent; // 0, 1, 2
+
+  ChecklistItem({required this.text, this.done = false, this.indent = 0});
+
+  factory ChecklistItem.fromJson(Map<String, dynamic> json) {
+    return ChecklistItem(
+      text: json['text'] ?? '',
+      done: json['done'] ?? false,
+      indent: json['indent'] ?? 0,
+    );
+  }
+
+  Map<String, dynamic> toJson() => {'text': text, 'done': done, 'indent': indent};
+
+  ChecklistItem copyWith({String? text, bool? done, int? indent}) {
+    return ChecklistItem(
+      text: text ?? this.text,
+      done: done ?? this.done,
+      indent: indent ?? this.indent,
+    );
+  }
+}
+
 class TaskModel {
   final String id;
   final String title;
@@ -27,6 +53,8 @@ class TaskModel {
   final String? categoryName;
   final String? categoryColor;
   final String? categoryEmoji;
+  final List<ChecklistItem>? checklist;
+  final bool isHabit;
 
   TaskModel({
     required this.id,
@@ -55,6 +83,8 @@ class TaskModel {
     this.categoryName,
     this.categoryColor,
     this.categoryEmoji,
+    this.checklist,
+    this.isHabit = false,
   });
 
   factory TaskModel.fromJson(Map<String, dynamic> json) {
@@ -94,6 +124,10 @@ class TaskModel {
       categoryName: json['categoryRef']?['name'],
       categoryColor: json['categoryRef']?['color'],
       categoryEmoji: json['categoryRef']?['emoji'],
+      checklist: (json['checklist'] as List?)
+          ?.map((e) => ChecklistItem.fromJson(e as Map<String, dynamic>))
+          .toList(),
+      isHabit: json['isHabit'] ?? false,
     );
   }
 
@@ -104,6 +138,9 @@ class TaskModel {
   bool get hasTime => scheduledTime != null;
   bool get hasDueDate => dueDate != null;
   bool get isRecurring => rrule != null || recurrenceType != 'NONE';
+  bool get hasChecklist => checklist != null && checklist!.isNotEmpty;
+  int get checklistDoneCount => checklist?.where((c) => c.done).length ?? 0;
+  int get checklistTotalCount => checklist?.length ?? 0;
 
   /// True when this instance's id is a virtual composite id
   /// (`${masterId}_${instanceDate.toISOString()}`) rather than the master id.

@@ -12,6 +12,12 @@ class ApiService {
   );
   final _storage = const FlutterSecureStorage();
 
+  /// Refresh 실패 시 호출되는 콜백. AuthProvider가 등록하여 _user = null 처리.
+  void Function()? onSessionExpired;
+
+  /// 동시 refresh 방지: 진행 중인 refresh가 있으면 같은 Future를 공유.
+  Future<bool>? _refreshInFlight;
+
   // Storage keys
   static const _kAccessTokenKey = 'accessToken';
   static const _kRefreshTokenKey = 'refreshToken';
@@ -135,9 +141,17 @@ class ApiService {
     return response;
   }
 
-  Future<bool> _refreshTokens() async {
+  Future<bool> _refreshTokens() {
+    _refreshInFlight ??= _doRefresh().whenComplete(() => _refreshInFlight = null);
+    return _refreshInFlight!;
+  }
+
+  Future<bool> _doRefresh() async {
     final refresh = await refreshToken;
-    if (refresh == null) return false;
+    if (refresh == null) {
+      onSessionExpired?.call();
+      return false;
+    }
     try {
       final response = await http.post(
         Uri.parse('$baseUrl/auth/refresh'),
@@ -151,6 +165,7 @@ class ApiService {
       }
     } catch (_) {}
     await clearTokens();
+    onSessionExpired?.call();
     return false;
   }
 }

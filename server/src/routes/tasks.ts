@@ -2,7 +2,7 @@ import { Router, Response } from 'express';
 import { taskService } from '../services/task.service';
 import { authenticate } from '../middleware/auth';
 import { validate } from '../middleware/validate';
-import { createTaskSchema, updateTaskSchema, queryTaskSchema, linkEventSchema } from '../schemas/task.schema';
+import { createTaskSchema, updateTaskSchema, queryTaskSchema, linkEventSchema, habitStatsQuerySchema } from '../schemas/task.schema';
 import { AuthRequest } from '../types';
 
 const router = Router();
@@ -29,6 +29,23 @@ router.post('/', validate(createTaskSchema), async (req: AuthRequest, res: Respo
   try {
     const result = await taskService.create(req.userId!, req.body);
     res.status(201).json(result);
+  } catch (err: any) {
+    const status = err.statusCode || 500;
+    res.status(status).json({ error: err.message });
+  }
+});
+
+router.get('/:id/habit-stats', async (req: AuthRequest, res: Response) => {
+  try {
+    const parsed = habitStatsQuerySchema.safeParse(req.query);
+    if (!parsed.success) {
+      res.status(400).json({ error: 'Validation failed', details: parsed.error.flatten() });
+      return;
+    }
+
+    const { year, month } = parsed.data;
+    const result = await taskService.getHabitStats(req.userId!, req.params.id as string, year, month);
+    res.json(result);
   } catch (err: any) {
     const status = err.statusCode || 500;
     res.status(status).json({ error: err.message });

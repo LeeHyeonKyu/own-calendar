@@ -5,6 +5,14 @@ const TASK_PRIORITIES = ['HIGH', 'MEDIUM', 'LOW', 'NONE'] as const;
 const RECURRENCE_TYPES = ['NONE', 'DAILY', 'WEEKLY', 'MONTHLY', 'YEARLY'] as const;
 const EDIT_MODES = ['this', 'thisAndFuture', 'all'] as const;
 
+const checklistItem = z.object({
+  text: z.string().min(1),
+  done: z.boolean().default(false),
+  indent: z.number().int().min(0).max(2).default(0),
+});
+
+const checklist = z.array(checklistItem).max(50).nullable().optional();
+
 export const createTaskSchema = z.object({
   title: z.string().min(1),
   description: z.string().optional(),
@@ -18,6 +26,8 @@ export const createTaskSchema = z.object({
   eventId: z.string().nullable().optional(),
   calendarId: z.string(),
   sortOrder: z.number().int().optional(),
+  checklist,
+  isHabit: z.boolean().optional(),
 });
 
 export const updateTaskSchema = z.object({
@@ -34,6 +44,8 @@ export const updateTaskSchema = z.object({
   eventId: z.string().nullable().optional(),
   calendarId: z.string().optional(),
   sortOrder: z.number().int().optional(),
+  checklist,
+  isHabit: z.boolean().optional(),
   // Recurrence edit scope - normally sent as query params (see routes/tasks.ts),
   // but also accepted in the body for flexibility.
   editMode: z.enum(EDIT_MODES).optional(),
@@ -51,4 +63,9 @@ export const queryTaskSchema = z.object({
 
 export const linkEventSchema = z.object({
   eventId: z.string().nullable(),
+});
+
+export const habitStatsQuerySchema = z.object({
+  year: z.coerce.number().int(),
+  month: z.coerce.number().int().min(1).max(12),
 });
