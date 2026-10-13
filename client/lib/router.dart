@@ -5,7 +5,6 @@ import 'screens/monthly_view_screen.dart';
 import 'screens/daily_view_screen.dart';
 import 'screens/weekly_view_screen.dart';
 import 'screens/yearly_view_screen.dart';
-import 'screens/family_screen.dart';
 import 'models/event.dart';
 import 'screens/event_form_screen.dart';
 import 'screens/task_form_screen.dart';
@@ -74,8 +73,8 @@ GoRouter createRouter(AuthProvider authProvider) {
             builder: (context, state) => const YearlyViewScreen(),
           ),
           GoRoute(
-            path: '/family',
-            builder: (context, state) => const FamilyScreen(),
+            path: '/groups',
+            builder: (context, state) => const GroupScreen(),
           ),
           GoRoute(
             path: '/settings',
@@ -146,10 +145,6 @@ GoRouter createRouter(AuthProvider authProvider) {
       GoRoute(
         path: '/import',
         builder: (context, state) => const ImportScreen(),
-      ),
-      GoRoute(
-        path: '/groups',
-        builder: (context, state) => const GroupScreen(),
       ),
       GoRoute(
         path: '/groups/:id',
