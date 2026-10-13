@@ -6,6 +6,7 @@ type EditMode = 'this' | 'thisAndFuture' | 'all';
 const taskIncludes = {
   calendar: { select: { id: true, name: true, color: true } },
   event: { select: { id: true, title: true, startTime: true } },
+  categoryRef: { select: { id: true, name: true, color: true, emoji: true } },
 } as const;
 
 /**
@@ -99,6 +100,7 @@ export const taskService = {
     start?: string;
     end?: string;
     includeDone?: string;
+    isHabit?: string;
   }) {
     const where: any = {
       calendar: { ownerId: userId },
@@ -116,6 +118,12 @@ export const taskService = {
 
     if (query.eventId) {
       where.eventId = query.eventId;
+    }
+
+    if (query.isHabit === 'true') {
+      where.isHabit = true;
+    } else if (query.isHabit === 'false') {
+      where.isHabit = false;
     }
 
     const queryStart = query.start ? new Date(query.start) : new Date(0);
@@ -215,8 +223,16 @@ export const taskService = {
       metaInherited?: boolean;
       categoryId?: string | null;
       checklist?: any;
+      isHabit?: boolean;
     },
   ) {
+    // Habits require a recurrence rule
+    if (data.isHabit && !data.rrule && (!data.recurrenceType || data.recurrenceType === 'NONE')) {
+      const error = new Error('Habits must have a recurrence rule');
+      (error as any).statusCode = 400;
+      throw error;
+    }
+
     const calendar = await prisma.calendar.findUnique({
       where: { id: data.calendarId },
     });
@@ -263,6 +279,7 @@ export const taskService = {
         metaInherited: data.metaInherited ?? false,
         categoryId: data.categoryId || null,
         checklist: data.checklist ?? undefined,
+        isHabit: data.isHabit ?? false,
       },
       include: taskIncludes,
     });
@@ -291,6 +308,7 @@ export const taskService = {
       metaInherited?: boolean;
       categoryId?: string | null;
       checklist?: any;
+      isHabit?: boolean;
     },
   ) {
     const { baseId } = resolveInstance(taskId);
@@ -305,6 +323,16 @@ export const taskService = {
     if (task.createdById !== userId) {
       const error = new Error('Forbidden');
       (error as any).statusCode = 403;
+      throw error;
+    }
+
+    // Validate habit requires rrule
+    const effectiveIsHabit = data.isHabit !== undefined ? data.isHabit : task.isHabit;
+    const effectiveRrule = data.rrule !== undefined ? data.rrule : task.rrule;
+    const effectiveRecurrenceType = data.recurrenceType !== undefined ? data.recurrenceType : task.recurrenceType;
+    if (effectiveIsHabit && !effectiveRrule && (!effectiveRecurrenceType || effectiveRecurrenceType === 'NONE')) {
+      const error = new Error('Habits must have a recurrence rule');
+      (error as any).statusCode = 400;
       throw error;
     }
 
@@ -353,6 +381,7 @@ export const taskService = {
     if (data.metaInherited !== undefined) updateData.metaInherited = data.metaInherited;
     if (data.categoryId !== undefined) updateData.categoryId = data.categoryId;
     if (data.checklist !== undefined) updateData.checklist = data.checklist;
+    if (data.isHabit !== undefined) updateData.isHabit = data.isHabit;
 
     return prisma.task.update({
       where: { id: baseId },
@@ -722,5 +751,161 @@ export const taskService = {
         where: { masterTaskId: baseId, originalDate: { gte: instanceDate } },
       }),
     ]);
+  },
+
+  /**
+   * Get habit statistics for a specific task.
+   * Returns streak, weekly summary, and monthly completion grid.
+   */
+  async getHabitStats(userId: string, taskId: string, year: number, month?: number) {
+    const task = await prisma.task.findUnique({
+      where: { id: taskId },
+      include: { exceptions: true },
+    });
+
+    if (!task) {
+      const error = new Error('Task not found');
+      (error as any).statusCode = 404;
+      throw error;
+    }
+
+    if (task.createdById !== userId) {
+      const error = new Error('Forbidden');
+      (error as any).statusCode = 403;
+      throw error;
+    }
+
+    if (!task.isHabit) {
+      const error = new Error('Task is not a habit');
+      (error as any).statusCode = 400;
+      throw error;
+    }
+
+    const rruleStr = recurrenceService.resolveRRule(task);
+    if (!rruleStr) {
+      return { streak: 0, weekSummary: [], monthGrid: [] };
+    }
+
+    const baseDate: Date = task.dueDate || task.scheduledDate || task.createdAt;
+
+    // Build a set of completed dates from RecurrenceExceptions
+    const completedDates = new Set<string>();
+    for (const ex of task.exceptions) {
+      if (ex.status === 'DONE' && !ex.isDeleted) {
+        const d = new Date(ex.originalDate);
+        completedDates.add(`${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`);
+      }
+    }
+    // Also check the master task itself
+    if (task.status === 'DONE' && baseDate) {
+      completedDates.add(`${baseDate.getFullYear()}-${baseDate.getMonth() + 1}-${baseDate.getDate()}`);
+    }
+
+    // --- Streak calculation ---
+    // Look back from today, counting consecutive completed days
+    const today = new Date();
+    today.setHours(23, 59, 59, 999);
+    const streakStart = new Date(today);
+    streakStart.setFullYear(streakStart.getFullYear() - 1); // look back up to 1 year
+
+    let occurrences: Date[];
+    try {
+      occurrences = recurrenceService.expandInstances(rruleStr, baseDate, streakStart, today);
+    } catch {
+      occurrences = [];
+    }
+
+    // Sort descending (most recent first)
+    occurrences.sort((a, b) => b.getTime() - a.getTime());
+
+    let streak = 0;
+    for (const occ of occurrences) {
+      const key = `${occ.getFullYear()}-${occ.getMonth() + 1}-${occ.getDate()}`;
+      if (completedDates.has(key)) {
+        streak++;
+      } else {
+        // If today's occurrence is not yet complete, skip it (don't break streak)
+        const todayKey = `${today.getFullYear()}-${today.getMonth() + 1}-${today.getDate()}`;
+        if (key === todayKey) {
+          continue;
+        }
+        break;
+      }
+    }
+
+    // --- Weekly summary ---
+    // This week: Monday to Sunday
+    const now = new Date();
+    const dayOfWeek = now.getDay(); // 0=Sun, 1=Mon, ...
+    const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+    const weekStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() + mondayOffset);
+    const weekEnd = new Date(weekStart);
+    weekEnd.setDate(weekEnd.getDate() + 6);
+    weekEnd.setHours(23, 59, 59, 999);
+
+    let weekOccurrences: Date[];
+    try {
+      weekOccurrences = recurrenceService.expandInstances(rruleStr, baseDate, weekStart, weekEnd);
+    } catch {
+      weekOccurrences = [];
+    }
+
+    const weekDayLabels = ['월', '화', '수', '목', '금', '토', '일'];
+    const weekSummary = weekDayLabels.map((label, i) => {
+      const date = new Date(weekStart);
+      date.setDate(date.getDate() + i);
+      const key = `${date.getFullYear()}-${date.getMonth() + 1}-${date.getDate()}`;
+      const isScheduled = weekOccurrences.some(
+        (o) => o.getFullYear() === date.getFullYear() && o.getMonth() === date.getMonth() && o.getDate() === date.getDate(),
+      );
+      const isCompleted = completedDates.has(key);
+      const isFuture = date > now;
+      return { day: label, date: date.toISOString().slice(0, 10), scheduled: isScheduled, completed: isCompleted, future: isFuture };
+    });
+
+    // --- Monthly grid ---
+    const targetMonth = month ?? now.getMonth() + 1;
+    const monthStart = new Date(year, targetMonth - 1, 1);
+    const monthEnd = new Date(year, targetMonth, 0, 23, 59, 59, 999);
+
+    let monthOccurrences: Date[];
+    try {
+      monthOccurrences = recurrenceService.expandInstances(rruleStr, baseDate, monthStart, monthEnd);
+    } catch {
+      monthOccurrences = [];
+    }
+
+    const daysInMonth = monthEnd.getDate();
+    const monthGrid = [];
+    for (let d = 1; d <= daysInMonth; d++) {
+      const date = new Date(year, targetMonth - 1, d);
+      const key = `${date.getFullYear()}-${date.getMonth() + 1}-${date.getDate()}`;
+      const isScheduled = monthOccurrences.some(
+        (o) => o.getFullYear() === date.getFullYear() && o.getMonth() === date.getMonth() && o.getDate() === date.getDate(),
+      );
+      const isCompleted = completedDates.has(key);
+      const isFuture = date > now;
+      monthGrid.push({
+        day: d,
+        date: date.toISOString().slice(0, 10),
+        scheduled: isScheduled,
+        completed: isCompleted,
+        future: isFuture,
+      });
+    }
+
+    // Monthly achievement rate
+    const scheduledCount = monthGrid.filter((d) => d.scheduled && !d.future).length;
+    const completedCount = monthGrid.filter((d) => d.scheduled && d.completed && !d.future).length;
+    const achievementRate = scheduledCount > 0 ? Math.round((completedCount / scheduledCount) * 100) : 0;
+
+    return {
+      streak,
+      weekSummary,
+      monthGrid,
+      achievementRate,
+      scheduledCount,
+      completedCount,
+    };
   },
 };

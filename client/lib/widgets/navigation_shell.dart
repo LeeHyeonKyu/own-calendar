@@ -32,6 +32,7 @@ const List<TabItem> allTabs = [
   TabItem(id: 'daily', icon: Icons.today, label: '일별', route: '/daily'),
   TabItem(id: 'weekly', icon: Icons.view_week, label: '주별', route: '/weekly'),
   TabItem(id: 'yearly', icon: Icons.calendar_today, label: '연별', route: '/yearly'),
+  TabItem(id: 'habit', icon: Icons.self_improvement, label: '습관', route: '/habits'),
   TabItem(id: 'group', icon: Icons.group, label: '그룹', route: '/groups'),
   TabItem(id: 'settings', icon: Icons.settings, label: '설정', route: '/settings'),
 ];
@@ -41,6 +42,7 @@ const List<String> defaultVisibleTabIds = [
   'monthly',
   'daily',
   'weekly',
+  'habit',
   'group',
   'settings',
 ];

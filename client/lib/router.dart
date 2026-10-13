@@ -19,6 +19,7 @@ import 'screens/group_screen.dart';
 import 'screens/group_detail_screen.dart';
 import 'screens/follow_search_screen.dart';
 import 'screens/followee_events_screen.dart';
+import 'screens/habit_screen.dart';
 import 'widgets/navigation_shell.dart';
 
 GoRouter createRouter(AuthProvider authProvider) {
@@ -74,6 +75,10 @@ GoRouter createRouter(AuthProvider authProvider) {
             builder: (context, state) => const YearlyViewScreen(),
           ),
           GoRoute(
+            path: '/habits',
+            builder: (context, state) => const HabitScreen(),
+          ),
+          GoRoute(
             path: '/groups',
             builder: (context, state) => const GroupScreen(),
           ),
@@ -114,7 +119,12 @@ GoRouter createRouter(AuthProvider authProvider) {
           final dateStr = state.uri.queryParameters['date'];
           final date = dateStr != null ? DateTime.tryParse(dateStr) : null;
           final eventId = state.uri.queryParameters['eventId'];
-          return TaskFormScreen(initialDate: date, initialEventId: eventId);
+          final isHabit = state.uri.queryParameters['isHabit'] == 'true';
+          return TaskFormScreen(
+            initialDate: date,
+            initialEventId: eventId,
+            initialIsHabit: isHabit,
+          );
         },
       ),
       GoRoute(

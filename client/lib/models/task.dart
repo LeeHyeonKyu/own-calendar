@@ -86,6 +86,7 @@ class TaskModel {
   final String? categoryColor;
   final String? categoryEmoji;
   final List<ChecklistItem>? checklist;
+  final bool isHabit;
 
   TaskModel({
     required this.id,
@@ -115,6 +116,7 @@ class TaskModel {
     this.categoryColor,
     this.categoryEmoji,
     this.checklist,
+    this.isHabit = false,
   });
 
   factory TaskModel.fromJson(Map<String, dynamic> json) {
@@ -157,6 +159,7 @@ class TaskModel {
       checklist: (json['checklist'] as List<dynamic>?)
           ?.map((c) => ChecklistItem.fromJson(Map<String, dynamic>.from(c as Map)))
           .toList(),
+      isHabit: json['isHabit'] ?? false,
     );
   }
 

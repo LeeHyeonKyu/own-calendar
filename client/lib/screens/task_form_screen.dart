@@ -14,8 +14,15 @@ class TaskFormScreen extends StatefulWidget {
   final String? taskId;
   final DateTime? initialDate;
   final String? initialEventId;
+  final bool initialIsHabit;
 
-  const TaskFormScreen({super.key, this.taskId, this.initialDate, this.initialEventId});
+  const TaskFormScreen({
+    super.key,
+    this.taskId,
+    this.initialDate,
+    this.initialEventId,
+    this.initialIsHabit = false,
+  });
 
   @override
   State<TaskFormScreen> createState() => _TaskFormScreenState();
@@ -43,6 +50,7 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
   List<ChecklistItem> _checklist = [];
   bool _showChecklist = false;
   bool _showMetadata = false;
+  bool _isHabit = false;
 
   bool get isEditing => widget.taskId != null;
   bool get _isEditingInstance => _originalTask?.isVirtualInstance ?? false;
@@ -52,6 +60,7 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
     super.initState();
     _scheduledDate = widget.initialDate;
     _selectedEventId = widget.initialEventId;
+    _isHabit = widget.initialIsHabit;
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _loadCalendars();
@@ -115,6 +124,7 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
         _showMetadata = task.location != null ||
             task.notes != null ||
             task.attendees.isNotEmpty;
+        _isHabit = task.isHabit;
       });
     }
   }
@@ -164,6 +174,14 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
     if (!_formKey.currentState!.validate()) return;
     if (_selectedCalendarId == null) return;
 
+    // Habits require a recurrence rule
+    if (_isHabit && _rrule == null && _recurrenceType == 'NONE') {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('습관은 반복 설정이 필수입니다')),
+      );
+      return;
+    }
+
     String? editMode;
     if (isEditing && _isEditingInstance) {
       editMode = await showEditModeDialog(context);
@@ -192,6 +210,7 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
       'checklist': _checklist.isEmpty
           ? null
           : _checklist.map((c) => c.toJson()).toList(),
+      'isHabit': _isHabit,
     };
 
     if (_dueDate != null) {
@@ -301,6 +320,18 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
                 border: OutlineInputBorder(),
               ),
               maxLines: 3,
+            ),
+            const SizedBox(height: Spacing.lg),
+            SwitchListTile(
+              title: const Text('습관으로 추적'),
+              subtitle: const Text('반복 Task를 습관으로 등록하여 streak과 달성률을 추적합니다'),
+              secondary: const Icon(Icons.self_improvement),
+              value: _isHabit,
+              onChanged: (v) => setState(() => _isHabit = v),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(AppRadius.sm),
+                side: BorderSide(color: Theme.of(context).colorScheme.outline),
+              ),
             ),
             const SizedBox(height: Spacing.lg),
             DropdownButtonFormField<String>(

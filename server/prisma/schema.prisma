@@ -218,6 +218,7 @@ model Task {
   attendees      Json?
   checklist      Json?
   metaInherited  Boolean        @default(false)
+  isHabit        Boolean        @default(false)
   categoryId     String?
   categoryRef    Category?      @relation(fields: [categoryId], references: [id], onDelete: SetNull)
   eventId        String?
@@ -235,6 +236,7 @@ model Task {
   @@index([eventId])
   @@index([status])
   @@index([dueDate])
+  @@index([isHabit])
 }
 
 model RecurrenceException {
