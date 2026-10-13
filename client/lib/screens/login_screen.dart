@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
 import '../providers/auth_provider.dart';
@@ -16,6 +17,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final _nameController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _isRegister = false;
+  bool _rememberMe = true;
 
   @override
   void dispose() {
@@ -41,10 +43,12 @@ class _LoginScreenState extends State<LoginScreen> {
       success = await auth.login(
         _emailController.text.trim(),
         _passwordController.text,
+        rememberMe: _rememberMe,
       );
     }
 
     if (success && mounted) {
+      TextInput.finishAutofillContext();
       context.go('/');
     }
   }
@@ -57,9 +61,10 @@ class _LoginScreenState extends State<LoginScreen> {
       body: Center(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(32),
-          child: Form(
-            key: _formKey,
-            child: Column(
+          child: AutofillGroup(
+            child: Form(
+              key: _formKey,
+              child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
@@ -85,6 +90,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     prefixIcon: Icon(Icons.email),
                   ),
                   keyboardType: TextInputType.emailAddress,
+                  autofillHints: const [AutofillHints.email],
                 ),
                 const SizedBox(height: 16),
                 if (_isRegister) ...[
@@ -95,6 +101,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       border: OutlineInputBorder(),
                       prefixIcon: Icon(Icons.person),
                     ),
+                    autofillHints: const [AutofillHints.name],
                   ),
                   const SizedBox(height: 16),
                 ],
@@ -106,6 +113,8 @@ class _LoginScreenState extends State<LoginScreen> {
                     prefixIcon: Icon(Icons.lock),
                   ),
                   obscureText: true,
+                  autofillHints: const [AutofillHints.password],
+                  onFieldSubmitted: (_) => _submit(),
                 ),
                 const SizedBox(height: 8),
                 if (auth.error != null)
@@ -118,6 +127,17 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                     ),
                   ),
+                if (!_isRegister) ...[
+                  CheckboxListTile(
+                    value: _rememberMe,
+                    onChanged: (v) => setState(() => _rememberMe = v ?? false),
+                    title: const Text('자동 로그인'),
+                    subtitle: const Text('30일간 로그인 유지'),
+                    controlAffinity: ListTileControlAffinity.leading,
+                    contentPadding: EdgeInsets.zero,
+                    dense: true,
+                  ),
+                ],
                 const SizedBox(height: 16),
                 FilledButton(
                   onPressed: auth.isLoading ? null : _submit,
@@ -145,6 +165,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
               ],
             ),
+          ),
           ),
         ),
       ),
