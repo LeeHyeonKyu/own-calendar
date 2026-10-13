@@ -5,6 +5,35 @@ const TASK_PRIORITIES = ['HIGH', 'MEDIUM', 'LOW', 'NONE'] as const;
 const RECURRENCE_TYPES = ['NONE', 'DAILY', 'WEEKLY', 'MONTHLY', 'YEARLY'] as const;
 const EDIT_MODES = ['this', 'thisAndFuture', 'all'] as const;
 
+const checklistItemSchema: z.ZodType<any> = z.lazy(() =>
+  z.object({
+    id: z.string().min(1),
+    text: z.string(),
+    checked: z.boolean(),
+    children: z.array(checklistItemSchema).max(50).default([]),
+  }),
+);
+
+/** Validate that nesting never exceeds 3 levels (root = level 1). */
+function validateChecklistDepth(items: any[], depth = 1): boolean {
+  if (depth > 3) return false;
+  for (const item of items) {
+    if (item.children && item.children.length > 0) {
+      if (!validateChecklistDepth(item.children, depth + 1)) return false;
+    }
+  }
+  return true;
+}
+
+export const checklistSchema = z
+  .array(checklistItemSchema)
+  .max(200)
+  .refine((items) => validateChecklistDepth(items), {
+    message: 'Checklist nesting must not exceed 3 levels',
+  })
+  .nullable()
+  .optional();
+
 export const createTaskSchema = z.object({
   title: z.string().min(1),
   description: z.string().optional(),
@@ -18,6 +47,7 @@ export const createTaskSchema = z.object({
   eventId: z.string().nullable().optional(),
   calendarId: z.string(),
   sortOrder: z.number().int().optional(),
+  checklist: checklistSchema,
 });
 
 export const updateTaskSchema = z.object({
@@ -34,6 +64,7 @@ export const updateTaskSchema = z.object({
   eventId: z.string().nullable().optional(),
   calendarId: z.string().optional(),
   sortOrder: z.number().int().optional(),
+  checklist: checklistSchema,
   // Recurrence edit scope - normally sent as query params (see routes/tasks.ts),
   // but also accepted in the body for flexibility.
   editMode: z.enum(EDIT_MODES).optional(),

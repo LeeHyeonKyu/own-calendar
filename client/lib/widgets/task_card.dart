@@ -104,8 +104,15 @@ class TaskCard extends StatelessWidget {
                           ],
                           if (task.hasDueDate)
                             _DueTag(task: task),
+                          if (task.hasChecklist) ...[
+                            if (task.hasDueDate || task.hasTime) const SizedBox(width: Spacing.sm),
+                            _ChecklistBadge(
+                              checked: task.checklistChecked,
+                              total: task.checklistTotal,
+                            ),
+                          ],
                           if (task.hasEvent) ...[
-                            if (task.hasDueDate) const SizedBox(width: Spacing.sm),
+                            if (task.hasDueDate || task.hasChecklist) const SizedBox(width: Spacing.sm),
                             _RelatedBadge(eventTitle: task.eventTitle ?? ''),
                           ],
                           if (task.isRecurring) ...[
@@ -164,6 +171,36 @@ class _DueTag extends StatelessWidget {
       child: Text(
         label,
         style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: color),
+      ),
+    );
+  }
+}
+
+class _ChecklistBadge extends StatelessWidget {
+  final int checked;
+  final int total;
+  const _ChecklistBadge({required this.checked, required this.total});
+
+  @override
+  Widget build(BuildContext context) {
+    final allDone = checked == total;
+    final color = allDone ? AppColors.taskDone : Theme.of(context).colorScheme.outline;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: Spacing.sm, vertical: 1),
+      decoration: BoxDecoration(
+        color: color.withAlpha(25),
+        borderRadius: BorderRadius.circular(AppRadius.sm),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.checklist, size: 12, color: color),
+          const SizedBox(width: 2),
+          Text(
+            '$checked/$total',
+            style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: color),
+          ),
+        ],
       ),
     );
   }

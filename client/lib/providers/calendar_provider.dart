@@ -509,6 +509,21 @@ class CalendarProvider extends ChangeNotifier {
     return false;
   }
 
+  Future<bool> toggleChecklistItem(String taskId, String itemId) async {
+    final res = await _api.patch('/tasks/$taskId/checklist/$itemId');
+    if (res.statusCode == 200) {
+      final json = jsonDecode(res.body);
+      final updated = TaskModel.fromJson(json);
+      final idx = _tasks.indexWhere((t) => t.id == taskId);
+      if (idx >= 0) {
+        _tasks[idx] = updated;
+        notifyListeners();
+      }
+      return true;
+    }
+    return false;
+  }
+
   Future<bool> linkTaskToEvent(String taskId, String? eventId) async {
     final res = await _api.patch('/tasks/$taskId/link', {'eventId': eventId});
     if (res.statusCode == 200) {

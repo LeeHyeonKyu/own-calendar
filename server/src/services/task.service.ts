@@ -83,6 +83,7 @@ function expandTaskInstances(task: any, queryStart: Date, queryEnd: Date): any[]
       scheduledDate: task.scheduledDate ? occDate : null,
       status: hasStatusOverride ? exception.status : isOriginal ? task.status : 'TODO',
       completedAt: hasStatusOverride ? exception.completedAt : isOriginal ? task.completedAt : null,
+      checklist: exception?.checklist ?? task.checklist,
       exceptions: undefined,
     });
   }
@@ -213,6 +214,7 @@ export const taskService = {
       attendees?: any;
       metaInherited?: boolean;
       categoryId?: string | null;
+      checklist?: any;
     },
   ) {
     const calendar = await prisma.calendar.findUnique({
@@ -260,6 +262,7 @@ export const taskService = {
         attendees: data.attendees || undefined,
         metaInherited: data.metaInherited ?? false,
         categoryId: data.categoryId || null,
+        checklist: data.checklist ?? undefined,
       },
       include: taskIncludes,
     });
@@ -287,6 +290,7 @@ export const taskService = {
       attendees?: any;
       metaInherited?: boolean;
       categoryId?: string | null;
+      checklist?: any;
     },
   ) {
     const { baseId } = resolveInstance(taskId);
@@ -348,6 +352,7 @@ export const taskService = {
     if (data.attendees !== undefined) updateData.attendees = data.attendees;
     if (data.metaInherited !== undefined) updateData.metaInherited = data.metaInherited;
     if (data.categoryId !== undefined) updateData.categoryId = data.categoryId;
+    if (data.checklist !== undefined) updateData.checklist = data.checklist;
 
     return prisma.task.update({
       where: { id: baseId },
@@ -557,6 +562,50 @@ export const taskService = {
       status: exception.status,
       completedAt: exception.completedAt,
     };
+  },
+
+  async toggleChecklistItem(userId: string, taskId: string, itemId: string) {
+    const { baseId } = resolveInstance(taskId);
+    const task = await prisma.task.findUnique({ where: { id: baseId } });
+
+    if (!task) {
+      const error = new Error('Task not found');
+      (error as any).statusCode = 404;
+      throw error;
+    }
+
+    if (task.createdById !== userId) {
+      const error = new Error('Forbidden');
+      (error as any).statusCode = 403;
+      throw error;
+    }
+
+    const checklist = (task.checklist as any[]) || [];
+
+    function toggleItem(items: any[]): boolean {
+      for (const item of items) {
+        if (item.id === itemId) {
+          item.checked = !item.checked;
+          return true;
+        }
+        if (item.children && item.children.length > 0) {
+          if (toggleItem(item.children)) return true;
+        }
+      }
+      return false;
+    }
+
+    if (!toggleItem(checklist)) {
+      const error = new Error('Checklist item not found');
+      (error as any).statusCode = 404;
+      throw error;
+    }
+
+    return prisma.task.update({
+      where: { id: baseId },
+      data: { checklist },
+      include: taskIncludes,
+    });
   },
 
   async linkEvent(userId: string, taskId: string, eventId: string | null) {

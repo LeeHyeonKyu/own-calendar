@@ -7,6 +7,7 @@ import '../models/task.dart';
 import '../utils/rrule_utils.dart';
 import '../widgets/recurrence_picker.dart';
 import '../widgets/edit_mode_dialog.dart';
+import '../widgets/checklist_editor.dart';
 import '../themes/spacing.dart';
 
 class TaskFormScreen extends StatefulWidget {
@@ -39,6 +40,8 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
   bool _isLoading = false;
   TaskModel? _originalTask;
   List<Map<String, dynamic>> _attendees = [];
+  List<ChecklistItem> _checklist = [];
+  bool _showChecklist = false;
   bool _showMetadata = false;
 
   bool get isEditing => widget.taskId != null;
@@ -104,6 +107,11 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
         _locationController.text = task.location ?? '';
         _notesController.text = task.notes ?? '';
         _attendees = List.from(task.attendees);
+        _checklist = task.checklist
+                ?.map((c) => c.copyWith())
+                .toList() ??
+            [];
+        _showChecklist = _checklist.isNotEmpty;
         _showMetadata = task.location != null ||
             task.notes != null ||
             task.attendees.isNotEmpty;
@@ -181,6 +189,9 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
           ? null
           : _notesController.text.trim(),
       'attendees': _attendees.isEmpty ? null : _attendees,
+      'checklist': _checklist.isEmpty
+          ? null
+          : _checklist.map((c) => c.toJson()).toList(),
     };
 
     if (_dueDate != null) {
@@ -401,6 +412,28 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
                 );
               },
             ),
+            const SizedBox(height: Spacing.lg),
+            // ── Checklist section (Feature 130) ──
+            ListTile(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(AppRadius.sm),
+                side: BorderSide(color: Theme.of(context).colorScheme.outline),
+              ),
+              leading: const Icon(Icons.checklist),
+              title: const Text('체크리스트'),
+              subtitle: Text(_checklist.isEmpty
+                  ? '탭하여 추가'
+                  : '${_checklist.fold<int>(0, (sum, c) => sum + c.checkedCount)}/${_checklist.fold<int>(0, (sum, c) => sum + c.totalCount)}개 완료'),
+              trailing: Icon(_showChecklist ? Icons.expand_less : Icons.expand_more),
+              onTap: () => setState(() => _showChecklist = !_showChecklist),
+            ),
+            if (_showChecklist) ...[
+              const SizedBox(height: Spacing.md),
+              ChecklistEditor(
+                items: _checklist,
+                onChanged: (items) => setState(() => _checklist = items),
+              ),
+            ],
             const SizedBox(height: Spacing.lg),
             // ── Metadata section (Feature 018) ──
             ListTile(

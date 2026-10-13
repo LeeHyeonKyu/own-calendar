@@ -59,6 +59,16 @@ router.patch('/:id/complete', async (req: AuthRequest, res: Response) => {
   }
 });
 
+router.patch('/:id/checklist/:itemId', async (req: AuthRequest, res: Response) => {
+  try {
+    const result = await taskService.toggleChecklistItem(req.userId!, req.params.id as string, req.params.itemId as string);
+    res.json(result);
+  } catch (err: any) {
+    const status = err.statusCode || 500;
+    res.status(status).json({ error: err.message });
+  }
+});
+
 router.patch('/:id/link', validate(linkEventSchema), async (req: AuthRequest, res: Response) => {
   try {
     const result = await taskService.linkEvent(req.userId!, req.params.id as string, req.body.eventId);

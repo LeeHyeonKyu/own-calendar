@@ -1,4 +1,62 @@
+import 'package:uuid/uuid.dart';
 import '../utils/rrule_utils.dart' as rrule_utils;
+
+const _uuid = Uuid();
+
+class ChecklistItem {
+  final String id;
+  String text;
+  bool checked;
+  List<ChecklistItem> children;
+
+  ChecklistItem({
+    String? id,
+    required this.text,
+    this.checked = false,
+    List<ChecklistItem>? children,
+  })  : id = id ?? _uuid.v4(),
+        children = children ?? [];
+
+  factory ChecklistItem.fromJson(Map<String, dynamic> json) {
+    return ChecklistItem(
+      id: json['id'] as String,
+      text: json['text'] as String? ?? '',
+      checked: json['checked'] as bool? ?? false,
+      children: (json['children'] as List<dynamic>?)
+              ?.map((c) => ChecklistItem.fromJson(Map<String, dynamic>.from(c as Map)))
+              .toList() ??
+          [],
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'text': text,
+        'checked': checked,
+        'children': children.map((c) => c.toJson()).toList(),
+      };
+
+  ChecklistItem copyWith({
+    String? id,
+    String? text,
+    bool? checked,
+    List<ChecklistItem>? children,
+  }) {
+    return ChecklistItem(
+      id: id ?? this.id,
+      text: text ?? this.text,
+      checked: checked ?? this.checked,
+      children: children ?? this.children.map((c) => c.copyWith()).toList(),
+    );
+  }
+
+  /// Count all items (self + descendants).
+  int get totalCount => 1 + children.fold(0, (sum, c) => sum + c.totalCount);
+
+  /// Count checked items (self + descendants).
+  int get checkedCount =>
+      (checked ? 1 : 0) + children.fold(0, (sum, c) => sum + c.checkedCount);
+}
 
 class TaskModel {
   final String id;
@@ -27,6 +85,7 @@ class TaskModel {
   final String? categoryName;
   final String? categoryColor;
   final String? categoryEmoji;
+  final List<ChecklistItem>? checklist;
 
   TaskModel({
     required this.id,
@@ -55,6 +114,7 @@ class TaskModel {
     this.categoryName,
     this.categoryColor,
     this.categoryEmoji,
+    this.checklist,
   });
 
   factory TaskModel.fromJson(Map<String, dynamic> json) {
@@ -94,6 +154,9 @@ class TaskModel {
       categoryName: json['categoryRef']?['name'],
       categoryColor: json['categoryRef']?['color'],
       categoryEmoji: json['categoryRef']?['emoji'],
+      checklist: (json['checklist'] as List<dynamic>?)
+          ?.map((c) => ChecklistItem.fromJson(Map<String, dynamic>.from(c as Map)))
+          .toList(),
     );
   }
 
@@ -101,6 +164,7 @@ class TaskModel {
   bool get isCancelled => status == 'CANCELLED';
   bool get isTodo => status == 'TODO';
   bool get hasEvent => eventId != null;
+  bool get hasChecklist => checklist != null && checklist!.isNotEmpty;
   bool get hasTime => scheduledTime != null;
   bool get hasDueDate => dueDate != null;
   bool get isRecurring => rrule != null || recurrenceType != 'NONE';
@@ -179,6 +243,14 @@ class TaskModel {
 
   /// Common RRULE presets keyed by a short id.
   static const rrulePresets = rrule_utils.rrulePresets;
+
+  /// Total number of checklist items (all levels).
+  int get checklistTotal =>
+      checklist?.fold<int>(0, (sum, item) => sum + item.totalCount) ?? 0;
+
+  /// Number of checked checklist items (all levels).
+  int get checklistChecked =>
+      checklist?.fold<int>(0, (sum, item) => sum + item.checkedCount) ?? 0;
 
   String get statusLabel => statusLabels[status] ?? '할 일';
   String get priorityLabel => priorityLabels[priority] ?? '없음';
