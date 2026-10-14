@@ -8,6 +8,7 @@ set -euo pipefail
 #   ./scripts/deploy.sh --from <branch>  # feature 브랜치를 squash merge 후 배포
 #   ./scripts/deploy.sh --web-only       # 웹 빌드+배포+검증만
 #   ./scripts/deploy.sh --server-only    # 서버 빌드+배포+검증만
+#   ./scripts/deploy.sh --skip-tag       # iOS 빌드 태그 생성 건너뛰기
 # ──────────────────────────────────────────────────
 
 PROJECT_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -37,12 +38,14 @@ warn()  { echo -e "  ${YELLOW}!${NC} $1"; }
 FEATURE_BRANCH=""
 WEB_ONLY=false
 SERVER_ONLY=false
+SKIP_TAG=false
 
 while [[ $# -gt 0 ]]; do
   case $1 in
     --from)       FEATURE_BRANCH="$2"; shift 2 ;;
     --web-only)   WEB_ONLY=true; shift ;;
     --server-only) SERVER_ONLY=true; shift ;;
+    --skip-tag)   SKIP_TAG=true; shift ;;
     *) echo "Unknown option: $1"; exit 1 ;;
   esac
 done
@@ -55,8 +58,9 @@ if $WEB_ONLY; then
 elif $SERVER_ONLY; then
   total_steps=4
 else
-  total_steps=9
+  total_steps=10
   [[ -n "$FEATURE_BRANCH" ]] && total_steps=$((total_steps+2))
+  $SKIP_TAG && total_steps=$((total_steps-1))
 fi
 
 echo -e "${CYAN}═══════════════════════════════════════${NC}"
@@ -112,6 +116,24 @@ if ! $WEB_ONLY && ! $SERVER_ONLY; then
   log "origin/main에 push"
   git push origin main || fail "Push 실패"
   ok "Push 완료: $(git log --oneline -1)"
+fi
+
+# ──────────────────────────────────────────────────
+# 2b. iOS/macOS 빌드 태그 생성
+# ──────────────────────────────────────────────────
+if ! $WEB_ONLY && ! $SERVER_ONLY && ! $SKIP_TAG; then
+  log "iOS/macOS 빌드 태그 생성"
+  DATE_TAG="v$(date -u +'%Y.%m.%d')"
+  EXISTING=$(git tag -l "${DATE_TAG}.*" | wc -l | tr -d ' ')
+  RUN_NUM=$((EXISTING + 1))
+  NEW_TAG="${DATE_TAG}.${RUN_NUM}"
+  if git tag "$NEW_TAG" && git push origin "$NEW_TAG" 2>/dev/null; then
+    ok "태그 생성 + push: $NEW_TAG (CI 빌드 트리거)"
+  else
+    warn "태그 생성 실패 — iOS/macOS 빌드는 수동으로 트리거하세요"
+  fi
+elif $SKIP_TAG && ! $WEB_ONLY && ! $SERVER_ONLY; then
+  warn "태그 생성 건너뜀 (--skip-tag)"
 fi
 
 # ──────────────────────────────────────────────────
