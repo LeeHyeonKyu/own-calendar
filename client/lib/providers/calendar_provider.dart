@@ -29,6 +29,7 @@ class CalendarProvider extends ChangeNotifier {
   bool _showGroupEvents = true;
   Set<String> _hiddenCategoryIds = {};
   bool _hideUncategorized = false;
+  DateTime _selectedDate = DateTime.now();
 
   /// Pending deferred deletes: event id -> timer.
   final Map<String, Timer> _pendingDeleteTimers = {};
@@ -68,6 +69,12 @@ class CalendarProvider extends ChangeNotifier {
   bool get hideUncategorized => _hideUncategorized;
   bool get isAllCategoriesVisible =>
       _hiddenCategoryIds.isEmpty && !_hideUncategorized;
+  DateTime get selectedDate => _selectedDate;
+
+  void setSelectedDate(DateTime date) {
+    _selectedDate = date;
+    notifyListeners();
+  }
 
   void toggleGroupEvents() {
     _showGroupEvents = !_showGroupEvents;

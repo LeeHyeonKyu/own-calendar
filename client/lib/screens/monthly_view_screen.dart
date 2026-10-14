@@ -99,7 +99,12 @@ class _MonthlyViewScreenState extends State<MonthlyViewScreen> {
     if (m.year == now.year && m.month == now.month) {
       _selectedDay = DateTime(now.year, now.month, now.day);
     }
-    WidgetsBinding.instance.addPostFrameCallback((_) => _loadData());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_selectedDay != null) {
+        context.read<CalendarProvider>().setSelectedDate(_selectedDay!);
+      }
+      _loadData();
+    });
   }
 
   Future<void> _loadData() async {
@@ -497,6 +502,7 @@ class _MonthlyViewScreenState extends State<MonthlyViewScreen> {
                         child: GestureDetector(
                           onTap: () {
                             setState(() => _selectedDay = day);
+                            context.read<CalendarProvider>().setSelectedDate(day);
                           },
                           onDoubleTap: () {
                             context.go('/daily?date=${day.toIso8601String()}');

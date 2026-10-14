@@ -186,6 +186,9 @@ class _EventFormScreenState extends State<EventFormScreen> {
       setState(() {
         if (isStart) {
           _startDate = picked;
+          if (_startDate.isAfter(_endDate)) {
+            _endDate = _startDate;
+          }
         } else {
           _endDate = picked;
         }
@@ -257,6 +260,14 @@ class _EventFormScreenState extends State<EventFormScreen> {
     final endDt = _isAllDay
         ? DateTime(_endDate.year, _endDate.month, _endDate.day, 23, 59, 59)
         : _combine(_endDate, _endTime);
+
+    if (endDt.isBefore(startDt)) {
+      setState(() => _isLoading = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('종료 시간이 시작 시간보다 빠릅니다')),
+      );
+      return;
+    }
 
     final data = {
       'title': _titleController.text.trim(),

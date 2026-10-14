@@ -42,6 +42,7 @@ class _WeeklyViewScreenState extends State<WeeklyViewScreen> {
     final now = DateTime.now();
     _weekStart = now.subtract(Duration(days: now.weekday % 7));
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<CalendarProvider>().setSelectedDate(now);
       _loadData();
       _scrollToNow();
     });

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../providers/calendar_provider.dart';
 import '../themes/spacing.dart';
 
 /// A single tab entry in the bottom navigation bar.
@@ -135,7 +137,7 @@ class _NavigationShellState extends State<NavigationShell> {
   }
 
   void _showCreateSheet() {
-    final now = DateTime.now();
+    final date = context.read<CalendarProvider>().selectedDate;
     showModalBottomSheet(
       context: context,
       builder: (ctx) {
@@ -152,7 +154,7 @@ class _NavigationShellState extends State<NavigationShell> {
                   subtitle: const Text('일정, 약속, 기념일'),
                   onTap: () {
                     Navigator.pop(ctx);
-                    context.push('/event/new?date=${now.toIso8601String()}');
+                    context.push('/event/new?date=${date.toIso8601String()}');
                   },
                 ),
                 ListTile(
@@ -161,7 +163,7 @@ class _NavigationShellState extends State<NavigationShell> {
                   subtitle: const Text('할 일, 체크리스트'),
                   onTap: () {
                     Navigator.pop(ctx);
-                    context.push('/task/new?date=${now.toIso8601String()}');
+                    context.push('/task/new?date=${date.toIso8601String()}');
                   },
                 ),
               ],

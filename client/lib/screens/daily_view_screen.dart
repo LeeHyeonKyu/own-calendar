@@ -30,6 +30,7 @@ class _DailyViewScreenState extends State<DailyViewScreen> {
     super.initState();
     _selectedDate = widget.initialDate ?? DateTime.now();
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<CalendarProvider>().setSelectedDate(_selectedDate);
       _loadData();
       _scrollToNow();
     });
@@ -99,6 +100,7 @@ class _DailyViewScreenState extends State<DailyViewScreen> {
             TextButton(
               onPressed: () {
                 setState(() => _selectedDate = DateTime.now());
+                context.read<CalendarProvider>().setSelectedDate(_selectedDate);
                 _loadData();
                 _scrollToNow();
               },
@@ -142,6 +144,7 @@ class _DailyViewScreenState extends State<DailyViewScreen> {
           return GestureDetector(
             onTap: () {
               setState(() => _selectedDate = day);
+              context.read<CalendarProvider>().setSelectedDate(day);
               _loadData();
             },
             child: Container(
