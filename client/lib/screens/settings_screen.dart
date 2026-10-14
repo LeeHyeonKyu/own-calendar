@@ -337,26 +337,56 @@ class _SettingsScreenState extends State<SettingsScreen> with WidgetsBindingObse
             )
           else
             ..._connections.map(
-              (c) => ListTile(
-                leading: const Icon(Icons.sync),
-                title: Text(c['externalId'] ?? 'Google Calendar'),
-                subtitle: Text(
-                  c['lastSyncedAt'] != null ? '마지막 동기화: ${c['lastSyncedAt']}' : '동기화 안됨',
-                ),
-                trailing: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    IconButton(
-                      icon: const Icon(Icons.refresh),
-                      onPressed: () => _syncGoogle(c['id']),
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.link_off, size: 20),
-                      onPressed: () => _disconnectGoogle(c['id']),
-                    ),
-                  ],
-                ),
-              ),
+              (c) {
+                final syncStatus = c['syncStatus'] as String? ?? 'ok';
+                final lastError = c['lastSyncError'] as String?;
+                final isExpired = syncStatus == 'token_expired';
+                final isError = syncStatus == 'error';
+
+                IconData statusIcon;
+                Color statusColor;
+                String subtitle;
+                if (isExpired) {
+                  statusIcon = Icons.key_off;
+                  statusColor = Colors.red;
+                  subtitle = '재연결 필요';
+                } else if (isError) {
+                  statusIcon = Icons.warning_amber;
+                  statusColor = Colors.orange;
+                  subtitle = lastError ?? '동기화 오류';
+                } else {
+                  statusIcon = Icons.check_circle;
+                  statusColor = Colors.green;
+                  subtitle = c['lastSyncedAt'] != null
+                      ? '마지막 동기화: ${c['lastSyncedAt']}'
+                      : '동기화 안됨';
+                }
+
+                return ListTile(
+                  leading: Icon(statusIcon, color: statusColor),
+                  title: Text(c['calendar']?['name'] ?? c['externalId'] ?? 'Google Calendar'),
+                  subtitle: Text(subtitle, maxLines: 1, overflow: TextOverflow.ellipsis),
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (isExpired)
+                        TextButton(
+                          onPressed: _connectGoogle,
+                          child: const Text('재연결'),
+                        )
+                      else
+                        IconButton(
+                          icon: const Icon(Icons.refresh),
+                          onPressed: () => _syncGoogle(c['id']),
+                        ),
+                      IconButton(
+                        icon: const Icon(Icons.link_off, size: 20),
+                        onPressed: () => _disconnectGoogle(c['id']),
+                      ),
+                    ],
+                  ),
+                );
+              },
             ),
           if (_connections.isNotEmpty)
             ListTile(

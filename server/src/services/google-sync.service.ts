@@ -299,6 +299,9 @@ export const googleSyncService = {
         provider: true,
         externalId: true,
         lastSyncedAt: true,
+        syncStatus: true,
+        lastSyncError: true,
+        consecutiveFailures: true,
         calendar: { select: { id: true, name: true, color: true } },
       },
     });
@@ -320,6 +323,33 @@ export const googleSyncService = {
     return { success: true };
   },
 
+  startAutoSync(): NodeJS.Timeout {
+    const intervalMs = config.googleSyncIntervalMs;
+    console.log(`[Google Sync] Auto-sync started (interval: ${intervalMs / 1000}s)`);
+
+    const run = async () => {
+      const connections = await prisma.externalCalendarConnection.findMany({
+        where: { provider: 'google' },
+        select: { userId: true },
+        distinct: ['userId'],
+      });
+      if (connections.length === 0) return;
+
+      console.log(`[Google Sync] Syncing ${connections.length} user(s)...`);
+      for (const { userId } of connections) {
+        try {
+          await googleSyncService.autoSync(userId);
+        } catch (err: any) {
+          console.error(`[Google Sync] User ${userId} failed: ${err.message}`);
+        }
+      }
+      console.log('[Google Sync] Cycle complete');
+    };
+
+    run();
+    return setInterval(run, intervalMs);
+  },
+
   async autoSync(userId: string) {
     const connections = await prisma.externalCalendarConnection.findMany({
       where: { userId, provider: 'google' },
@@ -335,8 +365,21 @@ export const googleSyncService = {
         totalCreated += result.created;
         totalUpdated += result.updated;
         totalDeleted += result.deleted;
-      } catch {
-        // Skip failed connections
+        await prisma.externalCalendarConnection.update({
+          where: { id: conn.id },
+          data: { syncStatus: 'ok', lastSyncError: null, consecutiveFailures: 0 },
+        });
+      } catch (err: any) {
+        const statusCode = err?.response?.status || err?.statusCode || 0;
+        const syncStatus = (statusCode === 401 || statusCode === 403) ? 'token_expired' : 'error';
+        await prisma.externalCalendarConnection.update({
+          where: { id: conn.id },
+          data: {
+            syncStatus,
+            lastSyncError: err.message || String(err),
+            consecutiveFailures: { increment: 1 },
+          },
+        }).catch(() => {});
       }
     }
 

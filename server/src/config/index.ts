@@ -58,4 +58,5 @@ export const config = {
     serviceAccountJson: process.env.FIREBASE_SERVICE_ACCOUNT_JSON || '',
   },
   koreaHolidayApiKey: process.env.KOREA_HOLIDAY_API_KEY || '',
+  googleSyncIntervalMs: parseInt(process.env.GOOGLE_SYNC_INTERVAL_MS || '900000', 10),
 };

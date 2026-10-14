@@ -165,9 +165,12 @@ model ExternalCalendarConnection {
   calendar     Calendar @relation(fields: [calendarId], references: [id], onDelete: Cascade)
   userId       String
   user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  lastSyncedAt DateTime?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  lastSyncedAt        DateTime?
+  syncStatus          String    @default("ok")
+  lastSyncError       String?
+  consecutiveFailures Int       @default(0)
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
 
   @@unique([provider, externalId, userId])
 }
