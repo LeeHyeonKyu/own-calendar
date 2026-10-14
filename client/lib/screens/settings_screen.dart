@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -19,6 +20,12 @@ class _SettingsScreenState extends State<SettingsScreen> with WidgetsBindingObse
   List<dynamic> _naverConnections = [];
   bool _isLoading = true;
   int? _defaultReminder;
+  String? _latestVersion;
+  String? _downloadUrl;
+  String? _altStoreSource;
+  bool _updateAvailable = false;
+
+  static const _currentVersion = String.fromEnvironment('APP_VERSION', defaultValue: 'dev');
 
   @override
   void initState() {
@@ -26,6 +33,7 @@ class _SettingsScreenState extends State<SettingsScreen> with WidgetsBindingObse
     WidgetsBinding.instance.addObserver(this);
     _loadConnections();
     _loadDefaultReminder();
+    _checkVersion();
   }
 
   @override
@@ -68,6 +76,24 @@ class _SettingsScreenState extends State<SettingsScreen> with WidgetsBindingObse
         final data = jsonDecode(res.body);
         if (mounted) {
           setState(() => _defaultReminder = data['defaultReminderMinutes'] as int?);
+        }
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _checkVersion() async {
+    try {
+      final res = await _api.get('/version');
+      if (res.statusCode == 200) {
+        final data = jsonDecode(res.body);
+        final latest = data['latestVersion'] as String?;
+        if (mounted && latest != null && latest != _currentVersion && _currentVersion != 'dev') {
+          setState(() {
+            _latestVersion = latest;
+            _downloadUrl = data['downloadUrl'] as String?;
+            _altStoreSource = data['altStoreSource'] as String?;
+            _updateAvailable = true;
+          });
         }
       }
     } catch (_) {}
@@ -315,6 +341,61 @@ class _SettingsScreenState extends State<SettingsScreen> with WidgetsBindingObse
             ),
             const Divider(),
           ],
+          if (_updateAvailable && _latestVersion != null)
+            Card(
+              margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              color: Theme.of(context).colorScheme.primaryContainer,
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(Icons.system_update, color: Theme.of(context).colorScheme.primary),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            '새 버전 $_latestVersion 사용 가능',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              color: Theme.of(context).colorScheme.onPrimaryContainer,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        if (_altStoreSource != null)
+                          TextButton.icon(
+                            onPressed: () {
+                              Clipboard.setData(ClipboardData(text: _altStoreSource!));
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('AltStore 소스 URL이 복사되었습니다')),
+                              );
+                            },
+                            icon: const Icon(Icons.copy, size: 16),
+                            label: const Text('AltStore 소스'),
+                          ),
+                        if (_downloadUrl != null)
+                          TextButton.icon(
+                            onPressed: () async {
+                              final uri = Uri.parse(_downloadUrl!);
+                              if (await canLaunchUrl(uri)) {
+                                await launchUrl(uri, mode: LaunchMode.externalApplication);
+                              }
+                            },
+                            icon: const Icon(Icons.open_in_new, size: 16),
+                            label: const Text('GitHub 릴리즈'),
+                          ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             child: Text(
@@ -531,6 +612,15 @@ class _SettingsScreenState extends State<SettingsScreen> with WidgetsBindingObse
               await auth.logout();
               if (context.mounted) context.go('/login');
             },
+          ),
+          const Divider(),
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Text(
+              '버전: $_currentVersion',
+              style: TextStyle(color: Colors.grey[500], fontSize: 12),
+              textAlign: TextAlign.center,
+            ),
           ),
         ],
       ),
