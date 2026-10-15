@@ -1,7 +1,17 @@
+import { randomUUID } from 'crypto';
 import prisma from '../lib/prisma';
 import { recurrenceService } from './recurrence.service';
 
 type EditMode = 'this' | 'thisAndFuture' | 'all';
+
+function ensureChecklistIds(items: any[] | null | undefined): any[] | undefined {
+  if (!items) return undefined;
+  return items.map((item: any) => ({
+    ...item,
+    id: item.id || randomUUID(),
+    children: item.children ? ensureChecklistIds(item.children) : [],
+  }));
+}
 
 const taskIncludes = {
   calendar: { select: { id: true, name: true, color: true } },
@@ -278,7 +288,7 @@ export const taskService = {
         attendees: data.attendees || undefined,
         metaInherited: data.metaInherited ?? false,
         categoryId: data.categoryId || null,
-        checklist: data.checklist ?? undefined,
+        checklist: ensureChecklistIds(data.checklist),
         isHabit: data.isHabit ?? false,
       },
       include: taskIncludes,
@@ -380,7 +390,7 @@ export const taskService = {
     if (data.attendees !== undefined) updateData.attendees = data.attendees;
     if (data.metaInherited !== undefined) updateData.metaInherited = data.metaInherited;
     if (data.categoryId !== undefined) updateData.categoryId = data.categoryId;
-    if (data.checklist !== undefined) updateData.checklist = data.checklist;
+    if (data.checklist !== undefined) updateData.checklist = ensureChecklistIds(data.checklist);
     if (data.isHabit !== undefined) updateData.isHabit = data.isHabit;
 
     return prisma.task.update({

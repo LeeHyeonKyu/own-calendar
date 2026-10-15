@@ -248,12 +248,11 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
           );
         }
       }
-    } catch (e, st) {
-      debugPrint('Task save error: $e\n$st');
+    } catch (e) {
       if (mounted) {
         setState(() => _isLoading = false);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('오류: $e'), duration: const Duration(seconds: 10)),
+          SnackBar(content: Text('저장 오류: $e')),
         );
       }
     }

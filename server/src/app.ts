@@ -3,6 +3,7 @@ import cors from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import { config } from './config';
+import { logger } from './lib/logger';
 import authRoutes from './routes/auth';
 import calendarRoutes from './routes/calendars';
 import eventRoutes from './routes/events';
@@ -34,6 +35,34 @@ if (config.corsOrigin.length > 0) {
 }
 
 app.use(express.json({ limit: '100kb' }));
+
+// Request logger — logs method, path, status, and response time for every non-health request.
+// On 4xx/5xx, also captures the response body (truncated) for debugging.
+app.use((req: Request, res: Response, next: NextFunction) => {
+  if (req.path === '/health') return next();
+  const start = Date.now();
+  const originalJson = res.json.bind(res);
+  let resBody: string | undefined;
+  res.json = (body: any) => {
+    if (res.statusCode >= 400) {
+      resBody = JSON.stringify(body).slice(0, 500);
+    }
+    return originalJson(body);
+  };
+  res.on('finish', () => {
+    const ms = Date.now() - start;
+    const meta: Record<string, unknown> = { method: req.method, path: req.originalUrl, status: res.statusCode, ms };
+    if (resBody) meta.body = resBody;
+    if (res.statusCode >= 500) {
+      logger.error(`${req.method} ${req.originalUrl} ${res.statusCode} ${ms}ms`, meta);
+    } else if (res.statusCode >= 400) {
+      logger.warn(`${req.method} ${req.originalUrl} ${res.statusCode} ${ms}ms`, meta);
+    } else {
+      logger.info(`${req.method} ${req.originalUrl} ${res.statusCode} ${ms}ms`, meta);
+    }
+  });
+  next();
+});
 
 // Global rate limiter — everyone hitting the API.
 // In test mode the limit is raised so the ~350 supertest requests across the full

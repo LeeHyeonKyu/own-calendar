@@ -19,9 +19,9 @@ class ChecklistItem {
 
   factory ChecklistItem.fromJson(Map<String, dynamic> json) {
     return ChecklistItem(
-      id: json['id'] as String,
+      id: json['id'] as String? ?? _uuid.v4(),
       text: json['text'] as String? ?? '',
-      checked: json['checked'] as bool? ?? false,
+      checked: json['checked'] as bool? ?? json['done'] as bool? ?? false,
       children: (json['children'] as List<dynamic>?)
               ?.map((c) => ChecklistItem.fromJson(Map<String, dynamic>.from(c as Map)))
               .toList() ??

@@ -7,7 +7,7 @@ const EDIT_MODES = ['this', 'thisAndFuture', 'all'] as const;
 
 const checklistItemSchema: z.ZodType<any> = z.lazy(() =>
   z.object({
-    id: z.string().min(1),
+    id: z.string().min(1).optional(),
     text: z.string(),
     checked: z.boolean(),
     children: z.array(checklistItemSchema).max(50).default([]),
