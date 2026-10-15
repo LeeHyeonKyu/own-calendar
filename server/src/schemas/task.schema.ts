@@ -36,7 +36,7 @@ export const checklistSchema = z
 
 export const createTaskSchema = z.object({
   title: z.string().min(1),
-  description: z.string().optional(),
+  description: z.string().nullable().optional(),
   priority: z.enum(TASK_PRIORITIES).optional().default('NONE'),
   dueDate: z.string().nullable().optional(),
   scheduledDate: z.string().nullable().optional(),
@@ -49,6 +49,9 @@ export const createTaskSchema = z.object({
   sortOrder: z.number().int().optional(),
   checklist: checklistSchema,
   isHabit: z.boolean().optional(),
+  location: z.string().nullable().optional(),
+  notes: z.string().nullable().optional(),
+  attendees: z.array(z.record(z.string().nullable())).nullable().optional(),
 });
 
 export const updateTaskSchema = z.object({
