@@ -36,6 +36,27 @@ export const googleSyncService = {
       throw error;
     }
 
+    const existing = await prisma.externalCalendarConnection.findFirst({
+      where: { provider: 'google', externalId: primaryCal.id, userId },
+      include: { calendar: true },
+    });
+
+    if (existing) {
+      await prisma.externalCalendarConnection.update({
+        where: { id: existing.id },
+        data: {
+          accessToken: tokens.access_token!,
+          refreshToken: tokens.refresh_token || existing.refreshToken,
+          tokenExpiry: tokens.expiry_date ? new Date(tokens.expiry_date) : null,
+          syncToken: null,
+          syncStatus: 'ok',
+          lastSyncError: null,
+          consecutiveFailures: 0,
+        },
+      });
+      return { calendar: existing.calendar, connection: { id: existing.id, provider: existing.provider } };
+    }
+
     const calendar = await prisma.calendar.create({
       data: {
         name: primaryCal.summary || 'Google Calendar',
