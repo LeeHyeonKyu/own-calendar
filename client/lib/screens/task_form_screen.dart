@@ -225,25 +225,34 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
     }
 
     final provider = context.read<CalendarProvider>();
-    bool success;
-    if (isEditing) {
-      success = await provider.updateTask(
-        widget.taskId!,
-        data,
-        editMode: editMode,
-        instanceDate: _isEditingInstance ? _originalTask?.instanceDateString : null,
-      );
-    } else {
-      success = await provider.createTask(data);
-    }
-
-    if (mounted) {
-      setState(() => _isLoading = false);
-      if (success) {
-        context.pop();
+    try {
+      bool success;
+      if (isEditing) {
+        success = await provider.updateTask(
+          widget.taskId!,
+          data,
+          editMode: editMode,
+          instanceDate: _isEditingInstance ? _originalTask?.instanceDateString : null,
+        );
       } else {
+        success = await provider.createTask(data);
+      }
+
+      if (mounted) {
+        setState(() => _isLoading = false);
+        if (success) {
+          context.pop();
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('저장에 실패했습니다')),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoading = false);
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('저장에 실패했습니다')),
+          SnackBar(content: Text('오류: $e')),
         );
       }
     }
