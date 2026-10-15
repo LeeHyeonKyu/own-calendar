@@ -371,7 +371,10 @@ export const googleSyncService = {
         });
       } catch (err: any) {
         const statusCode = err?.response?.status || err?.statusCode || 0;
-        const syncStatus = (statusCode === 401 || statusCode === 403) ? 'token_expired' : 'error';
+        const errMsg = err.message || String(err);
+        const isTokenError = statusCode === 401 || statusCode === 403
+          || errMsg.includes('invalid_grant') || errMsg.includes('Token has been expired or revoked');
+        const syncStatus = isTokenError ? 'token_expired' : 'error';
         await prisma.externalCalendarConnection.update({
           where: { id: conn.id },
           data: {
