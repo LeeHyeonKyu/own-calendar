@@ -125,6 +125,9 @@ export const googleSyncService = {
       const threeMonthsAgo = new Date();
       threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
       params.timeMin = threeMonthsAgo.toISOString();
+      const sixMonthsAhead = new Date();
+      sixMonthsAhead.setMonth(sixMonthsAhead.getMonth() + 6);
+      params.timeMax = sixMonthsAhead.toISOString();
     }
 
     let allEvents: any[] = [];
