@@ -137,16 +137,30 @@ open ios/Runner.xcworkspace
 
 상세 가이드: [`client/ios/OwnCalendarWidget/SETUP.md`](client/ios/OwnCalendarWidget/SETUP.md)
 
-### 5. IPA 빌드
+### 5. IPA 빌드 + AltStore 배포 (권장: 자동화)
+
+```bash
+# 한번에: IPA 빌드 → GitHub Release → AltStore 소스 업데이트
+./scripts/deploy.sh --ios
+
+# 서버+웹+iOS 전부 배포
+./scripts/deploy.sh --ios
+```
+
+이 명령이 자동으로:
+- `pubspec.yaml` build number 증가
+- `flutter build ios --release`
+- IPA 생성 + GitHub Release 업로드
+- `altstore/apps.json` 버전 동기화 + 커밋/push
+
+> **중요**: `altstore/apps.json`의 version은 IPA의 CFBundleShortVersionString과 반드시 일치해야 합니다.
+> `--ios` 플래그가 이를 자동 처리하므로, **수동으로 apps.json을 수정하지 마세요.**
+
+### 5-B. IPA 수동 빌드 (자동화 불가 시)
 
 ```bash
 cd client
-
-# Release 빌드 (운영 서버 연결 — 기본값)
 flutter build ios --release
-
-# 또는 특정 서버를 지정하려면:
-flutter build ios --release --dart-define-from-file=config/prod.json
 ```
 
 > **반드시 `--release`**. Debug 빌드는 홈 화면에서 직접 실행 불가.

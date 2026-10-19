@@ -121,6 +121,12 @@ Feature 구현 완료 후 배포는 반드시 `scripts/deploy.sh`를 통해 진�
 # 부분 배포
 ./scripts/deploy.sh --web-only      # 웹만
 ./scripts/deploy.sh --server-only   # 서버만
+
+# iOS 앱 배포 (IPA 빌드 + GitHub Release + AltStore 소스 업데이트)
+./scripts/deploy.sh --ios
+
+# 서버+웹+iOS 전부
+./scripts/deploy.sh --ios
 ```
 
 파이프라인이 수행하는 것:
@@ -133,8 +139,19 @@ Feature 구현 완료 후 배포는 반드시 `scripts/deploy.sh`를 통해 진�
 7. Flutter Web 빌드 + nginx 배포
 8. Web HTTP 200 + Flutter 부트스트랩 확인
 9. Feature 브랜치 정리
+10. (--ios) iOS IPA 빌드 + GitHub Release + AltStore apps.json 업데이트
 
 **배포 없이 "구현 완료"를 선언하지 않는다.**
+
+### AltStore 버전 규칙 (NON-NEGOTIABLE)
+
+`altstore/apps.json`의 `versions[].version`은 **IPA의 CFBundleShortVersionString과 반드시 일치**해야 한다.
+Flutter에서는 `client/pubspec.yaml`의 `version:` 필드에서 `+` 앞부분이 CFBundleShortVersionString이다.
+예: `version: 1.0.0+5` → CFBundleShortVersionString = `1.0.0`, CFBundleVersion = `5`.
+
+- `--ios` 플래그가 이 동기화를 자동 처리한다
+- 수동으로 apps.json을 수정할 때는 반드시 `grep '^version:' client/pubspec.yaml`로 확인
+- buildVersion도 pubspec.yaml의 `+` 뒤 숫자와 일치해야 함
 
 ### iOS Build (Widget / Native)
 

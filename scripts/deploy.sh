@@ -9,6 +9,7 @@ set -euo pipefail
 #   ./scripts/deploy.sh --web-only       # 웹 빌드+배포+검증만
 #   ./scripts/deploy.sh --server-only    # 서버 빌드+배포+검증만
 #   ./scripts/deploy.sh --skip-tag       # iOS 빌드 태그 생성 건너뛰기
+#   ./scripts/deploy.sh --ios            # iOS IPA 빌드 + GitHub Release + AltStore 소스 업데이트
 # ──────────────────────────────────────────────────
 
 PROJECT_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -39,6 +40,7 @@ FEATURE_BRANCH=""
 WEB_ONLY=false
 SERVER_ONLY=false
 SKIP_TAG=false
+IOS_BUILD=false
 
 while [[ $# -gt 0 ]]; do
   case $1 in
@@ -46,6 +48,7 @@ while [[ $# -gt 0 ]]; do
     --web-only)   WEB_ONLY=true; shift ;;
     --server-only) SERVER_ONLY=true; shift ;;
     --skip-tag)   SKIP_TAG=true; shift ;;
+    --ios)        IOS_BUILD=true; shift ;;
     *) echo "Unknown option: $1"; exit 1 ;;
   esac
 done
@@ -61,6 +64,7 @@ else
   total_steps=10
   [[ -n "$FEATURE_BRANCH" ]] && total_steps=$((total_steps+2))
   $SKIP_TAG && total_steps=$((total_steps-1))
+  $IOS_BUILD && total_steps=$((total_steps+4))
 fi
 
 echo -e "${CYAN}═══════════════════════════════════════${NC}"
@@ -217,6 +221,90 @@ fi
 if [[ -n "$FEATURE_BRANCH" ]]; then
   log "Feature 브랜치 정리"
   git branch -D "$FEATURE_BRANCH" 2>/dev/null && ok "브랜치 삭제: $FEATURE_BRANCH" || warn "브랜치 이미 없음"
+fi
+
+# ──────────────────────────────────────────────────
+# 6. iOS IPA 빌드 + AltStore 업데이트 (--ios)
+# ──────────────────────────────────────────────────
+if $IOS_BUILD; then
+  log "iOS IPA 빌드"
+  cd "$PROJECT_ROOT/client"
+
+  # pubspec.yaml에서 현재 버전 읽기
+  APP_VERSION=$(grep '^version:' pubspec.yaml | sed 's/version: *//' | cut -d'+' -f1)
+  BUILD_NUMBER=$(grep '^version:' pubspec.yaml | sed 's/version: *//' | cut -d'+' -f2)
+  ok "앱 버전: $APP_VERSION+$BUILD_NUMBER"
+
+  # 버전 자동 증가: build number +1
+  NEW_BUILD=$((BUILD_NUMBER + 1))
+  NEW_VERSION_LINE="version: $APP_VERSION+$NEW_BUILD"
+  sed -i '' "s/^version: .*/$NEW_VERSION_LINE/" pubspec.yaml
+  ok "버전 증가: $APP_VERSION+$BUILD_NUMBER → $APP_VERSION+$NEW_BUILD"
+
+  # 빌드
+  $FLUTTER clean 2>&1 | tail -1
+  $FLUTTER pub get 2>&1 | tail -1
+  cd ios && pod install 2>&1 | tail -1 && cd ..
+  $FLUTTER build ios --release 2>&1 | tail -3
+  [[ -d "build/ios/iphoneos/Runner.app" ]] || fail "iOS 빌드 실패"
+  ok "iOS 빌드 성공"
+
+  # IPA 생성
+  log "IPA 생성"
+  mkdir -p build/ios/ipa/Payload
+  cp -r build/ios/iphoneos/Runner.app build/ios/ipa/Payload/
+  cd build/ios/ipa
+  zip -r OwnCalendar.ipa Payload/ > /dev/null 2>&1
+  IPA_PATH="$PROJECT_ROOT/client/build/ios/ipa/OwnCalendar.ipa"
+  IPA_SIZE=$(stat -f%z "$IPA_PATH")
+  ok "IPA 생성: $(du -h "$IPA_PATH" | cut -f1)"
+  cd "$PROJECT_ROOT"
+
+  # GitHub Release 생성
+  log "GitHub Release 생성"
+  RELEASE_TAG="v$(date -u +'%Y.%m.%d')"
+  EXISTING=$(gh release list --limit 100 2>/dev/null | grep -c "^${RELEASE_TAG}" || true)
+  RUN_NUM=$((EXISTING + 1))
+  RELEASE_TAG="${RELEASE_TAG}.${RUN_NUM}"
+  gh release create "$RELEASE_TAG" "$IPA_PATH" \
+    --title "Own Calendar $RELEASE_TAG" \
+    --notes "Build $APP_VERSION+$NEW_BUILD" 2>&1 | tail -1
+  ok "Release: $RELEASE_TAG"
+
+  # AltStore apps.json 업데이트
+  # 중요: version은 CFBundleShortVersionString과 일치해야 함
+  log "AltStore 소스 업데이트"
+  DOWNLOAD_URL="https://github.com/LeeHyeonKyu/own-calendar/releases/download/${RELEASE_TAG}/OwnCalendar.ipa"
+  VERSION_DATE="$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+  python3 -c "
+import json
+with open('altstore/apps.json') as f: d = json.load(f)
+app = d['apps'][0]
+new_ver = {
+    'version': '$APP_VERSION',
+    'buildVersion': '$NEW_BUILD',
+    'date': '$VERSION_DATE',
+    'localizedDescription': 'Own Calendar $APP_VERSION build $NEW_BUILD',
+    'downloadURL': '$DOWNLOAD_URL',
+    'size': $IPA_SIZE,
+    'minOSVersion': '16.0'
+}
+app['versions'].insert(0, new_ver)
+app['versions'] = app['versions'][:5]
+with open('altstore/apps.json', 'w') as f: json.dump(d, f, indent=2, ensure_ascii=False)
+"
+  ok "apps.json 업데이트: version=$APP_VERSION, buildVersion=$NEW_BUILD"
+
+  # pubspec + apps.json 변경 커밋
+  git add client/pubspec.yaml altstore/apps.json
+  git commit -m "ci: iOS build $APP_VERSION+$NEW_BUILD — AltStore $RELEASE_TAG" 2>&1 | tail -1
+  git push origin main 2>&1 | tail -1
+  ok "커밋 + push 완료"
+
+  echo ""
+  echo -e "  ${GREEN}📱 AltStore 업데이트 방법:${NC}"
+  echo "  같은 Wi-Fi + AltServer 실행 → AltStore Browse → Own Calendar → Update"
+  echo ""
 fi
 
 # ──────────────────────────────────────────────────
