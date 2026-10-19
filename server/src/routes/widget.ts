@@ -1,15 +1,41 @@
-import { Router, Response } from 'express';
+import { Router, Response, NextFunction } from 'express';
+import crypto from 'crypto';
 import { authenticate } from '../middleware/auth';
 import { AuthRequest } from '../types';
 import { eventService } from '../services/event.service';
 import { taskService } from '../services/task.service';
+import prisma from '../lib/prisma';
 import { monthlyQuerySchema } from '../schemas/widget.schema';
 
 const router = Router();
 
-router.use(authenticate);
+async function widgetAuth(req: AuthRequest, res: Response, next: NextFunction) {
+  const key = req.query.key as string;
+  if (key) {
+    const widgetToken = await prisma.widgetToken.findUnique({ where: { token: key } });
+    if (widgetToken) {
+      req.userId = widgetToken.userId;
+      return next();
+    }
+    res.status(401).json({ error: 'Invalid widget key' });
+    return;
+  }
+  return authenticate(req, res, next);
+}
 
-router.get('/today', async (req: AuthRequest, res: Response) => {
+router.post('/key', authenticate, async (req: AuthRequest, res: Response) => {
+  try {
+    await prisma.widgetToken.deleteMany({ where: { userId: req.userId! } });
+    const token = crypto.randomBytes(32).toString('hex');
+    await prisma.widgetToken.create({ data: { userId: req.userId!, token } });
+    res.json({ key: token });
+  } catch (err: any) {
+    const status = err.statusCode || 500;
+    res.status(status).json({ error: err.message });
+  }
+});
+
+router.get('/today', widgetAuth, async (req: AuthRequest, res: Response) => {
   try {
     const now = new Date();
     const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -86,7 +112,7 @@ router.get('/today', async (req: AuthRequest, res: Response) => {
   }
 });
 
-router.get('/monthly', async (req: AuthRequest, res: Response) => {
+router.get('/monthly', widgetAuth, async (req: AuthRequest, res: Response) => {
   try {
     const parsed = monthlyQuerySchema.safeParse(req.query);
     if (!parsed.success) {

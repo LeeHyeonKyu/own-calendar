@@ -30,6 +30,7 @@ model User {
   eventInvites        EventInvite[]
   categories          Category[]
   holidaySubscriptions HolidaySubscription[]
+  widgetTokens        WidgetToken[]
   createdAt           DateTime           @default(now())
   updatedAt           DateTime           @updatedAt
 }
@@ -368,4 +369,12 @@ model Holiday {
 
   @@unique([countryCode, date])
   @@index([countryCode, year])
+}
+
+model WidgetToken {
+  id        String   @id @default(cuid())
+  userId    String
+  token     String   @unique
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }

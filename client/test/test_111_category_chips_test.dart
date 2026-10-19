@@ -23,6 +23,8 @@ import 'package:own_calendar/widgets/event_card.dart';
 /// payloads so tests can inspect the save data.
 class _FakeApiService implements ApiService {
   @override
+  Future<String?> createWidgetKey() async => null;
+  @override
   void Function()? onSessionExpired;
 
   final Map<String, http.Response Function(String)> _getHandlers = {};

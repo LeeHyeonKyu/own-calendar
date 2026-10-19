@@ -16,6 +16,8 @@ import 'package:own_calendar/services/api_service.dart';
 
 /// Fake [ApiService] for widget tests. Tracks POST/PUT calls separately.
 class _FakeApiService implements ApiService {
+  @override
+  Future<String?> createWidgetKey() async => null;
   _FakeApiService({this.events = const [], this.calendars = const []});
 
   @override

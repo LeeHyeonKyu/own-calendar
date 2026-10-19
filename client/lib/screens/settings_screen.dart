@@ -27,6 +27,9 @@ class _SettingsScreenState extends State<SettingsScreen> with WidgetsBindingObse
 
   static const _currentVersion = String.fromEnvironment('APP_VERSION', defaultValue: 'dev');
 
+  String? _widgetKey;
+  bool _widgetKeyLoading = false;
+
   @override
   void initState() {
     super.initState();
@@ -310,6 +313,22 @@ class _SettingsScreenState extends State<SettingsScreen> with WidgetsBindingObse
     try {
       await _api.put('/user-settings', {'defaultReminderMinutes': minutes ?? 10});
     } catch (_) {}
+  }
+
+  Future<void> _generateWidgetKey() async {
+    setState(() => _widgetKeyLoading = true);
+    try {
+      final key = await _api.createWidgetKey();
+      setState(() => _widgetKey = key);
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('위젯 키 생성에 실패했습니다.')),
+        );
+      }
+    } finally {
+      setState(() => _widgetKeyLoading = false);
+    }
   }
 
   static const _reminderOptions = <int?, String>{
@@ -604,6 +623,52 @@ class _SettingsScreenState extends State<SettingsScreen> with WidgetsBindingObse
             trailing: const Icon(Icons.chevron_right),
             onTap: () => context.push('/import'),
           ),
+          const Divider(),
+          // ── Widget Key (Feature 021) ──
+          ListTile(
+            leading: const Icon(Icons.widgets_outlined),
+            title: const Text('위젯 설정'),
+            subtitle: _widgetKey != null
+                ? Text('${_widgetKey!.substring(0, 8)}••••', style: const TextStyle(fontFamily: 'monospace'))
+                : const Text('위젯 키를 생성하여 iOS 위젯에서 일정을 확인하세요'),
+            trailing: _widgetKeyLoading
+                ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                : _widgetKey != null
+                    ? Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          IconButton(
+                            icon: const Icon(Icons.copy, size: 20),
+                            onPressed: () {
+                              Clipboard.setData(ClipboardData(text: _widgetKey!));
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('위젯 키가 복사되었습니다.\n위젯을 길게 누른 후 편집에서 붙여넣기 하세요.'),
+                                  duration: Duration(seconds: 4),
+                                ),
+                              );
+                            },
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.refresh, size: 20),
+                            onPressed: _generateWidgetKey,
+                          ),
+                        ],
+                      )
+                    : null,
+            onTap: _widgetKey == null ? _generateWidgetKey : null,
+          ),
+          if (_widgetKey != null)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16).copyWith(bottom: 8),
+              child: Text(
+                '1. 위의 키를 복사합니다\n'
+                '2. 홈 화면에서 위젯을 길게 누릅니다\n'
+                '3. "위젯 편집"을 선택합니다\n'
+                '4. 위젯 키 필드에 붙여넣기합니다',
+                style: TextStyle(color: Colors.grey[500], fontSize: 12),
+              ),
+            ),
           const Divider(),
           ListTile(
             leading: const Icon(Icons.logout, color: Colors.red),

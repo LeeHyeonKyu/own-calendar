@@ -2,81 +2,37 @@ import Foundation
 
 struct WidgetAPIClient {
     static let serverBaseURL = "https://own-calendar.tailb2886a.ts.net/api"
-    private static let userDefaults = UserDefaults(suiteName: "group.com.owncalendar.ownCalendar")
 
-    // MARK: - Token (from UserDefaults, shared via HomeWidget)
-
-    static func fetchToken() -> String? {
-        guard let token = userDefaults?.string(forKey: "authToken"),
-              !token.isEmpty else { return nil }
-        return token
-    }
-
-    // MARK: - Today
-
-    static func fetchTodayData() async -> TodayResponse? {
-        guard let token = fetchToken(),
-              let url = URL(string: "\(serverBaseURL)/widget/today") else { return nil }
+    static func fetchTodayData(widgetKey: String) async -> TodayResponse? {
+        guard !widgetKey.isEmpty,
+              let url = URL(string: "\(serverBaseURL)/widget/today?key=\(widgetKey)") else { return nil }
 
         var request = URLRequest(url: url)
-        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         request.timeoutInterval = 10
 
         do {
             let (data, response) = try await URLSession.shared.data(for: request)
             guard let http = response as? HTTPURLResponse, http.statusCode == 200 else { return nil }
-            let decoded = try JSONDecoder().decode(TodayResponse.self, from: data)
-            cacheTodayToUserDefaults(decoded)
-            return decoded
+            return try JSONDecoder().decode(TodayResponse.self, from: data)
         } catch {
             return nil
         }
     }
 
-    // MARK: - Monthly
-
-    static func fetchMonthlyData(year: Int, month: Int) async -> MonthlyAPIResponse? {
-        guard let token = fetchToken(),
-              let url = URL(string: "\(serverBaseURL)/widget/monthly?year=\(year)&month=\(month)") else { return nil }
+    static func fetchMonthlyData(widgetKey: String, year: Int, month: Int) async -> MonthlyAPIResponse? {
+        guard !widgetKey.isEmpty,
+              let url = URL(string: "\(serverBaseURL)/widget/monthly?key=\(widgetKey)&year=\(year)&month=\(month)") else { return nil }
 
         var request = URLRequest(url: url)
-        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         request.timeoutInterval = 10
 
         do {
             let (data, response) = try await URLSession.shared.data(for: request)
             guard let http = response as? HTTPURLResponse, http.statusCode == 200 else { return nil }
-            let decoded = try JSONDecoder().decode(MonthlyAPIResponse.self, from: data)
-            cacheMonthlyToUserDefaults(decoded, rawData: data)
-            return decoded
+            return try JSONDecoder().decode(MonthlyAPIResponse.self, from: data)
         } catch {
             return nil
         }
-    }
-
-    // MARK: - Cache to UserDefaults
-
-    private static func cacheTodayToUserDefaults(_ response: TodayResponse) {
-        guard let ud = userDefaults else { return }
-        if let eventsData = try? JSONEncoder().encode(response.events),
-           let eventsStr = String(data: eventsData, encoding: .utf8) {
-            ud.set(eventsStr, forKey: "todayEvents")
-        }
-        if let tasksData = try? JSONEncoder().encode(response.tasks),
-           let tasksStr = String(data: tasksData, encoding: .utf8) {
-            ud.set(tasksStr, forKey: "todayTasks")
-        }
-        ud.set(response.taskDone, forKey: "taskDone")
-        ud.set(response.taskTotal, forKey: "taskTotal")
-        ud.set(true, forKey: "isLoggedIn")
-    }
-
-    private static func cacheMonthlyToUserDefaults(_ response: MonthlyAPIResponse, rawData: Data) {
-        guard let ud = userDefaults else { return }
-        if let jsonStr = String(data: rawData, encoding: .utf8) {
-            ud.set(jsonStr, forKey: "monthlyData")
-        }
-        ud.set(true, forKey: "isLoggedIn")
     }
 }
 

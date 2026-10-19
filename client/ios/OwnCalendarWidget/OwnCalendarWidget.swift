@@ -1,5 +1,6 @@
 import WidgetKit
 import SwiftUI
+import AppIntents
 
 struct EventEntry: TimelineEntry {
     let date: Date
@@ -29,62 +30,35 @@ struct CalendarTask: Codable, Identifiable {
     var isDone: Bool { status == "DONE" }
 }
 
-struct OwnCalendarProvider: TimelineProvider {
-    let userDefaults = UserDefaults(suiteName: "group.com.owncalendar.ownCalendar")
-
+struct OwnCalendarProvider: AppIntentTimelineProvider {
     func placeholder(in context: Context) -> EventEntry {
         EventEntry(date: Date(), events: [
             CalendarEvent(title: "일정 로딩 중...", time: "09:00", category: "PERSONAL")
         ], tasks: [], taskDone: 0, taskTotal: 0, isLoggedIn: true)
     }
 
-    func getSnapshot(in context: Context, completion: @escaping (EventEntry) -> Void) {
-        completion(getFallbackEntry())
+    func snapshot(for configuration: TodayWidgetConfigIntent, in context: Context) async -> EventEntry {
+        await getEntry(widgetKey: configuration.widgetKey ?? "")
     }
 
-    func getTimeline(in context: Context, completion: @escaping (Timeline<EventEntry>) -> Void) {
-        Task {
-            let entry: EventEntry
-            if let response = await WidgetAPIClient.fetchTodayData() {
-                let events = response.events.map { CalendarEvent(title: $0.title, time: $0.time, category: $0.category) }
-                let tasks = response.tasks.map { CalendarTask(title: $0.title, status: $0.status, priority: $0.priority, time: $0.time, dueDate: $0.dueDate, eventTitle: $0.eventTitle, isOverdue: $0.isOverdue) }
-                entry = EventEntry(date: Date(), events: events, tasks: tasks, taskDone: response.taskDone, taskTotal: response.taskTotal, isLoggedIn: true)
-            } else {
-                entry = getFallbackEntry()
-            }
-            let nextUpdate = Calendar.current.date(byAdding: .minute, value: 30, to: Date())!
-            let timeline = Timeline(entries: [entry], policy: .after(nextUpdate))
-            completion(timeline)
-        }
+    func timeline(for configuration: TodayWidgetConfigIntent, in context: Context) async -> Timeline<EventEntry> {
+        let entry = await getEntry(widgetKey: configuration.widgetKey ?? "")
+        let nextUpdate = Calendar.current.date(byAdding: .minute, value: 30, to: Date())!
+        return Timeline(entries: [entry], policy: .after(nextUpdate))
     }
 
-    private func getFallbackEntry() -> EventEntry {
-        let hasToken = WidgetAPIClient.fetchToken() != nil
-        let isLoggedIn = hasToken || (userDefaults?.bool(forKey: "isLoggedIn") ?? false)
-
-        guard isLoggedIn else {
+    private func getEntry(widgetKey: String) async -> EventEntry {
+        guard !widgetKey.isEmpty else {
             return EventEntry(date: Date(), events: [], tasks: [], taskDone: 0, taskTotal: 0, isLoggedIn: false)
         }
 
-        var events: [CalendarEvent] = []
-        if let jsonStr = userDefaults?.string(forKey: "todayEvents"),
-           let data = jsonStr.data(using: .utf8),
-           let decoded = try? JSONDecoder().decode([CalendarEvent].self, from: data) {
-            events = decoded
+        if let response = await WidgetAPIClient.fetchTodayData(widgetKey: widgetKey) {
+            let events = response.events.map { CalendarEvent(title: $0.title, time: $0.time, category: $0.category) }
+            let tasks = response.tasks.map { CalendarTask(title: $0.title, status: $0.status, priority: $0.priority, time: $0.time, dueDate: $0.dueDate, eventTitle: $0.eventTitle, isOverdue: $0.isOverdue) }
+            return EventEntry(date: Date(), events: events, tasks: tasks, taskDone: response.taskDone, taskTotal: response.taskTotal, isLoggedIn: true)
         }
 
-        var tasks: [CalendarTask] = []
-        if let jsonStr = userDefaults?.string(forKey: "todayTasks"),
-           let data = jsonStr.data(using: .utf8),
-           let decoded = try? JSONDecoder().decode([CalendarTask].self, from: data) {
-            tasks = decoded
-        }
-
-        let taskDone = userDefaults?.integer(forKey: "taskDone") ?? 0
-        let taskTotal = userDefaults?.integer(forKey: "taskTotal") ?? 0
-
-        return EventEntry(date: Date(), events: events, tasks: tasks,
-                          taskDone: taskDone, taskTotal: taskTotal, isLoggedIn: true)
+        return EventEntry(date: Date(), events: [], tasks: [], taskDone: 0, taskTotal: 0, isLoggedIn: true)
     }
 }
 
@@ -127,13 +101,13 @@ struct OwnCalendarWidgetView: View {
                 HStack {
                     Spacer()
                     VStack(spacing: 4) {
-                        Image(systemName: "person.crop.circle.badge.exclamationmark")
+                        Image(systemName: "key.fill")
                             .font(.title2)
                             .foregroundColor(.secondary)
-                        Text("로그인이 필요합니다")
+                        Text("위젯 키를 설정해주세요")
                             .font(.subheadline)
                             .foregroundColor(.secondary)
-                        Text("앱을 열어 로그인해 주세요")
+                        Text("위젯을 길게 눌러 편집")
                             .font(.caption)
                             .foregroundColor(.secondary)
                     }
@@ -252,7 +226,7 @@ struct OwnCalendarWidget: Widget {
     let kind: String = "OwnCalendarWidget"
 
     var body: some WidgetConfiguration {
-        StaticConfiguration(kind: kind, provider: OwnCalendarProvider()) { entry in
+        AppIntentConfiguration(kind: kind, intent: TodayWidgetConfigIntent.self, provider: OwnCalendarProvider()) { entry in
             if #available(iOS 17.0, *) {
                 OwnCalendarWidgetView(entry: entry)
                     .containerBackground(.fill.tertiary, for: .widget)

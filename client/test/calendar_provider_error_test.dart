@@ -13,6 +13,8 @@ import 'package:own_calendar/services/api_service.dart';
 ///
 /// Supports configurable responses per path and exception throwing.
 class _FakeApiService implements ApiService {
+  @override
+  Future<String?> createWidgetKey() async => null;
   _FakeApiService({this.onGet});
 
   @override

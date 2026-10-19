@@ -14,6 +14,8 @@ import 'package:own_calendar/services/api_service.dart';
 /// Fake [ApiService] that records delete calls and returns configurable
 /// responses for get/delete.
 class _FakeApiService implements ApiService {
+  @override
+  Future<String?> createWidgetKey() async => null;
   _FakeApiService({this.events = const []});
 
   @override
@@ -68,6 +70,8 @@ class _FakeApiService implements ApiService {
 /// Fake [ApiService] that can simulate delete failures for testing error
 /// handling (qa1 rework).
 class _FailableApiService implements ApiService {
+  @override
+  Future<String?> createWidgetKey() async => null;
   _FailableApiService({this.events = const []});
 
   @override
@@ -130,6 +134,8 @@ class _FailableApiService implements ApiService {
 /// Fake [ApiService] whose [delete] hangs until a [Completer] is completed,
 /// allowing tests to observe the in-flight window (qa1 rework part b).
 class _SlowDeleteApiService implements ApiService {
+  @override
+  Future<String?> createWidgetKey() async => null;
   _SlowDeleteApiService({this.events = const [], required this.deleteCompleter});
 
   @override

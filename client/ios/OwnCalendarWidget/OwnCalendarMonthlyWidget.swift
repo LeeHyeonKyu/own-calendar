@@ -145,30 +145,54 @@ struct MonthlyWidgetProvider: AppIntentTimelineProvider {
 
     func snapshot(for configuration: MonthlyWidgetConfigIntent, in context: Context) async -> MonthlyEntry {
         let presets = configuration.filterCategories.map { $0.rawValue }
-        return getFallbackEntry(presets: presets)
+        let widgetKey = configuration.widgetKey ?? ""
+        return await getEntry(widgetKey: widgetKey, presets: presets)
     }
 
     func timeline(for configuration: MonthlyWidgetConfigIntent, in context: Context) async -> Timeline<MonthlyEntry> {
         let presets = configuration.filterCategories.map { $0.rawValue }
+        let widgetKey = configuration.widgetKey ?? ""
         if let data = try? JSONEncoder().encode(presets),
            let json = String(data: data, encoding: .utf8) {
             userDefaults?.set(json, forKey: "monthlyFilterPresets")
         }
 
+        let entry = await getEntry(widgetKey: widgetKey, presets: presets)
+        let nextUpdate = Calendar.current.date(byAdding: .minute, value: 30, to: Date())!
+        return Timeline(entries: [entry], policy: .after(nextUpdate))
+    }
+
+    private func getEntry(widgetKey: String, presets: [String]) async -> MonthlyEntry {
         let now = Date()
         let cal = Calendar.current
+
+        guard !widgetKey.isEmpty else {
+            return MonthlyEntry(
+                date: now, isLoggedIn: false,
+                year: cal.component(.year, from: now),
+                month: cal.component(.month, from: now),
+                events: [:], taskDays: [],
+                selectedDay: cal.component(.day, from: now),
+                eventPage: 0, showFamilyEvents: true, filterIndex: 0,
+                filterPresets: presets
+            )
+        }
+
         let year = cal.component(.year, from: now)
         let month = cal.component(.month, from: now)
 
-        let entry: MonthlyEntry
-        if let response = await WidgetAPIClient.fetchMonthlyData(year: year, month: month) {
-            entry = buildEntryFromAPI(response: response, presets: presets)
-        } else {
-            entry = getFallbackEntry(presets: presets)
+        if let response = await WidgetAPIClient.fetchMonthlyData(widgetKey: widgetKey, year: year, month: month) {
+            return buildEntryFromAPI(response: response, presets: presets)
         }
 
-        let nextUpdate = Calendar.current.date(byAdding: .minute, value: 30, to: Date())!
-        return Timeline(entries: [entry], policy: .after(nextUpdate))
+        return MonthlyEntry(
+            date: now, isLoggedIn: true,
+            year: year, month: month,
+            events: [:], taskDays: [],
+            selectedDay: cal.component(.day, from: now),
+            eventPage: 0, showFamilyEvents: true, filterIndex: 0,
+            filterPresets: presets
+        )
     }
 
     // MARK: Build entry from server API response
@@ -221,96 +245,6 @@ struct MonthlyWidgetProvider: AppIntentTimelineProvider {
         )
     }
 
-    // MARK: Fallback entry from UserDefaults
-
-    private func getFallbackEntry(presets: [String]) -> MonthlyEntry {
-        let now = Date()
-        let cal = Calendar.current
-        let hasToken = WidgetAPIClient.fetchToken() != nil
-        let isLoggedIn = hasToken || (userDefaults?.bool(forKey: "isLoggedIn") ?? false)
-
-        guard isLoggedIn else {
-            return MonthlyEntry(
-                date: now, isLoggedIn: false,
-                year: cal.component(.year, from: now),
-                month: cal.component(.month, from: now),
-                events: [:], taskDays: [],
-                selectedDay: cal.component(.day, from: now),
-                eventPage: 0, showFamilyEvents: true, filterIndex: 0,
-                filterPresets: presets
-            )
-        }
-
-        var year  = cal.component(.year, from: now)
-        var month = cal.component(.month, from: now)
-        var events: [Int: [MonthlyEvent]] = [:]
-        var taskDays: Set<Int> = []
-
-        if let jsonStr = userDefaults?.string(forKey: "monthlyData"),
-           let data = jsonStr.data(using: .utf8),
-           let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
-
-            year  = json["year"]  as? Int ?? year
-            month = json["month"] as? Int ?? month
-
-            if let eventsDict = json["events"] as? [String: Any] {
-                for (dayStr, value) in eventsDict {
-                    guard let day = Int(dayStr),
-                          let arr = value as? [[String: Any]] else { continue }
-                    var dayEvents: [MonthlyEvent] = []
-                    for obj in arr {
-                        guard let id       = obj["id"]       as? String,
-                              let title    = obj["title"]    as? String,
-                              let time     = obj["time"]     as? String,
-                              let category = obj["category"] as? String else { continue }
-                        dayEvents.append(MonthlyEvent(
-                            id: id, title: title, time: time,
-                            endTime: obj["endTime"] as? String,
-                            category: category,
-                            isFamily: obj["isFamily"] as? Bool ?? false
-                        ))
-                    }
-                    events[day] = dayEvents
-                }
-            }
-
-            if let taskDaysDict = json["taskDays"] as? [String: Any] {
-                for (dayStr, _) in taskDaysDict {
-                    if let day = Int(dayStr) { taskDays.insert(day) }
-                }
-            }
-        }
-
-        let todayDay   = cal.component(.day, from: now)
-        let todayMonth = cal.component(.month, from: now)
-        let todayYear  = cal.component(.year, from: now)
-        let isCurrentMonth = (year == todayYear && month == todayMonth)
-
-        var selectedDay = userDefaults?.integer(forKey: "selectedDay") ?? 0
-        if selectedDay <= 0 {
-            selectedDay = isCurrentMonth ? todayDay : 1
-        }
-        let gridData = CalendarGridData.calculate(year: year, month: month)
-        selectedDay = min(selectedDay, gridData.daysInMonth)
-
-        let eventPage = userDefaults?.integer(forKey: "eventPage") ?? 0
-        let showFamilyEvents: Bool
-        if userDefaults?.object(forKey: "showFamilyEvents") != nil {
-            showFamilyEvents = userDefaults!.bool(forKey: "showFamilyEvents")
-        } else {
-            showFamilyEvents = true
-        }
-        let filterIndex = userDefaults?.integer(forKey: "monthlyFilterIndex") ?? 0
-
-        return MonthlyEntry(
-            date: now, isLoggedIn: true,
-            year: year, month: month, events: events, taskDays: taskDays,
-            selectedDay: selectedDay, eventPage: eventPage,
-            showFamilyEvents: showFamilyEvents,
-            filterIndex: min(filterIndex, presets.count),
-            filterPresets: presets
-        )
-    }
 }
 
 // MARK: - Helper Functions
@@ -391,13 +325,13 @@ private struct MonthlyLoginRequiredView: View {
     var body: some View {
         VStack(spacing: 4) {
             Spacer()
-            Image(systemName: "person.crop.circle.badge.exclamationmark")
+            Image(systemName: "key.fill")
                 .font(.title2)
                 .foregroundColor(.secondary)
-            Text("로그인이 필요합니다")
+            Text("위젯 키를 설정해주세요")
                 .font(.subheadline)
                 .foregroundColor(.secondary)
-            Text("앱을 열어 로그인해 주세요")
+            Text("위젯을 길게 눌러 편집")
                 .font(.caption)
                 .foregroundColor(.secondary)
             Spacer()

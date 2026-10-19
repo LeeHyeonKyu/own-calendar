@@ -10,6 +10,8 @@ import 'package:own_calendar/services/api_service.dart';
 /// Supports configurable token presence and allows triggering the
 /// onSessionExpired callback that AuthProvider wires up.
 class _FakeApiService implements ApiService {
+  @override
+  Future<String?> createWidgetKey() async => null;
   _FakeApiService({
     String? access,
     String? refresh,

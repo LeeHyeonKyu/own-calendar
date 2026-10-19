@@ -145,6 +145,15 @@ class ApiService {
     return response;
   }
 
+  Future<String?> createWidgetKey() async {
+    final res = await post('/widget/key', {});
+    if (res.statusCode == 200 || res.statusCode == 201) {
+      final data = jsonDecode(res.body);
+      return data['key'] as String?;
+    }
+    return null;
+  }
+
   /// Single-flight: concurrent callers share one in-flight refresh Future.
   Future<bool> _refreshTokens() {
     _refreshInFlight ??= _doRefresh().whenComplete(() => _refreshInFlight = null);

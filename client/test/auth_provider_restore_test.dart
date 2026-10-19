@@ -10,6 +10,8 @@ import 'package:own_calendar/services/api_service.dart';
 /// - 네트워크/secure storage를 전혀 건드리지 않고 인메모리로 동작
 /// - [onGet] 콜백으로 /auth/me 응답을 시나리오별로 조작
 class _FakeApiService implements ApiService {
+  @override
+  Future<String?> createWidgetKey() async => null;
   _FakeApiService({
     String? access,
     String? refresh,

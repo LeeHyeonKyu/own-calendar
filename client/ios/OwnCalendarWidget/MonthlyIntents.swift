@@ -28,11 +28,24 @@ enum WidgetCategory: String, AppEnum {
     ]
 }
 
-// MARK: - Widget Configuration Intent
+// MARK: - Today Widget Configuration Intent
+
+struct TodayWidgetConfigIntent: WidgetConfigurationIntent {
+    static var title: LocalizedStringResource = "오늘 일정 설정"
+    static var description = IntentDescription("위젯 키를 입력하여 서버에 연결합니다.")
+
+    @Parameter(title: "위젯 키")
+    var widgetKey: String?
+}
+
+// MARK: - Monthly Widget Configuration Intent
 
 struct MonthlyWidgetConfigIntent: WidgetConfigurationIntent {
     static var title: LocalizedStringResource = "월별 캘린더 설정"
     static var description = IntentDescription("위젯에 표시할 카테고리 필터를 선택합니다.")
+
+    @Parameter(title: "위젯 키")
+    var widgetKey: String?
 
     @Parameter(title: "필터 카테고리", default: [.work, .personal, .family, .health])
     var filterCategories: [WidgetCategory]
