@@ -28,48 +28,12 @@
       },
       "versions": [
         {
-          "version": "v2026.10.19.4",
-          "date": "2026-10-19T06:07:35Z",
-          "localizedDescription": "Own Calendar v2026.10.19.4",
-          "downloadURL": "https://github.com/LeeHyeonKyu/own-calendar/releases/download/v2026.10.19.4/OwnCalendar.ipa",
-          "size": 8300753,
+          "version": "1.0.0",
           "buildVersion": "1",
-          "minOSVersion": "16.0"
-        },
-        {
-          "version": "v2026.10.19.2",
-          "date": "2026-10-19T05:54:16Z",
-          "localizedDescription": "Own Calendar v2026.10.19.2",
-          "downloadURL": "https://github.com/LeeHyeonKyu/own-calendar/releases/download/v2026.10.19.2/OwnCalendar.ipa",
+          "date": "2026-10-19T06:03:00Z",
+          "localizedDescription": "Widget API key support — widgets work with AltStore sideloading",
+          "downloadURL": "https://github.com/LeeHyeonKyu/own-calendar/releases/download/v2026.10.19.3/OwnCalendar.ipa",
           "size": 8300753,
-          "buildVersion": "1",
-          "minOSVersion": "16.0"
-        },
-        {
-          "version": "v2026.10.14.2",
-          "date": "2026-10-14T08:43:31Z",
-          "localizedDescription": "Own Calendar v2026.10.14.2",
-          "downloadURL": "https://github.com/LeeHyeonKyu/own-calendar/releases/download/v2026.10.14.2/OwnCalendar.ipa",
-          "size": 8300753,
-          "buildVersion": "1",
-          "minOSVersion": "16.0"
-        },
-        {
-          "version": "v2026.09.22.2",
-          "date": "2026-09-22T07:39:55Z",
-          "localizedDescription": "Own Calendar v2026.09.22.2",
-          "downloadURL": "https://github.com/LeeHyeonKyu/own-calendar/releases/download/v2026.09.22.2/OwnCalendar.ipa",
-          "size": 8300753,
-          "buildVersion": "1",
-          "minOSVersion": "16.0"
-        },
-        {
-          "version": "v2026.09.22.1",
-          "date": "2026-09-22T05:53:01Z",
-          "localizedDescription": "Own Calendar v2026.09.22.1",
-          "downloadURL": "https://github.com/LeeHyeonKyu/own-calendar/releases/download/v2026.09.22.1/OwnCalendar.ipa",
-          "size": 8300753,
-          "buildVersion": "1",
           "minOSVersion": "16.0"
         }
       ]
