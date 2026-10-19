@@ -22,9 +22,16 @@
       "screenshots": [],
       "appPermissions": {
         "entitlements": [
-          "com.apple.security.application-groups"
+          {
+            "name": "com.apple.security.application-groups"
+          }
         ],
-        "privacy": {}
+        "privacy": [
+          {
+            "name": "LocalNetwork",
+            "usageDescription": "Connects to your self-hosted Own Calendar server for syncing events and family sharing."
+          }
+        ]
       },
       "versions": [
         {
@@ -36,7 +43,12 @@
           "size": 8300753,
           "minOSVersion": "16.0"
         }
-      ]
+      ],
+      "version": "1.0.0",
+      "versionDate": "2026-10-19T06:03:00Z",
+      "versionDescription": "Widget API key support — widgets work with AltStore sideloading",
+      "downloadURL": "https://github.com/LeeHyeonKyu/own-calendar/releases/download/v2026.10.19.3/OwnCalendar.ipa",
+      "size": 8300753
     }
   ],
   "news": [],
