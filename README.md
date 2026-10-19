@@ -68,6 +68,182 @@ Server — 아래 명령을 복사하기 전에 이 두 문단을 먼저 읽는�
 cd server && npm test
 ```
 
+## iOS Build & Install (다른 장비에서)
+
+다른 Mac에서 이 repo를 받아 iPhone에 앱 + 위젯을 설치하는 전체 과정.
+
+### 0. 전제 조건
+
+| 항목 | 요구 사양 |
+|------|-----------|
+| Mac | macOS 15.2+ (Intel) 또는 macOS 14+ (Apple Silicon) |
+| Xcode | **16.4** — macOS 15에서는 App Store 최신(26+)이 안 됨. [developer.apple.com/download/all](https://developer.apple.com/download/all)에서 직접 다운로드 |
+| Flutter SDK | 3.41+ — [flutter.dev/get-started/install](https://docs.flutter.dev/get-started/install) |
+| CocoaPods | `brew install cocoapods` |
+| iPhone | iOS 16.0+, USB 케이블 |
+| AltServer | [altstore.io](https://altstore.io) — Mac용 다운로드 |
+
+### 1. Repo 클론 및 의존성
+
+```bash
+git clone git@github.com:LeeHyeonKyu/own-calendar.git
+cd own-calendar/client
+flutter pub get
+```
+
+### 2. Xcode 설정
+
+```bash
+# Xcode 경로 지정 (다운로드 위치에 맞게 수정)
+sudo xcode-select -s "/path/to/Xcode.app/Contents/Developer"
+
+# 라이선스 동의
+sudo xcodebuild -license accept
+
+# 확인
+xcodebuild -version   # 16.4.x 인지 확인
+```
+
+### 3. CocoaPods 설치
+
+```bash
+cd client/ios
+pod install
+cd ..
+```
+
+> `flutter clean` 후에는 반드시 `pod install`을 다시 실행한다.
+
+### 4. Xcode에서 Widget Extension 추가
+
+Widget Extension은 **Xcode에서 수동 추가**가 필요하다. 소스 파일은 `client/ios/OwnCalendarWidget/`에 준비되어 있음.
+
+```bash
+open ios/Runner.xcworkspace
+```
+
+1. **File → New → Target → Widget Extension** → Product Name: `OwnCalendarWidget`
+2. "Include Configuration App Intent" **체크 해제** → Finish → Activate
+3. Xcode가 자동 생성한 Swift 파일 삭제 (Move to Trash)
+4. Finder에서 `ios/OwnCalendarWidget/*.swift` 파일들을 Xcode OwnCalendarWidget 그룹으로 드래그
+   - "Copy items if needed" 체크, Target: `OwnCalendarWidgetExtension`
+5. **Signing & Capabilities** — Runner와 Widget 양쪽 모두:
+   - `+ Capability` → `App Groups` → `group.com.owncalendar.ownCalendar` 추가
+6. Bundle ID 확인:
+   - Runner: `com.owncalendar.ownCalendar`
+   - Widget: `com.owncalendar.ownCalendar.OwnCalendarWidget`
+7. `project.pbxproj`에서 **"Thin Binary"를 마지막 빌드 페이즈로** 이동
+   (안 하면 `Cycle inside Runner` 에러 발생)
+
+상세 가이드: [`client/ios/OwnCalendarWidget/SETUP.md`](client/ios/OwnCalendarWidget/SETUP.md)
+
+### 5. IPA 빌드
+
+```bash
+cd client
+
+# Release 빌드 (운영 서버 연결 — 기본값)
+flutter build ios --release
+
+# 또는 특정 서버를 지정하려면:
+flutter build ios --release --dart-define-from-file=config/prod.json
+```
+
+> **반드시 `--release`**. Debug 빌드는 홈 화면에서 직접 실행 불가.
+
+### 6-A. USB로 직접 설치 (개발용)
+
+```bash
+flutter install --release
+```
+
+iPhone 설정:
+- **설정 → 개인정보 보호 및 보안 → 개발자 모드 → 켜기** (재부팅 필요)
+- **설정 → 일반 → VPN 및 기기 관리 → 개발자 앱 → 신뢰**
+
+> USB 직접 설치 앱은 **7일 후 만료**. AltStore 사용을 권장.
+
+### 6-B. AltStore로 설치 (권장 — 자동 갱신)
+
+#### IPA 파일 생성
+
+```bash
+cd client
+mkdir -p build/ios/ipa/Payload
+cp -r build/ios/iphoneos/Runner.app build/ios/ipa/Payload/
+cd build/ios/ipa
+zip -r OwnCalendar.ipa Payload/
+```
+
+#### AltServer 설정 (Mac)
+
+1. [altstore.io](https://altstore.io)에서 AltServer 다운로드 → 설치 → 실행
+2. 메뉴바 AltServer 아이콘 → Install AltStore → 연결된 iPhone 선택
+3. Apple ID 입력 (무료 계정 OK)
+
+#### AltStore에서 IPA 설치
+
+**방법 1 — AltStore 소스 추가 (자동 업데이트)**
+
+AltStore 앱 → Sources → `+` 버튼 → 아래 URL 입력:
+```
+https://raw.githubusercontent.com/LeeHyeonKyu/own-calendar/main/altstore/apps.json
+```
+→ Own Calendar 탭 → Install
+
+**방법 2 — IPA 직접 사이드로드**
+
+1. 생성된 `OwnCalendar.ipa`를 iPhone으로 AirDrop
+2. iPhone에서 AltStore 앱 열기 → My Apps → `+` → IPA 선택
+
+#### 자동 갱신 조건
+
+- Mac에서 AltServer 실행 중
+- iPhone과 **같은 Wi-Fi** 연결
+- 7일 내에 자동으로 갱신됨
+
+### 7. 위젯 추가
+
+앱 설치 후 첫 실행 → 로그인 → 일정 로드 완료 후:
+
+1. iPhone 홈 화면 길게 누르기
+2. 좌측 상단 `+` 버튼
+3. "Own Calendar" 검색
+4. 원하는 위젯 크기 선택 → 추가
+
+> 위젯은 앱 실행 후 데이터가 App Group 저장소에 기록되어야 표시됨.
+> 위젯 데이터는 30분마다 자동 갱신.
+
+### 트러블슈팅
+
+| 증상 | 원인 | 해결 |
+|------|------|------|
+| `Cycle inside Runner` | Thin Binary 빌드 페이즈 순서 | pbxproj에서 Thin Binary를 맨 마지막으로 이동 |
+| `The sandbox is not in sync with the Podfile.lock` | pod install 누락 | `cd ios && pod install` |
+| `higher minimum iOS deployment version` | iOS target 불일치 | Podfile과 pbxproj 모두 `16.0`으로 통일 |
+| 앱 아이콘 탭해도 실행 안 됨 | Debug 빌드 | `flutter build ios --release` 후 재설치 |
+| "Untrusted Developer" | 개발자 신뢰 미설정 | 설정 → 일반 → VPN 및 기기 관리 → 신뢰 |
+| 위젯에 데이터 안 나옴 | 앱 미실행 / App Group 불일치 | 앱 한 번 실행 후 확인. App Group ID 양쪽 동일한지 확인 |
+| 7일 후 앱 만료 | AltServer 미실행 또는 Wi-Fi 다름 | AltServer 실행 + 같은 Wi-Fi 확인 |
+
+### 요약 체크리스트
+
+```
+[ ] Xcode 16.4 설치 + xcode-select 경로 지정
+[ ] sudo xcodebuild -license accept
+[ ] brew install cocoapods
+[ ] git clone → cd client → flutter pub get
+[ ] cd ios && pod install
+[ ] Xcode에서 Widget Extension 추가 (SETUP.md 참조)
+[ ] Signing: App Groups 양쪽 설정
+[ ] pbxproj: Thin Binary → 마지막 빌드 페이즈
+[ ] flutter build ios --release
+[ ] AltServer 설치 + AltStore 설치
+[ ] IPA 생성 → AltStore에서 사이드로드
+[ ] iPhone: 개발자 모드 ON + 개발자 앱 신뢰
+[ ] 앱 실행 → 로그인 → 위젯 추가
+```
+
 ## Docs
 
 - [docs/PROJECT.md](docs/PROJECT.md) — 제품 정의, 원칙, 기능 레지스트리
