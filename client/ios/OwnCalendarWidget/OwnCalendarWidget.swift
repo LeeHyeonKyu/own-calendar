@@ -39,18 +39,28 @@ struct OwnCalendarProvider: TimelineProvider {
     }
 
     func getSnapshot(in context: Context, completion: @escaping (EventEntry) -> Void) {
-        completion(getEntry())
+        completion(getFallbackEntry())
     }
 
     func getTimeline(in context: Context, completion: @escaping (Timeline<EventEntry>) -> Void) {
-        let entry = getEntry()
-        let nextUpdate = Calendar.current.date(byAdding: .minute, value: 30, to: Date())!
-        let timeline = Timeline(entries: [entry], policy: .after(nextUpdate))
-        completion(timeline)
+        Task {
+            let entry: EventEntry
+            if let response = await WidgetAPIClient.fetchTodayData() {
+                let events = response.events.map { CalendarEvent(title: $0.title, time: $0.time, category: $0.category) }
+                let tasks = response.tasks.map { CalendarTask(title: $0.title, status: $0.status, priority: $0.priority, time: $0.time, dueDate: $0.dueDate, eventTitle: $0.eventTitle, isOverdue: $0.isOverdue) }
+                entry = EventEntry(date: Date(), events: events, tasks: tasks, taskDone: response.taskDone, taskTotal: response.taskTotal, isLoggedIn: true)
+            } else {
+                entry = getFallbackEntry()
+            }
+            let nextUpdate = Calendar.current.date(byAdding: .minute, value: 30, to: Date())!
+            let timeline = Timeline(entries: [entry], policy: .after(nextUpdate))
+            completion(timeline)
+        }
     }
 
-    private func getEntry() -> EventEntry {
-        let isLoggedIn = userDefaults?.bool(forKey: "isLoggedIn") ?? false
+    private func getFallbackEntry() -> EventEntry {
+        let hasToken = WidgetAPIClient.fetchToken() != nil
+        let isLoggedIn = hasToken || (userDefaults?.bool(forKey: "isLoggedIn") ?? false)
 
         guard isLoggedIn else {
             return EventEntry(date: Date(), events: [], tasks: [], taskDone: 0, taskTotal: 0, isLoggedIn: false)

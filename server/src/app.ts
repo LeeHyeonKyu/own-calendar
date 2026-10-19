@@ -20,6 +20,7 @@ import userSettingsRoutes from './routes/user-settings';
 import naverRoutes from './routes/naver';
 import holidayRoutes from './routes/holidays';
 import versionRoutes from './routes/version';
+import widgetRoutes from './routes/widget';
 
 const app = express();
 
@@ -110,6 +111,7 @@ app.use('/api/user-settings', userSettingsRoutes);
 app.use('/api/naver', naverRoutes);
 app.use('/api/holidays', holidayRoutes);
 app.use('/api/version', versionRoutes);
+app.use('/api/widget', widgetRoutes);
 
 app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
   console.error(err.stack);

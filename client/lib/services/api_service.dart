@@ -10,7 +10,12 @@ class ApiService {
     'API_BASE_URL',
     defaultValue: 'https://own-calendar.tailb2886a.ts.net/api',
   );
-  final _storage = const FlutterSecureStorage();
+  final _storage = const FlutterSecureStorage(
+    iOptions: IOSOptions(
+      groupId: 'group.com.owncalendar.ownCalendar',
+      accessibility: KeychainAccessibility.first_unlock,
+    ),
+  );
 
   // Storage keys
   static const _kAccessTokenKey = 'accessToken';

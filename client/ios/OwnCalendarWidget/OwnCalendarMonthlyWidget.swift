@@ -144,27 +144,90 @@ struct MonthlyWidgetProvider: AppIntentTimelineProvider {
     }
 
     func snapshot(for configuration: MonthlyWidgetConfigIntent, in context: Context) async -> MonthlyEntry {
-        getEntry(configuration: configuration)
+        let presets = configuration.filterCategories.map { $0.rawValue }
+        return getFallbackEntry(presets: presets)
     }
 
     func timeline(for configuration: MonthlyWidgetConfigIntent, in context: Context) async -> Timeline<MonthlyEntry> {
-        let entry = getEntry(configuration: configuration)
-        let nextUpdate = Calendar.current.date(byAdding: .minute, value: 30, to: Date())!
-        return Timeline(entries: [entry], policy: .after(nextUpdate))
-    }
-
-    // MARK: Build entry from UserDefaults
-
-    private func getEntry(configuration: MonthlyWidgetConfigIntent) -> MonthlyEntry {
-        // Save configured presets to UserDefaults so CycleFilterIntent can read them
         let presets = configuration.filterCategories.map { $0.rawValue }
         if let data = try? JSONEncoder().encode(presets),
            let json = String(data: data, encoding: .utf8) {
             userDefaults?.set(json, forKey: "monthlyFilterPresets")
         }
+
         let now = Date()
         let cal = Calendar.current
-        let isLoggedIn = userDefaults?.bool(forKey: "isLoggedIn") ?? false
+        let year = cal.component(.year, from: now)
+        let month = cal.component(.month, from: now)
+
+        let entry: MonthlyEntry
+        if let response = await WidgetAPIClient.fetchMonthlyData(year: year, month: month) {
+            entry = buildEntryFromAPI(response: response, presets: presets)
+        } else {
+            entry = getFallbackEntry(presets: presets)
+        }
+
+        let nextUpdate = Calendar.current.date(byAdding: .minute, value: 30, to: Date())!
+        return Timeline(entries: [entry], policy: .after(nextUpdate))
+    }
+
+    // MARK: Build entry from server API response
+
+    private func buildEntryFromAPI(response: MonthlyAPIResponse, presets: [String]) -> MonthlyEntry {
+        let now = Date()
+        let cal = Calendar.current
+
+        var events: [Int: [MonthlyEvent]] = [:]
+        for (dayStr, apiEvents) in response.events {
+            guard let day = Int(dayStr) else { continue }
+            events[day] = apiEvents.map { e in
+                MonthlyEvent(id: e.id, title: e.title, time: e.time, endTime: e.endTime,
+                             category: e.category, isFamily: false)
+            }
+        }
+
+        var taskDays: Set<Int> = []
+        for (dayStr, _) in response.taskDays {
+            if let day = Int(dayStr) { taskDays.insert(day) }
+        }
+
+        let todayDay = cal.component(.day, from: now)
+        let isCurrentMonth = (response.year == cal.component(.year, from: now) && response.month == cal.component(.month, from: now))
+
+        var selectedDay = userDefaults?.integer(forKey: "selectedDay") ?? 0
+        if selectedDay <= 0 {
+            selectedDay = isCurrentMonth ? todayDay : 1
+        }
+        let gridData = CalendarGridData.calculate(year: response.year, month: response.month)
+        selectedDay = min(selectedDay, gridData.daysInMonth)
+
+        let eventPage = userDefaults?.integer(forKey: "eventPage") ?? 0
+        let showFamilyEvents: Bool
+        if userDefaults?.object(forKey: "showFamilyEvents") != nil {
+            showFamilyEvents = userDefaults!.bool(forKey: "showFamilyEvents")
+        } else {
+            showFamilyEvents = true
+        }
+        let filterIndex = userDefaults?.integer(forKey: "monthlyFilterIndex") ?? 0
+
+        return MonthlyEntry(
+            date: now, isLoggedIn: true,
+            year: response.year, month: response.month,
+            events: events, taskDays: taskDays,
+            selectedDay: selectedDay, eventPage: eventPage,
+            showFamilyEvents: showFamilyEvents,
+            filterIndex: min(filterIndex, presets.count),
+            filterPresets: presets
+        )
+    }
+
+    // MARK: Fallback entry from UserDefaults
+
+    private func getFallbackEntry(presets: [String]) -> MonthlyEntry {
+        let now = Date()
+        let cal = Calendar.current
+        let hasToken = WidgetAPIClient.fetchToken() != nil
+        let isLoggedIn = hasToken || (userDefaults?.bool(forKey: "isLoggedIn") ?? false)
 
         guard isLoggedIn else {
             return MonthlyEntry(
@@ -178,7 +241,6 @@ struct MonthlyWidgetProvider: AppIntentTimelineProvider {
             )
         }
 
-        // Parse monthlyData JSON
         var year  = cal.component(.year, from: now)
         var month = cal.component(.month, from: now)
         var events: [Int: [MonthlyEvent]] = [:]
@@ -212,17 +274,13 @@ struct MonthlyWidgetProvider: AppIntentTimelineProvider {
                 }
             }
 
-            // Parse task days
             if let taskDaysDict = json["taskDays"] as? [String: Any] {
                 for (dayStr, _) in taskDaysDict {
-                    if let day = Int(dayStr) {
-                        taskDays.insert(day)
-                    }
+                    if let day = Int(dayStr) { taskDays.insert(day) }
                 }
             }
         }
 
-        // Selected day — default to today (if current month) or 1
         let todayDay   = cal.component(.day, from: now)
         let todayMonth = cal.component(.month, from: now)
         let todayYear  = cal.component(.year, from: now)
@@ -232,20 +290,16 @@ struct MonthlyWidgetProvider: AppIntentTimelineProvider {
         if selectedDay <= 0 {
             selectedDay = isCurrentMonth ? todayDay : 1
         }
-        // Clamp to valid range
         let gridData = CalendarGridData.calculate(year: year, month: month)
         selectedDay = min(selectedDay, gridData.daysInMonth)
 
         let eventPage = userDefaults?.integer(forKey: "eventPage") ?? 0
-
-        // showFamilyEvents defaults to true (UserDefaults.bool returns false when key absent)
         let showFamilyEvents: Bool
         if userDefaults?.object(forKey: "showFamilyEvents") != nil {
             showFamilyEvents = userDefaults!.bool(forKey: "showFamilyEvents")
         } else {
             showFamilyEvents = true
         }
-
         let filterIndex = userDefaults?.integer(forKey: "monthlyFilterIndex") ?? 0
 
         return MonthlyEntry(
