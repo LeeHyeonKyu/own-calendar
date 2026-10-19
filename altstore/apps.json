@@ -35,6 +35,13 @@
       },
       "versions": [
         {
+          "version": "v2026.10.19.6",
+          "date": "2026-10-19T09:16:37Z",
+          "localizedDescription": "Own Calendar v2026.10.19.6",
+          "downloadURL": "https://github.com/LeeHyeonKyu/own-calendar/releases/download/v2026.10.19.6/OwnCalendar.ipa",
+          "size": 0
+        },
+        {
           "version": "1.0.0",
           "buildVersion": "2",
           "date": "2026-10-19T09:15:00Z",
@@ -53,10 +60,10 @@
           "minOSVersion": "16.0"
         }
       ],
-      "version": "1.0.0",
-      "versionDate": "2026-10-19T09:15:00Z",
+      "version": "v2026.10.19.6",
+      "versionDate": "2026-10-19T09:16:37Z",
       "versionDescription": "위젯 타임존/태스크/공휴일 일관성 — KST 기준 날짜 표시, 태스크 상세, 공휴일 강조",
-      "downloadURL": "https://github.com/LeeHyeonKyu/own-calendar/releases/download/v2026.10.19.5/OwnCalendar.ipa",
+      "downloadURL": "https://github.com/LeeHyeonKyu/own-calendar/releases/download/v2026.10.19.6/OwnCalendar.ipa",
       "size": 8313159
     }
   ],
