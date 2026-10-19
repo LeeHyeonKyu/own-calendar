@@ -68,6 +68,8 @@ struct MonthlyAPIResponse: Codable {
     let month: Int
     let events: [String: [MonthlyAPIEvent]]
     let taskDays: [String: Bool]
+    let tasks: [String: [MonthlyAPITask]]?
+    let holidays: [String: String]?
 }
 
 struct MonthlyAPIEvent: Codable {
@@ -77,4 +79,13 @@ struct MonthlyAPIEvent: Codable {
     let endTime: String?
     let category: String
     let isAllDay: Bool
+}
+
+struct MonthlyAPITask: Codable {
+    let id: String
+    let title: String
+    let status: String
+    let priority: String
+    let time: String
+    let isOverdue: Bool
 }

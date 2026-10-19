@@ -11,6 +11,8 @@ struct MonthlyEntry: TimelineEntry {
     let month: Int
     let events: [Int: [MonthlyEvent]]  // day -> events
     let taskDays: Set<Int>             // days that have tasks (orange dots)
+    let tasks: [Int: [MonthlyTask]]    // day -> tasks
+    let holidays: [Int: String]        // day -> holiday name
     let selectedDay: Int
     let eventPage: Int
     let showFamilyEvents: Bool
@@ -26,6 +28,16 @@ struct MonthlyEvent: Codable, Identifiable {
     let category: String
     let isFamily: Bool
     var displayId: String { "\(id)_\(time)" }
+}
+
+struct MonthlyTask: Identifiable {
+    let id: String
+    let title: String
+    let status: String
+    let priority: String
+    let time: String
+    let isOverdue: Bool
+    var isDone: Bool { status == "DONE" }
 }
 
 // MARK: - Calendar Grid Data
@@ -137,6 +149,7 @@ struct MonthlyWidgetProvider: AppIntentTimelineProvider {
             year: cal.component(.year, from: now),
             month: cal.component(.month, from: now),
             events: [:], taskDays: [],
+            tasks: [:], holidays: [:],
             selectedDay: cal.component(.day, from: now),
             eventPage: 0, showFamilyEvents: true, filterIndex: 0,
             filterPresets: defaultPresets
@@ -172,6 +185,7 @@ struct MonthlyWidgetProvider: AppIntentTimelineProvider {
                 year: cal.component(.year, from: now),
                 month: cal.component(.month, from: now),
                 events: [:], taskDays: [],
+                tasks: [:], holidays: [:],
                 selectedDay: cal.component(.day, from: now),
                 eventPage: 0, showFamilyEvents: true, filterIndex: 0,
                 filterPresets: presets
@@ -189,6 +203,7 @@ struct MonthlyWidgetProvider: AppIntentTimelineProvider {
             date: now, isLoggedIn: true,
             year: year, month: month,
             events: [:], taskDays: [],
+            tasks: [:], holidays: [:],
             selectedDay: cal.component(.day, from: now),
             eventPage: 0, showFamilyEvents: true, filterIndex: 0,
             filterPresets: presets
@@ -215,6 +230,24 @@ struct MonthlyWidgetProvider: AppIntentTimelineProvider {
             if let day = Int(dayStr) { taskDays.insert(day) }
         }
 
+        var parsedTasks: [Int: [MonthlyTask]] = [:]
+        if let apiTasks = response.tasks {
+            for (dayStr, dayTasks) in apiTasks {
+                guard let day = Int(dayStr) else { continue }
+                parsedTasks[day] = dayTasks.map { t in
+                    MonthlyTask(id: t.id, title: t.title, status: t.status,
+                                priority: t.priority, time: t.time, isOverdue: t.isOverdue)
+                }
+            }
+        }
+
+        var parsedHolidays: [Int: String] = [:]
+        if let apiHolidays = response.holidays {
+            for (dayStr, name) in apiHolidays {
+                if let day = Int(dayStr) { parsedHolidays[day] = name }
+            }
+        }
+
         let todayDay = cal.component(.day, from: now)
         let isCurrentMonth = (response.year == cal.component(.year, from: now) && response.month == cal.component(.month, from: now))
 
@@ -238,6 +271,7 @@ struct MonthlyWidgetProvider: AppIntentTimelineProvider {
             date: now, isLoggedIn: true,
             year: response.year, month: response.month,
             events: events, taskDays: taskDays,
+            tasks: parsedTasks, holidays: parsedHolidays,
             selectedDay: selectedDay, eventPage: eventPage,
             showFamilyEvents: showFamilyEvents,
             filterIndex: min(filterIndex, presets.count),
@@ -347,6 +381,7 @@ private struct DayCellView: View {
     let isCurrentMonth: Bool
     let isToday: Bool
     let isSelected: Bool
+    let isHoliday: Bool
     let column: Int           // 0=Sunday ... 6=Saturday
     let categories: [String]  // for event dots
     let hasTask: Bool         // show orange task dot
@@ -406,6 +441,7 @@ private struct DayCellView: View {
             return Color.secondary.opacity(0.3)
         }
         if isToday { return .white }
+        if isHoliday { return MonthlyColors.sunday(colorScheme) }
         switch column {
         case 0:  return MonthlyColors.sunday(colorScheme)
         case 6:  return MonthlyColors.saturday(colorScheme)
@@ -492,6 +528,7 @@ private struct CalendarGridView: View {
         let isCurrentMonth: Bool
         let isToday: Bool
         let isSelected: Bool
+        let isHoliday: Bool
         let categories: [String]
         let hasTask: Bool
     }
@@ -500,12 +537,14 @@ private struct CalendarGridView: View {
         if index < data.firstWeekday {
             let day = data.previousMonthDays - data.firstWeekday + index + 1
             return DayInfo(dayNumber: day, isCurrentMonth: false,
-                           isToday: false, isSelected: false, categories: [], hasTask: false)
+                           isToday: false, isSelected: false, isHoliday: false,
+                           categories: [], hasTask: false)
         }
         if index >= data.firstWeekday + data.daysInMonth {
             let day = index - data.firstWeekday - data.daysInMonth + 1
             return DayInfo(dayNumber: day, isCurrentMonth: false,
-                           isToday: false, isSelected: false, categories: [], hasTask: false)
+                           isToday: false, isSelected: false, isHoliday: false,
+                           categories: [], hasTask: false)
         }
         let day = index - data.firstWeekday + 1
         let cats = categoriesForDay(
@@ -513,11 +552,13 @@ private struct CalendarGridView: View {
             showFamily: entry.showFamilyEvents, filterIndex: entry.filterIndex,
             filterPresets: entry.filterPresets
         )
+        let isHoliday = entry.holidays[day] != nil
         return DayInfo(
             dayNumber: day,
             isCurrentMonth: true,
             isToday: isCurrentMonth && day == todayDay,
             isSelected: day == entry.selectedDay,
+            isHoliday: isHoliday,
             categories: cats,
             hasTask: entry.taskDays.contains(day)
         )
@@ -530,6 +571,7 @@ private struct CalendarGridView: View {
             isCurrentMonth: info.isCurrentMonth,
             isToday: info.isToday,
             isSelected: info.isSelected,
+            isHoliday: info.isHoliday,
             column: col,
             categories: info.categories,
             hasTask: info.hasTask,
@@ -647,6 +689,8 @@ private struct EventsListView: View {
     }
 
     var body: some View {
+        let dayTasks = entry.tasks[entry.selectedDay] ?? []
+
         VStack(alignment: .leading, spacing: 4) {
             // Date header + add button
             HStack {
@@ -658,7 +702,14 @@ private struct EventsListView: View {
                 }
             }
 
-            if allFiltered.isEmpty {
+            // Holiday name
+            if let holidayName = entry.holidays[entry.selectedDay] {
+                Text(holidayName)
+                    .font(.system(size: 11))
+                    .foregroundColor(MonthlyColors.sunday(colorScheme))
+            }
+
+            if allFiltered.isEmpty && dayTasks.isEmpty {
                 Spacer()
                 HStack {
                     Spacer()
@@ -687,6 +738,28 @@ private struct EventsListView: View {
                                     showCategoryTag: showCategoryTags,
                                     colorScheme: colorScheme
                                 )
+                            }
+                        }
+
+                        // Tasks section
+                        if !dayTasks.isEmpty {
+                            if !allFiltered.isEmpty {
+                                Rectangle()
+                                    .fill(Color.secondary.opacity(0.2))
+                                    .frame(height: 1)
+                                    .padding(.vertical, 1)
+                            }
+                            ForEach(dayTasks) { task in
+                                HStack(spacing: 6) {
+                                    Image(systemName: task.isDone ? "checkmark.square.fill" : "square")
+                                        .font(.system(size: 12))
+                                        .foregroundColor(task.isDone ? Color(red: 74/255, green: 222/255, blue: 128/255) : task.isOverdue ? Color(red: 239/255, green: 107/255, blue: 107/255) : Color(red: 240/255, green: 160/255, blue: 80/255))
+                                    Text(task.title)
+                                        .font(.system(size: 12))
+                                        .strikethrough(task.isDone)
+                                        .foregroundColor(task.isOverdue && !task.isDone ? Color(red: 239/255, green: 107/255, blue: 107/255) : .primary)
+                                        .lineLimit(1)
+                                }
                             }
                         }
                     }

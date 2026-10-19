@@ -4,8 +4,17 @@ import { authenticate } from '../middleware/auth';
 import { AuthRequest } from '../types';
 import { eventService } from '../services/event.service';
 import { taskService } from '../services/task.service';
+import { holidayService } from '../services/holiday.service';
 import prisma from '../lib/prisma';
 import { monthlyQuerySchema } from '../schemas/widget.schema';
+
+const KST_OFFSET_MS = 9 * 60 * 60 * 1000;
+function toKST(date: Date): Date {
+  return new Date(date.getTime() + KST_OFFSET_MS);
+}
+function toUTC(kstDate: Date): Date {
+  return new Date(kstDate.getTime() - KST_OFFSET_MS);
+}
 
 const router = Router();
 
@@ -38,7 +47,9 @@ router.post('/key', authenticate, async (req: AuthRequest, res: Response) => {
 router.get('/today', widgetAuth, async (req: AuthRequest, res: Response) => {
   try {
     const now = new Date();
-    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const nowKST = toKST(now);
+    const todayStartKST = new Date(Date.UTC(nowKST.getUTCFullYear(), nowKST.getUTCMonth(), nowKST.getUTCDate()));
+    const todayStart = toUTC(todayStartKST);
     const todayEnd = new Date(todayStart.getTime() + 86400000);
 
     const [events, tasks] = await Promise.all([
@@ -121,8 +132,11 @@ router.get('/monthly', widgetAuth, async (req: AuthRequest, res: Response) => {
     }
 
     const { year, month } = parsed.data;
-    const monthStart = new Date(year, month - 1, 1);
-    const monthEnd = new Date(year, month, 1);
+    const now = new Date();
+    const monthStartKST = new Date(Date.UTC(year, month - 1, 1));
+    const monthStart = toUTC(monthStartKST);
+    const monthEndKST = new Date(Date.UTC(year, month, 1));
+    const monthEnd = toUTC(monthEndKST);
 
     const [events, tasks] = await Promise.all([
       eventService.list(req.userId!, {
@@ -143,13 +157,17 @@ router.get('/monthly', widgetAuth, async (req: AuthRequest, res: Response) => {
       const clampedStart = start < monthStart ? monthStart : start;
       const clampedEnd = end > monthEnd ? monthEnd : end;
 
+      // Convert to KST for day-key generation
+      const kstClampedStart = toKST(clampedStart);
+      const kstClampedEnd = toKST(clampedEnd);
+
       for (
-        let d = new Date(clampedStart.getFullYear(), clampedStart.getMonth(), clampedStart.getDate());
-        d < clampedEnd;
+        let d = new Date(Date.UTC(kstClampedStart.getUTCFullYear(), kstClampedStart.getUTCMonth(), kstClampedStart.getUTCDate()));
+        d < kstClampedEnd;
         d = new Date(d.getTime() + 86400000)
       ) {
-        if (d.getMonth() !== month - 1) continue;
-        const dayKey = d.getDate().toString();
+        if (d.getUTCMonth() !== month - 1) continue;
+        const dayKey = d.getUTCDate().toString();
         if (!eventsMap[dayKey]) eventsMap[dayKey] = [];
         if (eventsMap[dayKey].some((e: any) => e.id === event.id)) continue;
         const eventStart = new Date(event.startTime);
@@ -172,11 +190,31 @@ router.get('/monthly', widgetAuth, async (req: AuthRequest, res: Response) => {
     }
 
     const taskDays: Record<string, boolean> = {};
+    const tasksMap: Record<string, any[]> = {};
     for (const task of tasks as any[]) {
       const date = task.scheduledDate ? new Date(task.scheduledDate) : task.dueDate ? new Date(task.dueDate) : null;
       if (!date) continue;
-      if (date.getMonth() !== month - 1 || date.getFullYear() !== year) continue;
-      taskDays[date.getDate().toString()] = true;
+      const kstDate = toKST(date);
+      if (kstDate.getUTCMonth() !== month - 1 || kstDate.getUTCFullYear() !== year) continue;
+      const dayKey = kstDate.getUTCDate().toString();
+      taskDays[dayKey] = true;
+      if (!tasksMap[dayKey]) tasksMap[dayKey] = [];
+      const scheduledTime = task.scheduledTime || '';
+      tasksMap[dayKey].push({
+        id: task.id,
+        title: task.title,
+        status: task.status,
+        priority: task.priority,
+        time: scheduledTime,
+        isOverdue: !!(task.dueDate && new Date(task.dueDate) < now && task.status !== 'DONE'),
+      });
+    }
+
+    const holidays = await holidayService.getHolidays(req.userId!, year, month);
+    const holidaysMap: Record<string, string> = {};
+    for (const h of holidays as any[]) {
+      const hDate = new Date(h.date);
+      holidaysMap[hDate.getDate().toString()] = h.name;
     }
 
     res.json({
@@ -184,6 +222,8 @@ router.get('/monthly', widgetAuth, async (req: AuthRequest, res: Response) => {
       month,
       events: eventsMap,
       taskDays,
+      tasks: tasksMap,
+      holidays: holidaysMap,
     });
   } catch (err: any) {
     const status = err.statusCode || 500;

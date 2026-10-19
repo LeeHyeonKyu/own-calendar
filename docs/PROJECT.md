@@ -189,6 +189,7 @@ lastEvolve: 2026-08-31
 | 019 | [네이티브 앱 패키징 (iOS/macOS + CI/CD)](features/019-native-app-packaging.md) | P0 | 001 | complete |
 | 020 | [디자인 대개편 (상용 캘린더 리서치 기반)](features/020-design-overhaul.md) | P0 | 001, 015, 017 | complete |
 | 021 | [위젯 서버 API 직접 호출 (AltStore App Group 우회)](features/021-widget-server-api.md) | P0 | 005, 007 | complete |
+| 022 | [위젯 타임존/태스크/공휴일 일관성](features/022-widget-consistency.md) | P0 | 005, 006, 013, 021 | complete |
 
 **Technical Foundation:** [TECHNICAL.md](TECHNICAL.md)
 
