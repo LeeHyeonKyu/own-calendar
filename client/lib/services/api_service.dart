@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:home_widget/home_widget.dart';
 import 'package:http/http.dart' as http;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
@@ -10,12 +11,7 @@ class ApiService {
     'API_BASE_URL',
     defaultValue: 'https://own-calendar.tailb2886a.ts.net/api',
   );
-  final _storage = const FlutterSecureStorage(
-    iOptions: IOSOptions(
-      groupId: 'group.com.owncalendar.ownCalendar',
-      accessibility: KeychainAccessibility.first_unlock,
-    ),
-  );
+  final _storage = const FlutterSecureStorage();
 
   // Storage keys
   static const _kAccessTokenKey = 'accessToken';
@@ -39,6 +35,7 @@ class ApiService {
   Future<void> saveTokens(String access, String refresh) async {
     await _storage.write(key: _kAccessTokenKey, value: access);
     await _storage.write(key: _kRefreshTokenKey, value: refresh);
+    try { await HomeWidget.saveWidgetData<String>('authToken', access); } catch (_) {}
   }
 
   Future<void> saveCachedUser(String userJson) async {

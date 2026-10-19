@@ -28,6 +28,7 @@ class AuthProvider extends ChangeNotifier {
   Future<void> _clearWidgetData() async {
     try {
       await HomeWidget.saveWidgetData<String>('todayEvents', '[]');
+      await HomeWidget.saveWidgetData<String>('authToken', '');
       await HomeWidget.saveWidgetData<bool>('isLoggedIn', false);
       await HomeWidget.updateWidget(
         iOSName: 'OwnCalendarWidget',
@@ -44,6 +45,10 @@ class AuthProvider extends ChangeNotifier {
 
   Future<void> _setWidgetLoggedIn() async {
     try {
+      final token = await _api.accessToken;
+      if (token != null) {
+        await HomeWidget.saveWidgetData<String>('authToken', token);
+      }
       await HomeWidget.saveWidgetData<bool>('isLoggedIn', true);
       await HomeWidget.updateWidget(
         iOSName: 'OwnCalendarWidget',

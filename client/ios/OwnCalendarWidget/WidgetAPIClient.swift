@@ -1,30 +1,14 @@
 import Foundation
-import Security
 
 struct WidgetAPIClient {
     static let serverBaseURL = "https://own-calendar.tailb2886a.ts.net/api"
-    private static let keychainAccessGroup = "group.com.owncalendar.ownCalendar"
-    private static let keychainService = "flutter_secure_storage_service"
     private static let userDefaults = UserDefaults(suiteName: "group.com.owncalendar.ownCalendar")
 
-    // MARK: - Keychain
+    // MARK: - Token (from UserDefaults, shared via HomeWidget)
 
     static func fetchToken() -> String? {
-        let query: [CFString: Any] = [
-            kSecClass: kSecClassGenericPassword,
-            kSecAttrService: keychainService,
-            kSecAttrAccount: "accessToken",
-            kSecAttrAccessGroup: keychainAccessGroup,
-            kSecReturnData: true,
-            kSecMatchLimit: kSecMatchLimitOne,
-        ]
-        var result: AnyObject?
-        let status = SecItemCopyMatching(query as CFDictionary, &result)
-        guard status == errSecSuccess,
-              let data = result as? Data,
-              let token = String(data: data, encoding: .utf8) else {
-            return nil
-        }
+        guard let token = userDefaults?.string(forKey: "authToken"),
+              !token.isEmpty else { return nil }
         return token
     }
 
