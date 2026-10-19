@@ -4,7 +4,6 @@
   "subtitle": "Self-hosted family calendar hub",
   "description": "Own Calendar source for AltStore. All your schedules in one place — Naver, Google, TickTick unified with family sharing.",
   "iconURL": "https://raw.githubusercontent.com/LeeHyeonKyu/own-calendar/main/altstore/icon.png",
-  "headerURL": "",
   "website": "https://github.com/LeeHyeonKyu/own-calendar",
   "tintColor": "4A90D9",
   "featuredApps": [
